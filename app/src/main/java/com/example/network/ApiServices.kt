@@ -161,7 +161,7 @@ interface SupabaseDbApi {
     // Admin endpoints: Announcements
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
-        @Body data: Map<String, Any?>,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
@@ -170,7 +170,7 @@ interface SupabaseDbApi {
     @PATCH("rest/v1/announcements")
     suspend fun updateAnnouncement(
         @Query("id") idQuery: String,
-        @Body data: Map<String, Any?>,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
@@ -186,7 +186,7 @@ interface SupabaseDbApi {
     // Admin endpoints: Featured Anime
     @POST("rest/v1/featured_anime")
     suspend fun insertFeaturedAnime(
-        @Body data: Map<String, Any?>,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
@@ -202,7 +202,7 @@ interface SupabaseDbApi {
     // Admin endpoints: Blacklist
     @POST("rest/v1/blacklisted_anime")
     suspend fun insertBlacklistedAnime(
-        @Body data: Map<String, Any?>,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
