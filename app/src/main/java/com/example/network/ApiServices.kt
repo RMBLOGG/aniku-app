@@ -155,8 +155,8 @@ interface SupabaseDbApi {
         @Body profile: Map<String, Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "return=representation"
-    ): List<ProfileDto>
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): Response<Unit>
 
     // Admin endpoints: Announcements
     @POST("rest/v1/announcements")

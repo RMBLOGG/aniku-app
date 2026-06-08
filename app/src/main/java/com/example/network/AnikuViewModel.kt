@@ -734,13 +734,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val newBanStatus = !(profile.is_banned ?: false)
         viewModelScope.launch {
             try {
-                NetworkClient.supabaseDbApi.updateProfile(
+                val response = NetworkClient.supabaseDbApi.updateProfile(
                     idQuery = "eq.$userIdToModify",
                     profile = mapOf("is_banned" to newBanStatus),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
-                loadAdminDetails()
+                if (response.isSuccessful || response.code() == 204) {
+                    loadAdminDetails()
+                } else {
+                    Log.e("AnikuVM", "Ban failed: ${response.code()} ${response.errorBody()?.string()}")
+                }
             } catch (e: java.lang.Exception) {
                 Log.e("AnikuVM", "Failed updating ban for $userIdToModify", e)
             }
