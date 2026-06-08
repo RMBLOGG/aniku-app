@@ -1,0 +1,2838 @@
+package com.example.ui
+
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import com.example.network.*
+import com.example.ui.theme.getAccentColor
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+// ================================================================
+// REUSABLE COMPONENTS
+// ================================================================
+
+@Composable
+fun ShimmerCard(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "shimmer_trans")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer_anim"
+    )
+
+    val brush = Brush.linearGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.05f),
+            Color.White.copy(alpha = 0.15f),
+            Color.White.copy(alpha = 0.05f)
+        ),
+        start = androidx.compose.ui.geometry.Offset(translateAnim - 300f, translateAnim - 300f),
+        end = androidx.compose.ui.geometry.Offset(translateAnim, translateAnim)
+    )
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(brush)
+    )
+}
+
+@Composable
+fun AnimeCard(
+    anime: AnimeRaw,
+    accentColor: Color,
+    onClick: () -> Unit,
+    isBookmarked: Boolean,
+    onBookmarkToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .testTag("anime_card_${anime.slug}")
+            .width(115.dp)
+            .clickable { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            // Image Poster
+            AsyncImage(
+                model = anime.poster,
+                contentDescription = anime.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Dynamic Subtle overlay for depth
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.1f),
+                                Color.Black.copy(alpha = 0.4f)
+                            )
+                        )
+                    )
+            )
+
+            // Type Badge (Top-left) - Orange bg, black bold text as per spec
+            anime.type?.let { typeString ->
+                if (typeString.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFFF8C00)) // AccentOrange or FF8C00 in theme
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .align(Alignment.TopStart)
+                    ) {
+                        Text(
+                            text = typeString,
+                            color = Color.Black,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+
+            // Bookmark Icon (Top-right)
+            IconButton(
+                onClick = { onBookmarkToggle() },
+                modifier = Modifier
+                    .padding(4.dp)
+                    .size(32.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .align(Alignment.TopEnd)
+                    .testTag("bookmark_btn_${anime.slug}")
+            ) {
+                Icon(
+                    imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Bookmark",
+                    tint = if (isBookmarked) accentColor else Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            // Episode Badge (Bottom-left) - Dense dark semi-transparent bg
+            anime.episode?.let { epString ->
+                if (epString.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = epString,
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Status or Day Badge (Bottom-right) - e.g., Fire emojis or Selesai v
+            anime.status_or_day?.let { statusString ->
+                if (statusString.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = statusString,
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Title text styled as per spec: text-[11px] font-bold line-clamp-2
+        Text(
+            text = anime.title,
+            color = MaterialTheme.colorScheme.onBackground,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = 14.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun SectionHeader(
+    title: String,
+    onSeeAllClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        TextButton(
+            onClick = onSeeAllClick,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "LIHAT SEMUA",
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.sp
+            )
+        }
+    }
+}
+
+// ================================================================
+// 1. HOME SCREEN
+// ================================================================
+
+@Composable
+fun HomeScreen(
+    viewModel: AnikuViewModel,
+    navController: NavController,
+    onNavigateToDetail: (String) -> Unit,
+    onSeeAllClicked: (String) -> Unit
+) {
+    val isHomeLoading by viewModel.isHomeLoading.collectAsState()
+    val homeError by viewModel.homeError.collectAsState()
+    val ongoingList by viewModel.homeOngoing.collectAsState()
+    val recentList by viewModel.homeRecent.collectAsState()
+    val popularList by viewModel.homePopular.collectAsState()
+    val moviesList by viewModel.homeMovies.collectAsState()
+    val slidesList by viewModel.featuredSlides.collectAsState()
+    val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
+    val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    var slideIndex by remember { mutableStateOf(0) }
+
+    // Auto-sliding Hero (3 seconds cycle)
+    // Hero banner → use ongoing[0] as first slide
+    val sliderItems = remember(ongoingList, slidesList) {
+        val list = mutableListOf<AnimeRaw>()
+        if (ongoingList.isNotEmpty()) {
+            list.add(ongoingList[0])
+            val processedSlugs = mutableSetOf(ongoingList[0].slug)
+            slidesList.forEach { slide ->
+                if (!processedSlugs.contains(slide.anime_slug)) {
+                    list.add(AnimeRaw(title = slide.anime_title ?: "", slug = slide.anime_slug, poster = slide.anime_poster ?: ""))
+                    processedSlugs.add(slide.anime_slug)
+                }
+            }
+            ongoingList.drop(1).forEach { anime ->
+                if (!processedSlugs.contains(anime.slug)) {
+                    list.add(anime)
+                    processedSlugs.add(anime.slug)
+                }
+            }
+        }
+        list.take(5)
+    }
+
+    LaunchedEffect(sliderItems) {
+        if (sliderItems.isNotEmpty()) {
+            while (true) {
+                delay(3500)
+                slideIndex = (slideIndex + 1) % sliderItems.size
+            }
+        }
+    }
+
+    if (isHomeLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = accentColor)
+        }
+    } else if (homeError != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(56.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = homeError ?: "Gagal memuat data. Periksa koneksi internet Anda.",
+                color = Color.White,
+                fontSize = 16.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = { viewModel.loadHomeData() },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+            ) {
+                Text("Coba Lagi", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Edeg-to-Edge Hero Billboard Slider
+            if (sliderItems.isNotEmpty()) {
+                item {
+                    val activeSlide = sliderItems.getOrNull(slideIndex)
+                    if (activeSlide != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(460.dp)
+                        ) {
+                            // Bleeding Poster Graphic
+                            AsyncImage(
+                                model = activeSlide.poster,
+                                contentDescription = activeSlide.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Immersive Linear Gradients
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.6f),
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.3f),
+                                                MaterialTheme.colorScheme.background
+                                            )
+                                        )
+                                    )
+                            )
+
+                            // Atmospheric Radial Bleeding overlay
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .drawBehind {
+                                        drawRect(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(
+                                                    accentColor.copy(alpha = 0.15f),
+                                                    Color.Transparent
+                                                ),
+                                                center = center,
+                                                radius = size.width * 0.7f
+                                            )
+                                        )
+                                    }
+                            )
+
+                            // Slider metadata info (Bottom aligned)
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(horizontal = 20.dp, vertical = 24.dp)
+                            ) {
+                                // Dynamic Glassmorphism Categories Row (above title)
+                                val genresToShow = activeSlide.genres?.filter { it.isNotBlank() } ?: listOf("Action", "Fantasy", "Adventure")
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    genresToShow.take(3).forEach { genre ->
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50))
+                                                .background(Color.White.copy(alpha = 0.12f))
+                                                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
+                                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = genre,
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = activeSlide.title,
+                                    color = Color.White,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Button(
+                                        onClick = { onNavigateToDetail(activeSlide.slug) },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp)
+                                            .testTag("hero_play_btn")
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
+                                    }
+
+                                    val isHeroBookmarked = bookmarkedAnimes.any { it.slug == activeSlide.slug }
+                                    IconButton(
+                                        onClick = { viewModel.toggleBookmark(activeSlide.slug, activeSlide.title, activeSlide.poster) },
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color.White.copy(alpha = 0.12f))
+                                            .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                            .testTag("hero_bookmark_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isHeroBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                            contentDescription = "Bookmark Hero",
+                                            tint = if (isHeroBookmarked) accentColor else Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Dot selectors
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    sliderItems.forEachIndexed { idx, _ ->
+                                        val isSelected = idx == slideIndex
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 3.dp)
+                                                .width(if (isSelected) 20.dp else 6.dp)
+                                                .height(6.dp)
+                                                .clip(RoundedCornerShape(50))
+                                                .background(if (isSelected) accentColor else Color.White.copy(alpha = 0.3f))
+                                                .clickable { slideIndex = idx }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Floating Setting button Top-Right
+                            IconButton(
+                                onClick = { navController.navigate("settings") },
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(top = 16.dp, end = 16.dp)
+                                    .size(44.dp)
+                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    .align(Alignment.TopEnd)
+                                    .testTag("home_settings_btn")
+                            ) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Active Supabase Announcement banner row (dismissible)
+            activeAnnouncement?.let { ann ->
+                item {
+                    var dismissed by remember { mutableStateOf(false) }
+                    if (!dismissed) {
+                        Card(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth()
+                                .border(1.dp, accentColor.copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = "Alert", tint = accentColor)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = ann.title,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = ann.message,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                IconButton(onClick = { dismissed = true }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Tutup", tint = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section 1: Sedang Tayang
+            item { SectionHeader(title = "Sedang Tayang", onSeeAllClick = { onSeeAllClicked("Ongoing") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(ongoingList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+            }
+
+            // Section 2: Terbaru
+            item { SectionHeader(title = "Terbaru", onSeeAllClick = { onSeeAllClicked("Latest") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(recentList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+            }
+
+            // Section 3: Terpopuler
+            item { SectionHeader(title = "Terpopuler", onSeeAllClick = { onSeeAllClicked("Popular") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(popularList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+            }
+
+            // Section 4: Anime Movie
+            item { SectionHeader(title = "Anime Movie", onSeeAllClick = { onSeeAllClicked("Movie") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(moviesList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(30.dp))
+            }
+        }
+    }
+}
+
+// ================================================================
+// 2. SEARCH SCREEN
+// ================================================================
+
+@Composable
+fun SearchScreen(
+    viewModel: AnikuViewModel,
+    onNavigateToDetail: (String) -> Unit
+) {
+    val query by viewModel.searchQuery.collectAsState()
+    val results by viewModel.searchResults.collectAsState()
+    val popularList by viewModel.searchPopular.collectAsState()
+    val isLoading by viewModel.isSearchLoading.collectAsState()
+    val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Search Input Bar
+        TextField(
+            value = query,
+            onValueChange = { viewModel.onSearchQueryChanged(it) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .statusBarsPadding()
+                .testTag("search_input"),
+            placeholder = { Text("Cari Anime Kesukaanmu...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                cursorColor = accentColor,
+                focusedIndicatorColor = accentColor,
+                unfocusedIndicatorColor = Color.Transparent,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+            ),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor)
+            }
+        } else if (query.isEmpty()) {
+            // Hot Anime Section
+            Text(
+                text = "Rekomendasi Terpopuler",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(popularList) { anim ->
+                    AnimeCard(
+                        anime = anim,
+                        accentColor = accentColor,
+                        onClick = { onNavigateToDetail(anim.slug) },
+                        isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                        onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        } else if (results.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(52.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Anime tidak ditemukan.", color = Color.Gray, fontSize = 16.sp)
+            }
+        } else {
+            // Live Search Query results
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(results) { anim ->
+                    AnimeCard(
+                        anime = anim,
+                        accentColor = accentColor,
+                        onClick = { onNavigateToDetail(anim.slug) },
+                        isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                        onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 3. EXPLORE SCREEN
+// ================================================================
+
+@Composable
+fun ExploreScreen(
+    viewModel: AnikuViewModel,
+    onNavigateToDetail: (String) -> Unit
+) {
+    val activeTab by viewModel.exploreTab.collectAsState()
+    val activeGenre by viewModel.selectedGenreSlug.collectAsState()
+    val genresList by viewModel.genres.collectAsState()
+    val itemsList by viewModel.exploreAnimes.collectAsState()
+    val isLoading by viewModel.isExploreLoading.collectAsState()
+    val hasNext by viewModel.exploreHasNext.collectAsState()
+    val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    val gridState = rememberLazyGridState()
+
+    // Detect endless scroll
+    val shouldLoadMore = remember {
+        derivedStateOf {
+            val total = gridState.layoutInfo.totalItemsCount
+            val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 2
+        }
+    }
+
+    LaunchedEffect(shouldLoadMore.value) {
+        if (shouldLoadMore.value && hasNext && !isLoading) {
+            viewModel.loadNextExplorePage()
+        }
+    }
+
+    // Trigger loading if empty
+    LaunchedEffect(Unit) {
+        if (itemsList.isEmpty()) {
+            viewModel.loadExplorePage()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Tab Filters Ongoing | Completed | Movie | Latest
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .statusBarsPadding()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            val tabs = listOf("Ongoing", "Completed", "Movie", "Latest")
+            tabs.forEach { tabName ->
+                val isSelected = activeTab == tabName && activeGenre == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (isSelected) accentColor else Color.Transparent)
+                        .clickable { viewModel.setExploreTab(tabName) }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (tabName == "Movie") "Movie" else if (tabName == "Latest") "Terbaru" else tabName,
+                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // Horizontal Genreschips
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                val isAllSelected = activeGenre == null
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isAllSelected) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, if (isAllSelected) accentColor else Color.Transparent, RoundedCornerShape(12.dp))
+                        .clickable { viewModel.selectGenre(null) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "Semua Genre",
+                        color = if (isAllSelected) accentColor else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            items(genresList) { gen ->
+                val isSelected = activeGenre == gen.slug
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, if (isSelected) accentColor else Color.Transparent, RoundedCornerShape(12.dp))
+                        .clickable { viewModel.selectGenre(gen.slug) }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = gen.name,
+                        color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        // Two Column Grid
+        Box(modifier = Modifier.weight(1f)) {
+            if (itemsList.isEmpty() && !isLoading) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Daftar anime kosong.", color = Color.Gray)
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    state = gridState,
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(itemsList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Indicator loader at bottom grid
+                    if (isLoading) {
+                        item(span = { GridItemSpan(2) }) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 4. SCHEDULE SCREEN
+// ================================================================
+
+@Composable
+fun ScheduleScreen(
+    viewModel: AnikuViewModel,
+    onNavigateToDetail: (String) -> Unit
+) {
+    val activeDay by viewModel.selectedDay.collectAsState()
+    val scheduleMap by viewModel.scheduleMap.collectAsState()
+    val isLoading by viewModel.isScheduleLoading.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(Unit) {
+        if (scheduleMap.isEmpty()) {
+            viewModel.fetchScheduleData()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Day selector header (horizontal scroll)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .statusBarsPadding()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 12.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            val days = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
+            days.forEach { d ->
+                val isSelected = activeDay == d
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { viewModel.selectDay(d) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = d,
+                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor)
+            }
+        } else {
+            val activeDayList = scheduleMap[activeDay] ?: emptyList()
+            if (activeDayList.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(52.dp), tint = Color.Gray)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Hari $activeDay tidak ada jadwal tayang.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(activeDayList) { anim ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { onNavigateToDetail(anim.slug) }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Small poster
+                            AsyncImage(
+                                model = anim.poster,
+                                contentDescription = anim.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(width = 60.dp, height = 90.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = anim.title,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                anim.episode?.let { ep ->
+                                    Text(
+                                        text = "Tayang: $ep",
+                                        color = accentColor,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                anim.type?.let { t ->
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = t,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Play",
+                                tint = accentColor,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 5. BOOKMARK SCREEN
+// ================================================================
+
+@Composable
+fun BookmarkScreen(
+    viewModel: AnikuViewModel,
+    onNavigateToDetail: (String) -> Unit
+) {
+    val bookmarksList by viewModel.bookmarks.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshBookmarks()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // App title
+        Text(
+            text = "Daftar Bookmark Saya",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(16.dp)
+        )
+
+        if (bookmarksList.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FavoriteBorder,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(72.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Daftar Bookmark Anda Kosong",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Cari anime kesukaanmu dan tandai sebagai favorit untuk disimpan di sini.",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(bookmarksList) { bookmarked ->
+                    // Construct structural back Raw item compatible with renderer
+                    val backingRaw = AnimeRaw(
+                        title = bookmarked.title,
+                        slug = bookmarked.slug,
+                        poster = bookmarked.poster,
+                        type = bookmarked.type,
+                        episode = bookmarked.episode
+                    )
+                    AnimeCard(
+                        anime = backingRaw,
+                        accentColor = accentColor,
+                        onClick = { onNavigateToDetail(bookmarked.slug) },
+                        isBookmarked = true,
+                        onBookmarkToggle = {
+                            viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 6. ANIME DETAIL SCREEN
+// ================================================================
+
+@Composable
+fun AnimeDetailScreen(
+    slug: String,
+    viewModel: AnikuViewModel,
+    navController: NavController,
+    onBack: () -> Unit,
+    onNavigateToWatch: (String, String) -> Unit
+) {
+    val detail by viewModel.animeDetail.collectAsState()
+    val isDetailLoading by viewModel.isDetailLoading.collectAsState()
+    val detailError by viewModel.detailError.collectAsState()
+    val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+
+    var isSynopsisExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(slug) {
+        viewModel.loadAnimeDetail(slug)
+    }
+
+    if (isDetailLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black), contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = accentColor)
+        }
+    } else if (detailError != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(48.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = detailError ?: "Terjadi kesalahan", color = Color.White, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = accentColor)) {
+                Text("Kembali")
+            }
+        }
+    } else {
+        detail?.let { d ->
+            val isBookmarked = bookmarkedAnimes.any { it.slug == slug }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                // Background Poster with Dark Gradient overlays
+                AsyncImage(
+                    model = d.poster,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.5f),
+                                    MaterialTheme.colorScheme.background
+                                )
+                            )
+                        )
+                )
+
+                // Scrollable details contents
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Spacer(modifier = Modifier.height(220.dp))
+
+                    // Detail Row Cards
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            // Title & Type Badge
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = d.title,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    d.synonym?.let { syn ->
+                                        if (syn.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(text = syn, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(accentColor)
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = d.type ?: "TV",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Rating & Status Badges
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Star, contentDescription = "Rating", tint = Color(0xFFFFD700), modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = d.rating ?: "0.0", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                                ) {
+                                    Text(text = d.status ?: "Airing", color = Color(0xFF4CAF50), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Studio Extra info chips
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val infos = listOf(
+                                    "Studio: ${d.studio ?: "-"}",
+                                    "Musim: ${d.season ?: "-"}",
+                                    "Durasi: ${d.duration ?: "-"}",
+                                    "Rilis: ${d.aired ?: "-"}"
+                                )
+                                infos.forEach { inf ->
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Text(text = inf, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                        }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Bookmark Toggle & Tonton Button Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val firstEp = d.episodes?.firstOrNull()?.slug
+                                        if (!firstEp.isNullOrEmpty()) {
+                                            onNavigateToWatch(firstEp, d.title)
+                                        } else {
+                                            Toast.makeText(context, "Tidak ada episode tersedia", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("detail_play_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Mulai Tonton", fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = { viewModel.toggleBookmark(slug, d.title, d.poster, d.type) },
+                                    modifier = Modifier.testTag("detail_bookmark_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = "Simpan",
+                                        tint = if (isBookmarked) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            // Synopsis section
+                            Text(text = "Sinopsis", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = d.synopsis ?: "Tidak ada sinopsis.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 13.sp,
+                                maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                            )
+                            Text(
+                                text = if (isSynopsisExpanded) "Sembunyikan" else "Baca Selengkapnya...",
+                                color = accentColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                modifier = Modifier
+                                    .padding(vertical = 4.dp)
+                                    .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Genres chips
+                            Text(text = "Genre", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                d.genres?.forEach { gen ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                viewModel.setExploreTab("Ongoing")
+                                                viewModel.selectGenre(gen.slug)
+                                                navController.navigate("explore")
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(text = gen.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            // Episode listing (newest first)
+                            Text(
+                                text = "Daftar Episode (${d.episodes?.size ?: 0})",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            val episodesList = d.episodes ?: emptyList()
+                            if (episodesList.isEmpty()) {
+                                Text(text = "Belum ada episode tersedia.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 13.sp)
+                            } else {
+                                // List episodes column (newest first - reversed)
+                                episodesList.reversed().forEachIndexed { i, ep ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .clickable { onNavigateToWatch(ep.slug, d.title) }
+                                            .padding(horizontal = 14.dp, vertical = 14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = ep.name,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "Tonton", tint = accentColor)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Floating controller back button
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(top = 16.dp, start = 16.dp)
+                        .size(40.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .align(Alignment.TopStart)
+                ) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 7. WATCH / STREAMING SCREEN
+// ================================================================
+
+@Composable
+fun WatchScreen(
+    episodeSlug: String,
+    animeTitle: String,
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val streams by viewModel.streams.collectAsState()
+    val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
+    val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
+    val isStreamLoading by viewModel.isStreamLoading.collectAsState()
+    val streamError by viewModel.streamError.collectAsState()
+    val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
+    val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    LaunchedEffect(episodeSlug) {
+        viewModel.loadEpisodeStream(episodeSlug)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // App controls Header row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(vertical = 8.dp, horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = animeTitle,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = episodeTitle ?: "Memuat...",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Webview embed stream container
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(240.dp)
+                .background(Color.Black)
+        ) {
+            if (isStreamLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = accentColor)
+                }
+            } else if (streamError != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
+                }
+            } else if (!activeStreamUrl.isNullOrEmpty()) {
+                // Render embed stream player inside Android native WebView
+                AndroidView(
+                    factory = { context ->
+                        WebView(context).apply {
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                mediaPlaybackRequiresUserGesture = false
+                            }
+                            webViewClient = WebViewClient()
+                            webChromeClient = WebChromeClient()
+                        }
+                    },
+                    update = { view ->
+                        view.loadUrl(activeStreamUrl!!)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
+        // Horizontal quality tags selection
+        if (streams.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp, horizontal = 16.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                streams.forEachIndexed { i, q ->
+                    val isSelected = selectedIndex == i
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { viewModel.selectStreamQuality(i) }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = q.name,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // Previous and Next Episode controls
+        detail?.episodes?.let { eps ->
+            val currentIndex = eps.indexOfFirst { it.slug == episodeSlug }
+            if (currentIndex != -1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Previous ep
+                    val hasPrev = currentIndex > 0
+                    Button(
+                        onClick = {
+                            val newEp = eps.getOrNull(currentIndex - 1)
+                            if (newEp != null) {
+                                viewModel.loadEpisodeStream(newEp.slug)
+                            }
+                        },
+                        enabled = hasPrev,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("< Sebelumnya")
+                    }
+
+                    // Next ep
+                    val hasNext = currentIndex < eps.size - 1
+                    Button(
+                        onClick = {
+                            val newEp = eps.getOrNull(currentIndex + 1)
+                            if (newEp != null) {
+                                viewModel.loadEpisodeStream(newEp.slug)
+                            }
+                        },
+                        enabled = hasNext,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Selanjutnya >")
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Episode List selector
+        val eps = detail?.episodes ?: emptyList()
+        Text(
+            text = "Daftar Episode",
+            color = MaterialTheme.colorScheme.onBackground,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            modifier = Modifier.padding(16.dp)
+        )
+
+        LazyColumn(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            itemsIndexed(eps.reversed()) { idx, item ->
+                val isActive = item.slug == episodeSlug
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isActive) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, if (isActive) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
+                        .clickable { viewModel.loadEpisodeStream(item.slug) }
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.name,
+                        color = if (isActive) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (isActive) {
+                        Text("Memutar", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 8. AUTH SCREENS (LOGIN / REGISTER)
+// ================================================================
+
+@Composable
+fun AuthScreen(
+    viewModel: AnikuViewModel,
+    onAuthSuccess: () -> Unit,
+    onGuestMode: () -> Unit
+) {
+    var isLoginTab by remember { mutableStateOf(true) }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+
+    val authLoading by viewModel.authLoading.collectAsState()
+    val authError by viewModel.authError.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Stylized Cinematic Logo
+            Text(
+                text = "Aniku",
+                color = accentColor,
+                fontWeight = FontWeight.Black,
+                fontSize = 44.sp,
+                letterSpacing = 2.sp
+            )
+            Text(
+                text = "Cinema-grade Anime Portal",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                fontSize = 12.sp
+            )
+
+            Spacer(modifier = Modifier.height(44.dp))
+
+            // Card Form
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    // Segment control Tab
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isLoginTab) accentColor else Color.Transparent)
+                                .clickable { isLoginTab = true }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Masuk", color = if (isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (!isLoginTab) accentColor else Color.Transparent)
+                                .clickable { isLoginTab = false }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Daftar", color = if (!isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    authError?.let { err ->
+                        Text(text = err, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
+                    }
+
+                    // Email Field
+                    Text("Email", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier.fillMaxWidth().testTag("auth_email"),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Username field (only in signup)
+                    if (!isLoginTab) {
+                        Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextField(
+                            value = username,
+                            onValueChange = { username = it },
+                            modifier = Modifier.fillMaxWidth().testTag("auth_username"),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+
+                    // Password Field
+                    Text("Sandi", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.fillMaxWidth().testTag("auth_password"),
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Submission action
+                    Button(
+                        onClick = {
+                            if (isLoginTab) {
+                                viewModel.login(email.trim(), password.trim(), onAuthSuccess)
+                            } else {
+                                viewModel.register(email.trim(), password.trim(), username.trim(), onAuthSuccess)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("auth_submit"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        enabled = !authLoading
+                    ) {
+                        if (authLoading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text(if (isLoginTab) "Masuk" else "Daftar", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Guest Mode link
+            TextButton(onClick = onGuestMode) {
+                Text(
+                    text = "Gunakan Mode Tamu",
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+// ================================================================
+// 9. PROFILE SCREEN (USER EDIT)
+// ================================================================
+
+@Composable
+fun ProfileScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val sess by viewModel.session.collectAsState()
+    val isDark by viewModel.isDark.collectAsState()
+    val isUploading by viewModel.isUploadingAvatar.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var usernameEditor by remember { mutableStateOf(sess.username ?: "") }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.uploadAvatar(uri) { processing ->
+                if (!processing) {
+                    Toast.makeText(context, "Avatar berhasil diunggah!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Toolbar header elevation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Profil Pengguna",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Interactive user Avatar
+            Box(
+                modifier = Modifier
+                    .size(110.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable { photoPickerLauncher.launch("image/*") },
+                contentAlignment = Alignment.Center
+            ) {
+                if (sess.avatarUrl.isNullOrEmpty()) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
+                } else {
+                    AsyncImage(
+                        model = sess.avatarUrl,
+                        contentDescription = "Avatar",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // Loader overlay during Cloudinary uploads
+                if (isUploading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.6f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = "Sentuh Foto Untuk Mengubah", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 11.sp)
+
+            Spacer(modifier = Modifier.height(30.dp))
+
+            // User Info Cards
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Email", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Text(text = sess.email ?: "-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("Nama Pengguna (Username)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    TextField(
+                        value = usernameEditor,
+                        onValueChange = { usernameEditor = it },
+                        modifier = Modifier.fillMaxWidth().testTag("profile_username_input"),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.updateProfileUsername(usernameEditor) {
+                                Toast.makeText(context, "Username berhasil diubah!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("profile_save_btn")
+                    ) {
+                        Text("Simpan Perubahan", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // User role notice badge
+            if (sess.isAdmin) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF331E1E) else Color(0xFFFFEBEE))
+                        .border(1.dp, Color.Red, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(text = "Tingkatan Pengguna: Administrator (ADMIN)", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Logout Button
+            Button(
+                onClick = {
+                    viewModel.logout {
+                        onBack()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0x33FF0000) else Color(0xFFFFEBEE)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("profile_logout_btn")
+            ) {
+                Text("Keluar (Logout)", color = Color.Red, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+// ================================================================
+// 10. ADMIN PANEL SCREEN
+// ================================================================
+
+@Composable
+fun AdminPanelScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val users by viewModel.adminUsers.collectAsState()
+    val announcements by viewModel.adminAnnouncements.collectAsState()
+    val featured by viewModel.adminFeatured.collectAsState()
+    val blacklist by viewModel.adminBlacklist.collectAsState()
+    val isLoading by viewModel.isAdminLoading.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+
+    var selectedTab by remember { mutableStateOf(0) } // 0: Users, 1: Announcements, 2: Slider, 3: Blacklist
+
+    // Announcements adding inputs state
+    var annTitle by remember { mutableStateOf("") }
+    var annMessage by remember { mutableStateOf("") }
+
+    // Manual Slider adding state
+    var sliderSlug by remember { mutableStateOf("") }
+    var sliderTitle by remember { mutableStateOf("") }
+    var sliderPoster by remember { mutableStateOf("") }
+    var sliderOrder by remember { mutableStateOf("0") }
+
+    // Blacklist adding state
+    var blacklistSlug by remember { mutableStateOf("") }
+    var blacklistTitle by remember { mutableStateOf("") }
+    var blacklistReason by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAdminDetails()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Panel Kontrol Admin",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        // Subheader Tab selection (horizontal scroll)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 10.dp, horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            val sections = listOf("Manajemen User", "Pengumuman", "Hero Slider", "Blacklist Anime")
+            sections.forEachIndexed { index, s ->
+                val isSelected = selectedTab == index
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) accentColor else MaterialTheme.colorScheme.background)
+                        .clickable { selectedTab = index }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = s,
+                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor)
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
+                when (selectedTab) {
+                    0 -> {
+                        // Section A: Users List
+                        Text("List Seluruh Pengguna", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        users.forEach { usr ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Mini raw avatar status representation
+                                    AsyncImage(
+                                        model = usr.avatar_url,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surface)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(text = usr.username ?: "Tamu", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                        Text(text = "Tipe: ${if (usr.is_admin == true) "Admin" else "Pengguna"}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 11.sp)
+                                        Text(text = "Status: ${if (usr.is_banned == true) "Banned (Ditangguhkan)" else "Aktif"}", color = if (usr.is_banned == true) Color.Red else Color(0xFF4CAF50), fontSize = 11.sp)
+                                    }
+                                    
+                                    // Ban Action Button
+                                    Button(
+                                        onClick = { viewModel.toggleUserBanStatus(usr) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = if (usr.is_banned == true) Color(0xFF4CAF50) else Color.Red),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text(if (usr.is_banned == true) "Aktifkan" else "Ban")
+                                    }
+                                    
+                                    // Reset password option triggers recovery email link from Supabase auth
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.sendAuthRecovery(usr.id) { sent ->
+                                                if (sent) Toast.makeText(context, "Recovery email sent successfully", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = "Password reset link", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    1 -> {
+                        // Section B: Announcements Create Form
+                        Text("Tambah Pengumuman Baru", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        TextField(
+                            value = annTitle,
+                            onValueChange = { annTitle = it },
+                            placeholder = { Text("Judul Pengumuman") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = annMessage,
+                            onValueChange = { annMessage = it },
+                            placeholder = { Text("Isi Pesan Pengumuman") },
+                            modifier = Modifier.fillMaxWidth().height(80.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                if (annTitle.isNotBlank() && annMessage.isNotBlank()) {
+                                    viewModel.saveAnnouncement(null, annTitle, annMessage, true)
+                                    annTitle = ""
+                                    annMessage = ""
+                                    Toast.makeText(context, "Pengumuman berhasil dipublikasi!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Publikasikan Tambah Pengumuman")
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider()
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Daftar Pengumuman Aktif", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        
+                        if (announcements.isEmpty()) {
+                            Text("Tidak ada pengumuman.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
+                        } else {
+                            announcements.forEach { ann ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
+                                ) {
+                                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = ann.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                            Text(text = ann.message, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                                        }
+                                        IconButton(onClick = { viewModel.deleteAnnouncement(ann.id) }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    2 -> {
+                        // Section C: Featured Slider Overwrite Hero Manual
+                        Text("Tambahkan Hero Banner Baru", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        TextField(
+                            value = sliderSlug,
+                            onValueChange = { sliderSlug = it },
+                            placeholder = { Text("Slug Anime (Unik)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = sliderTitle,
+                            onValueChange = { sliderTitle = it },
+                            placeholder = { Text("Judul Anime") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = sliderPoster,
+                            onValueChange = { sliderPoster = it },
+                            placeholder = { Text("Link URL Poster") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = sliderOrder,
+                            onValueChange = { sliderOrder = it },
+                            placeholder = { Text("Nomor Indeks Urutan (0, 1, 2...)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                val idx = sliderOrder.toIntOrNull() ?: 0
+                                if (sliderSlug.isNotBlank()) {
+                                    viewModel.saveFeaturedAnime(sliderSlug.trim(), sliderTitle.trim(), sliderPoster.trim(), idx)
+                                    sliderSlug = ""
+                                    sliderTitle = ""
+                                    sliderPoster = ""
+                                    sliderOrder = "0"
+                                    Toast.makeText(context, "Featured Anime ditambahkan!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Tambahkan ke Hero Banner")
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider()
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("List Manual Hero Banner Aktif", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        
+                        if (featured.isEmpty()) {
+                            Text("Tidak ada list manual. Banner otomatis menggunakan ongoing anime.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
+                        } else {
+                            featured.forEach { ft ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
+                                ) {
+                                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        AsyncImage(
+                                            model = ft.anime_poster,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(45.dp, 65.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = ft.anime_title ?: ft.anime_slug, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                            Text(text = "Order Index: ${ft.order_index ?: 0}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                                        }
+                                        IconButton(onClick = { viewModel.deleteFeaturedAnime(ft.id) }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    3 -> {
+                        // Section D: Blacklist Management
+                        Text("Blacklist / Aturan Sembunyikan Anime", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        TextField(
+                            value = blacklistSlug,
+                            onValueChange = { blacklistSlug = it },
+                            placeholder = { Text("Slug Anime Yang Ingin Disembunyikan") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = blacklistTitle,
+                            onValueChange = { blacklistTitle = it },
+                            placeholder = { Text("Judul Anime (Opsional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = blacklistReason,
+                            onValueChange = { blacklistReason = it },
+                            placeholder = { Text("Alasan disembunyikan (Opsional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                if (blacklistSlug.isNotBlank()) {
+                                    viewModel.saveBlacklistAnime(blacklistSlug.trim(), blacklistTitle.trim(), blacklistReason.trim())
+                                    blacklistSlug = ""
+                                    blacklistTitle = ""
+                                    blacklistReason = ""
+                                    Toast.makeText(context, "Anime berhasil diblacklist!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Sembunyikan Anime")
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider()
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Daftar Anime Yang Disembunyikan", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        
+                        if (blacklist.isEmpty()) {
+                            Text("Tidak ada anime disembunyikan.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
+                        } else {
+                            blacklist.forEach { bl ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
+                                ) {
+                                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(text = bl.anime_title ?: bl.anime_slug, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                            Text(text = "Slug: ${bl.anime_slug}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                                            bl.reason?.let { r ->
+                                                if (r.isNotBlank()) {
+                                                    Text(text = "Alasan: $r", color = Color.Red, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                                }
+                                            }
+                                        }
+                                        IconButton(onClick = { viewModel.deleteBlacklistAnime(bl.id) }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// 11. SETTINGS SCREEN
+// ================================================================
+@Composable
+fun SettingsScreen(
+    viewModel: AnikuViewModel,
+    navController: NavController,
+    onBack: () -> Unit
+) {
+    val isDark by viewModel.isDark.collectAsState()
+    val textScale by viewModel.textSize.collectAsState()
+    val activeAccent by viewModel.accentColorName.collectAsState()
+    val sess by viewModel.session.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // TopHeader
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Pengaturan Aplikasi",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Section A: Current session Auth Status Block
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (sess.token.isNullOrEmpty()) {
+                        Column {
+                            Text("Gunakan Akun Untuk Profil & Admin", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 11.sp)
+                            Text("Anda Masuk Sebagai Tamu", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        }
+                        Button(
+                            onClick = { navController.navigate("auth") },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("settings_login_btn")
+                        ) {
+                            Text("Masuk", fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = sess.avatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface)
+                             )
+                             Spacer(modifier = Modifier.width(16.dp))
+                             Column {
+                                 Text(text = sess.username ?: sess.email ?: "Pengguna", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                 Text(text = "Pangkat: ${if (sess.isAdmin) "Admin" else "Member"}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                             }
+                        }
+                        Button(
+                            onClick = { navController.navigate("profile") },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("settings_profile_btn")
+                        ) {
+                            Text("Ubah Profil")
+                        }
+                    }
+                }
+            }
+
+            // Section B: User Admin Access Toggle Card
+            if (!sess.token.isNullOrEmpty() && sess.isAdmin) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF2E1A1A) else Color(0xFFFFEBEE)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                        .clickable { navController.navigate("admin") }
+                        .testTag("settings_admin_panel_btn")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Red, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Panel Kontrol Admin Terdeteksi", color = if (isDark) Color.White else Color(0xFFC62828), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("Klik untuk kelola Users, Banner Slider, & Blacklist", color = if (isDark) Color.LightGray else Color(0xFFE53935), fontSize = 12.sp)
+                        }
+                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.Red)
+                    }
+                }
+            }
+
+            // Section C: Theme preferences toggle
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Pilihan Tema", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Tema Gelap (Dark Mode)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Switch(
+                            checked = isDark,
+                            onCheckedChange = { viewModel.toggleDarkMode(it) },
+                            colors = SwitchDefaults.colors(checkedThumbColor = accentColor, checkedTrackColor = accentColor.copy(alpha = 0.5f))
+                        )
+                    }
+                }
+            }
+
+            // Section D: Text size setting selectors
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Ukuran Tulisan", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val sizes = listOf("Kecil", "Sedang", "Besar")
+                        sizes.forEach { sz ->
+                            val isSelected = textScale == sz
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeTextSize(sz) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = sz,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section E: Color Accent Selector row
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Pilihan Warna Aksen", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val accentList = listOf(
+                            "Red" to Color(0xFFE53935),
+                            "Green" to Color(0xFF4CAF50),
+                            "Blue" to Color(0xFF2196F3),
+                            "Purple" to Color(0xFF9C27B0),
+                            "Orange" to Color(0xFFFF8C00)
+                        )
+                        accentList.forEach { (name, colHex) ->
+                            val isSelected = activeAccent == name
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(colHex)
+                                    .border(3.dp, if (isSelected) (if (isDark) Color.White else Color.Black) else Color.Transparent, CircleShape)
+                                    .clickable { viewModel.changeAccentColor(name) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Section F: Support donation Saweria card
+            Card(
+                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF162516) else Color(0xFFE8F5E9)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime"))
+                        context.startActivity(browserIntent)
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF4CAF50)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("☕", fontSize = 20.sp)
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Dukung kami dengan Saweria",
+                            color = if (isDark) Color.White else Color(0xFF2E7D32),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Text(
+                            text = "Bantuan Anda sangat berarti bagi kelangsungan aplikasi",
+                            color = if (isDark) Color.LightGray else Color(0xFF43A047),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            // Developer Metadata credits block
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Aniku v1.0",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = "Developer: Dayynime",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/profile.php?id=61588359607423"))
+                        context.startActivity(browserIntent)
+                    }
+                ) {
+                    Text("Kunjungi Facebook Developer", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
