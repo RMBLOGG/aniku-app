@@ -5,6 +5,7 @@ import android.net.Uri
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1562,10 +1563,7 @@ fun WatchScreen(
 
         // Webview embed stream container
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(240.dp)
-                .background(Color.Black)
+            modifier = Modifier.fillMaxWidth().height(220.dp).background(Color.Black)
         ) {
             if (isStreamLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1580,13 +1578,15 @@ fun WatchScreen(
                 AndroidView(
                     factory = { context ->
                         WebView(context).apply {
+                            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                             settings.apply {
                                 javaScriptEnabled = true
                                 domStorageEnabled = true
+                                mediaPlaybackRequiresUserGesture = false
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
-                                mediaPlaybackRequiresUserGesture = false
                             }
+                            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                             webViewClient = WebViewClient()
                             webChromeClient = WebChromeClient()
                         }
