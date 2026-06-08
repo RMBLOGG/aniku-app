@@ -525,41 +525,155 @@ fun HomeScreen(
                 }
             }
 
-            // Active Supabase Announcement banner row (dismissible)
+            // Active Supabase Announcement banner row (dismissible) - Floating Card Style
             activeAnnouncement?.let { ann ->
                 item {
                     var dismissed by remember { mutableStateOf(false) }
+                    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
                     if (!dismissed) {
-                        Card(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                                .border(1.dp, accentColor.copy(alpha = 0.8f), RoundedCornerShape(12.dp)),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            shape = RoundedCornerShape(12.dp)
+                        AnimatedVisibility(
+                            visibleState = visible,
+                            enter = slideInVertically(
+                                initialOffsetY = { -it },
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                            ) + fadeIn(animationSpec = tween(300)),
+                            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
                         ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.Warning, contentDescription = "Alert", tint = accentColor)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = ann.title,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = ann.message,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                IconButton(onClick = { dismissed = true }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Tutup", tint = Color.Gray)
+                                // Bottom glow
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.8f)
+                                        .height(12.dp)
+                                        .align(Alignment.BottomCenter)
+                                        .offset(y = 6.dp)
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(Color.Transparent, Color(0x33E53935), Color.Transparent)
+                                            ),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                )
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(18.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0xFF1C0A0A), Color(0xFF141414), Color(0xFF1A0D0D))
+                                                ),
+                                                shape = RoundedCornerShape(18.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0x44E53935), Color(0x22E53935), Color(0x44E53935))
+                                                ),
+                                                shape = RoundedCornerShape(18.dp)
+                                            )
+                                    ) {
+                                        // Shimmer top line
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.7f)
+                                                .height(1.dp)
+                                                .align(Alignment.TopCenter)
+                                                .background(
+                                                    brush = Brush.horizontalGradient(
+                                                        colors = listOf(Color.Transparent, Color(0x88FF6464), Color.Transparent)
+                                                    )
+                                                )
+                                        )
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                        ) {
+                                            // Icon box
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .background(
+                                                        brush = Brush.linearGradient(
+                                                            colors = listOf(Color(0x44E53935), Color(0x22B71C1C))
+                                                        ),
+                                                        shape = RoundedCornerShape(14.dp)
+                                                    )
+                                                    .border(1.dp, Color(0x44E53935), RoundedCornerShape(14.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("📢", fontSize = 22.sp)
+                                            }
+                                            // Content
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                // Badge with pulse dot
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier
+                                                        .background(Color(0x22E53935), RoundedCornerShape(6.dp))
+                                                        .border(1.dp, Color(0x33E53935), RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                                                    val pulseAlpha by infiniteTransition.animateFloat(
+                                                        initialValue = 1f, targetValue = 0.3f,
+                                                        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                                                        label = "pulseAlpha"
+                                                    )
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(5.dp)
+                                                            .background(Color(0xFFFF5252).copy(alpha = pulseAlpha), CircleShape)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(5.dp))
+                                                    Text(
+                                                        "PENGUMUMAN",
+                                                        color = Color(0xFFFF6B6B),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        letterSpacing = 1.5.sp
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(5.dp))
+                                                Text(
+                                                    text = ann.title,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    fontSize = 14.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = ann.message,
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.5.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            // Close button
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                    .clickable { dismissed = true },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
