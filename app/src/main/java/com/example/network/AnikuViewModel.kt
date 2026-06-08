@@ -621,16 +621,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val updateFields = mapOf("username" to newUsername)
-                val result = NetworkClient.supabaseDbApi.updateProfile(
+                NetworkClient.supabaseDbApi.updateProfile(
                     idQuery = "eq.$uId",
                     profile = updateFields,
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
-                val p = result.firstOrNull()
                 val updatedSession = sess.copy(
-                    username = p?.username ?: newUsername,
-                    avatarUrl = p?.avatar_url ?: sess.avatarUrl
+                    username = newUsername,
+                    avatarUrl = sess.avatarUrl
                 )
                 settingsStore.saveSession(updatedSession)
                 onComplete()
@@ -672,16 +671,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val secureUrl = cloudinaryRes.secure_url
 
                 // 4. Update url in Supabase profiles
-                val r = NetworkClient.supabaseDbApi.updateProfile(
+                NetworkClient.supabaseDbApi.updateProfile(
                     idQuery = "eq.$uId",
                     profile = mapOf("avatar_url" to secureUrl),
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
                 
-                val p = r.firstOrNull()
                 val updatedSession = sess.copy(
-                    avatarUrl = p?.avatar_url ?: secureUrl
+                    avatarUrl = secureUrl
                 )
                 settingsStore.saveSession(updatedSession)
                 _isUploadingAvatar.value = false
