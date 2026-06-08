@@ -184,6 +184,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isAdminLoading = MutableStateFlow(false)
     val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
+    private val _banStatusMessage = MutableStateFlow<String?>(null)
+    val banStatusMessage: StateFlow<String?> = _banStatusMessage.asStateFlow()
+
     init {
         // Load initial state
         refreshBookmarks()
@@ -730,6 +733,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val authHeader = getAuthHeader()
         val userIdToModify = profile.id
         val newBanStatus = !(profile.is_banned ?: false)
+        Log.d("AnikuVM", "Trying ban - token: ${session.value.token?.take(20)} userId: $userIdToModify")
         viewModelScope.launch {
             try {
                 val response = NetworkClient.supabaseDbApi.updateProfile(
@@ -739,11 +743,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     apiKey = SUPABASE_ANON_KEY
                 )
                 if (response.isSuccessful || response.code() == 204) {
+                    _banStatusMessage.value = if (newBanStatus) "User berhasil dibanned" else "User berhasil diaktifkan"
                     loadAdminDetails()
                 } else {
-                    Log.e("AnikuVM", "Ban failed: ${response.code()} ${response.errorBody()?.string()}")
+                    val errBody = response.errorBody()?.string() ?: "Unknown error"
+                    _banStatusMessage.value = "Gagal: ${response.code()} - $errBody"
+                    Log.e("AnikuVM", "Ban failed: ${response.code()} $errBody")
                 }
             } catch (e: java.lang.Exception) {
+                _banStatusMessage.value = "Error: ${e.message}"
                 Log.e("AnikuVM", "Failed updating ban for $userIdToModify", e)
             }
         }

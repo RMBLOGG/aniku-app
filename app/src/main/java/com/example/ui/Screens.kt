@@ -2113,8 +2113,15 @@ fun AdminPanelScreen(
     val featured by viewModel.adminFeatured.collectAsState()
     val blacklist by viewModel.adminBlacklist.collectAsState()
     val isLoading by viewModel.isAdminLoading.collectAsState()
+    val banStatusMessage by viewModel.banStatusMessage.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
+
+    LaunchedEffect(banStatusMessage) {
+        banStatusMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+        }
+    }
 
     var selectedTab by remember { mutableStateOf(0) } // 0: Users, 1: Announcements, 2: Slider, 3: Blacklist
 
