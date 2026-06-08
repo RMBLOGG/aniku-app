@@ -152,7 +152,7 @@ interface SupabaseDbApi {
     @PATCH("rest/v1/profiles")
     suspend fun updateProfile(
         @Query("id") idQuery: String,
-        @Body profile: Map<String, Any?>,
+        @Body profile: Map<String, @JvmSuppressWildcards Any?>,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=minimal"
