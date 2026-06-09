@@ -682,7 +682,6 @@ fun HomeScreen(
                                                     val ctx = LocalContext.current
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(28.dp)
                                                             .background(
                                                                 brush = Brush.linearGradient(
                                                                     colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
@@ -692,14 +691,15 @@ fun HomeScreen(
                                                             .clickable {
                                                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url))
                                                                 ctx.startActivity(intent)
-                                                            },
+                                                            }
+                                                            .padding(horizontal = 8.dp, vertical = 5.dp),
                                                         contentAlignment = Alignment.Center
                                                     ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.FileDownload,
-                                                            contentDescription = "Download",
-                                                            tint = Color.White,
-                                                            modifier = Modifier.size(16.dp)
+                                                        Text(
+                                                            "Download",
+                                                            color = Color.White,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold
                                                         )
                                                     }
                                                 }
