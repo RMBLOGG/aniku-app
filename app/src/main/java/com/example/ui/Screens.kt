@@ -6,7 +6,6 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.view.ViewGroup
-import androidx.activity.compose.BackHandler
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1672,13 +1671,38 @@ fun WatchScreen(
         viewModel.loadEpisodeStream(episodeSlug)
     }
 
+    val activity = LocalContext.current as? android.app.Activity
+    var isFullscreen by remember { mutableStateOf(false) }
+
+    // Handle back press to exit fullscreen
+    BackHandler(enabled = isFullscreen) {
+        isFullscreen = false
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+    }
+
+    // Effect to handle orientation & system UI when fullscreen changes
+    LaunchedEffect(isFullscreen) {
+        if (isFullscreen) {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            activity?.window?.decorView?.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        } else {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
         // App controls Header row
-        Row(
+        if (!isFullscreen) Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
@@ -1710,7 +1734,8 @@ fun WatchScreen(
 
         // Webview embed stream container
         Box(
-            modifier = Modifier.fillMaxWidth().height(220.dp).background(Color.Black)
+            modifier = if (isFullscreen) Modifier.fillMaxSize().background(Color.Black)
+                       else Modifier.fillMaxWidth().height(220.dp).background(Color.Black)
         ) {
             if (isStreamLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1789,8 +1814,34 @@ fun WatchScreen(
             }
         }
 
+        // Fullscreen enter button (shown below video when not fullscreen)
+        if (!isFullscreen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 12.dp, top = 4.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFF1A1A1A), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF333333), RoundedCornerShape(8.dp))
+                        .clickable { isFullscreen = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("⛶", color = Color.White, fontSize = 14.sp)
+                        Text("Layar Penuh", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         // Horizontal quality tags selection
-        if (streams.isNotEmpty()) {
+        if (!isFullscreen && streams.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1874,9 +1925,10 @@ fun WatchScreen(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         // Episode List selector
+        if (!isFullscreen)
         val eps = detail?.episodes ?: emptyList()
         Text(
             text = "Daftar Episode",
