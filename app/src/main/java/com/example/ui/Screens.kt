@@ -650,7 +650,7 @@ fun HomeScreen(
                                                     color = Color.White,
                                                     fontWeight = FontWeight.ExtraBold,
                                                     fontSize = 14.sp,
-                                                    maxLines = 1,
+                                                    maxLines = 2,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
@@ -658,8 +658,8 @@ fun HomeScreen(
                                                     text = ann.message,
                                                     color = Color.White.copy(alpha = 0.5f),
                                                     fontSize = 11.5.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    maxLines = Int.MAX_VALUE,
+                                                    overflow = TextOverflow.Visible
                                                 )
                                             }
                                             Column(
