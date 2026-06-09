@@ -1603,8 +1603,56 @@ fun AnimeDetailScreen(
                             if (episodesList.isEmpty()) {
                                 Text(text = "Belum ada episode tersedia.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 13.sp)
                             } else {
-                                // List episodes column (newest first - reversed)
-                                episodesList.reversed().forEachIndexed { i, ep ->
+                                // Grouped pagination
+                                val groupSize = 30
+                                val totalEps = episodesList.size
+                                val groups = if (totalEps > groupSize) {
+                                    (0 until totalEps step groupSize).map { start ->
+                                        val end = minOf(start + groupSize - 1, totalEps - 1)
+                                        Pair(start, end)
+                                    }
+                                } else null
+
+                                var selectedGroup by remember(episodesList) { mutableStateOf(0) }
+
+                                // Group tabs
+                                if (groups != null && groups.size > 1) {
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.padding(bottom = 10.dp)
+                                    ) {
+                                        itemsIndexed(groups) { idx, (start, end) ->
+                                            val epStart = episodesList.getOrNull(start)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (start + 1)
+                                            val epEnd = episodesList.getOrNull(end)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (end + 1)
+                                            val isSelected = selectedGroup == idx
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .border(1.dp, if (isSelected) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
+                                                    .clickable { selectedGroup = idx }
+                                                    .padding(horizontal = 14.dp, vertical = 7.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$epStart-$epEnd",
+                                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Display episodes for selected group
+                                val displayEps = if (groups != null) {
+                                    val (start, end) = groups[selectedGroup]
+                                    episodesList.subList(start, end + 1)
+                                } else episodesList
+
+                                displayEps.forEachIndexed { i, ep ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
