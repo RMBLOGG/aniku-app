@@ -1928,23 +1928,79 @@ fun WatchScreen(
         Spacer(modifier = Modifier.height(12.dp))
         if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-        // Episode List selector
+        // Episode List selector - Grouped Pagination (Bstation style)
         if (!isFullscreen) {
         val eps = detail?.episodes ?: emptyList()
-        Text(
-            text = "Daftar Episode",
-            color = MaterialTheme.colorScheme.onBackground,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp,
-            modifier = Modifier.padding(16.dp)
-        )
+        val groupSize = 30
+        val totalEps = eps.size
+        val groups = if (totalEps > groupSize) {
+            (0 until totalEps step groupSize).map { start ->
+                val end = minOf(start + groupSize - 1, totalEps - 1)
+                Pair(start, end)
+            }
+        } else null
+
+        var selectedGroup by remember(eps) { mutableStateOf(0) }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Daftar Episode ($totalEps)",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        }
+
+        // Group tabs (only show if > 30 episodes)
+        if (groups != null && groups.size > 1) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                itemsIndexed(groups) { idx, (start, end) ->
+                    val epStart = eps.getOrNull(start)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (start + 1)
+                    val epEnd = eps.getOrNull(end)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (end + 1)
+                    val isSelected = selectedGroup == idx
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .border(1.dp, if (isSelected) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
+                            .clickable { selectedGroup = idx }
+                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = "$epStart-$epEnd",
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        }
+
+        // Episode items for selected group
+        val displayEps = if (groups != null) {
+            val (start, end) = groups[selectedGroup]
+            eps.subList(start, end + 1)
+        } else eps
 
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
-            itemsIndexed(eps.reversed()) { idx, item ->
+            itemsIndexed(displayEps) { idx, item ->
                 val isActive = item.slug == episodeSlug
                 Row(
                     modifier = Modifier
