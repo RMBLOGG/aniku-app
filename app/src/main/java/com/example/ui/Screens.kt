@@ -281,6 +281,7 @@ fun HomeScreen(
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val session by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     var slideIndex by remember { mutableStateOf(0) }
@@ -508,18 +509,56 @@ fun HomeScreen(
                                 }
                             }
 
-                            // Floating Setting button Top-Right
-                            IconButton(
-                                onClick = { navController.navigate("settings") },
+                            // Header Bar (logo + profile)
+                            Row(
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .statusBarsPadding()
-                                    .padding(top = 16.dp, end = 16.dp)
-                                    .size(44.dp)
-                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                    .align(Alignment.TopEnd)
-                                    .testTag("home_settings_btn")
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .align(Alignment.TopStart),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                                // Logo
+                                Text(
+                                    text = "ANIKU",
+                                    color = Color.White,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 3.sp,
+                                    style = LocalTextStyle.current.copy(
+                                        shadow = androidx.compose.ui.graphics.Shadow(
+                                            color = accentColor.copy(alpha = 0.8f),
+                                            blurRadius = 8f
+                                        )
+                                    )
+                                )
+                                // Avatar / Settings
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                        .clickable { navController.navigate("settings") },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (!session.avatarUrl.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = session.avatarUrl,
+                                            contentDescription = "Profile",
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = "Settings",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
