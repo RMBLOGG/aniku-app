@@ -1756,7 +1756,30 @@ fun WatchScreen(
                                     loadWithOverviewMode = true
                                 }
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                                webViewClient = WebViewClient()
+                                webViewClient = object : WebViewClient() {
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        // Inject CSS to make video fill the screen
+                                        val css = """
+                                            video, iframe, embed, object {
+                                                width: 100% !important;
+                                                height: 100% !important;
+                                                max-width: 100% !important;
+                                                max-height: 100% !important;
+                                            }
+                                            body, html {
+                                                margin: 0 !important;
+                                                padding: 0 !important;
+                                                background: #000 !important;
+                                                width: 100% !important;
+                                                height: 100% !important;
+                                                overflow: hidden !important;
+                                            }
+                                        """.trimIndent()
+                                        val js = "var style = document.createElement('style'); style.innerHTML = `$css`; document.head.appendChild(style);"
+                                        view?.evaluateJavascript(js, null)
+                                    }
+                                }
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
                                         super.onShowCustomView(view, callback)
