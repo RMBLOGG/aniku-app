@@ -1928,7 +1928,7 @@ fun WatchScreen(
         if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         // Episode List selector
-        if (!isFullscreen)
+        if (!isFullscreen) {
         val eps = detail?.episodes ?: emptyList()
         Text(
             text = "Daftar Episode",
@@ -1968,6 +1968,7 @@ fun WatchScreen(
                 }
             }
         }
+        } // end if (!isFullscreen)
     }
 }
 
