@@ -3011,10 +3011,11 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     if (sess.token.isNullOrEmpty()) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Gunakan Akun Untuk Profil & Admin", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 11.sp)
                             Text("Anda Masuk Sebagai Tamu", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Button(
                             onClick = { navController.navigate("auth") },
                             colors = ButtonDefaults.buttonColors(containerColor = accentColor),
