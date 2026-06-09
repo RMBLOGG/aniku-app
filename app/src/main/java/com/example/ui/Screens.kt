@@ -696,7 +696,7 @@ fun HomeScreen(
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
-                                                            imageVector = Icons.Default.Download,
+                                                            imageVector = Icons.Default.FileDownload,
                                                             contentDescription = "Download",
                                                             tint = Color.White,
                                                             modifier = Modifier.size(16.dp)
