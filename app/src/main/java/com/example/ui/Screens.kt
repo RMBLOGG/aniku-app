@@ -1720,26 +1720,35 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
-                // Render embed stream player inside Android native WebView with fullscreen support
-                val context = LocalContext.current
-                val activity = context as? android.app.Activity
-                var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
-                var isFullscreen by remember { mutableStateOf(false) }
+                // Render embed stream player - otakuzone style fullscreen
+                var customView by remember { mutableStateOf<android.view.View?>(null) }
+                var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
-                DisposableEffect(Unit) {
-                    onDispose {
-                        // Restore portrait when leaving screen
-                        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        fullscreenView = null
-                        isFullscreen = false
-                    }
+                val handleHideCustomView = {
+                    customViewCallback?.onCustomViewHidden()
+                    customView = null
+                    customViewCallback = null
                 }
 
-                if (isFullscreen && fullscreenView != null) {
-                    AndroidView(
-                        factory = { fullscreenView!! },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                if (customView != null) {
+                    BackHandler { handleHideCustomView() }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black)
+                    ) {
+                        AndroidView(
+                            factory = {
+                                customView?.apply {
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+                                } ?: android.view.View(it)
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 } else {
                     AndroidView(
                         factory = { ctx ->
@@ -1756,52 +1765,16 @@ fun WatchScreen(
                                     loadWithOverviewMode = true
                                 }
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                                webViewClient = object : WebViewClient() {
-                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        // Inject CSS to make video fill the screen
-                                        val css = """
-                                            video, iframe, embed, object {
-                                                width: 100% !important;
-                                                height: 100% !important;
-                                                max-width: 100% !important;
-                                                max-height: 100% !important;
-                                            }
-                                            body, html {
-                                                margin: 0 !important;
-                                                padding: 0 !important;
-                                                background: #000 !important;
-                                                width: 100% !important;
-                                                height: 100% !important;
-                                                overflow: hidden !important;
-                                            }
-                                        """.trimIndent()
-                                        val js = "var style = document.createElement('style'); style.innerHTML = `$css`; document.head.appendChild(style);"
-                                        view?.evaluateJavascript(js, null)
-                                    }
-                                }
+                                webViewClient = WebViewClient()
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
                                         super.onShowCustomView(view, callback)
-                                        fullscreenView = view
-                                        isFullscreen = true
-                                        // Force landscape
-                                        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                        // Hide system UI
-                                        activity?.window?.decorView?.systemUiVisibility = (
-                                            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
-                                            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                                            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                                        )
+                                        customView = view
+                                        customViewCallback = callback
                                     }
                                     override fun onHideCustomView() {
                                         super.onHideCustomView()
-                                        fullscreenView = null
-                                        isFullscreen = false
-                                        // Restore portrait
-                                        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                        // Restore system UI
-                                        activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                                        handleHideCustomView()
                                     }
                                 }
                             }
