@@ -770,14 +770,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Announcements management
-    fun saveAnnouncement(annId: String?, title: String, message: String, active: Boolean) {
+    fun saveAnnouncement(annId: String?, title: String, message: String, active: Boolean, downloadUrl: String? = null) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
-                val inputBody = mapOf<String, Any?>(
+                val inputBody = mapOf<String, @JvmSuppressWildcards Any?>(
                     "title" to title,
                     "message" to message,
-                    "is_active" to active
+                    "is_active" to active,
+                    "download_url" to downloadUrl
                 )
                 if (annId.isNullOrEmpty()) {
                     NetworkClient.supabaseDbApi.insertAnnouncement(inputBody, authHeader, SUPABASE_ANON_KEY)

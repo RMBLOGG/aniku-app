@@ -661,16 +661,48 @@ fun HomeScreen(
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            // Close button
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                                                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                                                    .clickable { dismissed = true },
-                                                contentAlignment = Alignment.Center
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
+                                                // Close button
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                        .clickable { dismissed = true },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
+                                                }
+                                                // Download button (only if download_url exists)
+                                                if (!ann.download_url.isNullOrBlank()) {
+                                                    val ctx = LocalContext.current
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(
+                                                                brush = Brush.linearGradient(
+                                                                    colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
+                                                                ),
+                                                                shape = RoundedCornerShape(8.dp)
+                                                            )
+                                                            .clickable {
+                                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url))
+                                                                ctx.startActivity(intent)
+                                                            }
+                                                            .padding(horizontal = 8.dp, vertical = 5.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            "⬇ DL",
+                                                            color = Color.White,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            letterSpacing = 0.5.sp
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -2242,6 +2274,7 @@ fun AdminPanelScreen(
     // Announcements adding inputs state
     var annTitle by remember { mutableStateOf("") }
     var annMessage by remember { mutableStateOf("") }
+    var annDownloadUrl by remember { mutableStateOf("") }
 
     // Manual Slider adding state
     var sliderSlug by remember { mutableStateOf("") }
@@ -2409,13 +2442,27 @@ fun AdminPanelScreen(
                                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextField(
+                            value = annDownloadUrl,
+                            onValueChange = { annDownloadUrl = it },
+                            placeholder = { Text("Link Download (opsional)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = {
                                 if (annTitle.isNotBlank() && annMessage.isNotBlank()) {
-                                    viewModel.saveAnnouncement(null, annTitle, annMessage, true)
+                                    viewModel.saveAnnouncement(null, annTitle, annMessage, true, annDownloadUrl.ifBlank { null })
                                     annTitle = ""
                                     annMessage = ""
+                                    annDownloadUrl = ""
                                     Toast.makeText(context, "Pengumuman berhasil dipublikasi!", Toast.LENGTH_SHORT).show()
                                 }
                             },

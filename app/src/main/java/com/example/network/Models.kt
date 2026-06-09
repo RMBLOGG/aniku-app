@@ -183,7 +183,8 @@ data class AnnouncementDto(
     val title: String,
     val message: String,
     val is_active: Boolean? = true,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val download_url: String? = null
 )
 
 @JsonClass(generateAdapter = true)
