@@ -2,7 +2,32 @@ package com.example.network
 
 import com.squareup.moshi.JsonClass
 
-// Anime API models
+// ─────────────────────────────────────────────
+// SOURCE ENUM
+// ─────────────────────────────────────────────
+
+enum class AnimeSource(val displayName: String, val pingUrl: String) {
+    ANIMASU(
+        displayName = "Animasu",
+        pingUrl = "https://www.sankavollerei.com/anime/animasu/home?apikey=planaai"
+    ),
+    SAMEHADAKU(
+        displayName = "Samehadaku",
+        pingUrl = "https://dayynime-api.vercel.app/shk/anime/home"
+    )
+}
+
+enum class SourceStatus { CHECKING, ONLINE, OFFLINE }
+
+data class AnimeSourceInfo(
+    val source: AnimeSource,
+    val status: SourceStatus = SourceStatus.CHECKING
+)
+
+// ─────────────────────────────────────────────
+// ANIMASU MODELS (existing)
+// ─────────────────────────────────────────────
+
 @JsonClass(generateAdapter = true)
 data class AnimeRaw(
     val title: String,
@@ -57,7 +82,7 @@ data class ScheduleRaw(
     val selasa: List<AnimeRaw>?,
     val rabu: List<AnimeRaw>?,
     val kamis: List<AnimeRaw>?,
-    val jumat: List<AnimeRaw>? = null, // API might use jum'at, let's handle both
+    val jumat: List<AnimeRaw>? = null,
     @com.squareup.moshi.Json(name = "jum'at") val jumatAlt: List<AnimeRaw>? = null,
     val sabtu: List<AnimeRaw>?
 )
@@ -125,7 +150,145 @@ data class EpisodeResponse(
     val streams: List<StreamRaw>?
 )
 
-// Supabase Auth models
+// ─────────────────────────────────────────────
+// SAMEHADAKU MODELS
+// ─────────────────────────────────────────────
+
+// Generic wrapper: { "status": "success", "data": { ... } }
+@JsonClass(generateAdapter = true)
+data class ShkResponse<T>(
+    val status: String,
+    val data: T?
+)
+
+// Shared anime item used in home/ongoing/completed/movies/popular/search
+@JsonClass(generateAdapter = true)
+data class ShkAnimeItem(
+    val animeId: String,
+    val title: String,
+    val poster: String,
+    val type: String? = null,
+    val score: String? = null,
+    val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkPagination(
+    val hasNextPage: Boolean?,
+    val hasPrevPage: Boolean?,
+    val currentPage: Int?
+)
+
+// Home
+@JsonClass(generateAdapter = true)
+data class ShkHomeData(
+    val animeList: List<ShkAnimeItem>?,
+    val schedule: List<Any>?
+)
+
+// List pages (ongoing/completed/movies/popular/search)
+@JsonClass(generateAdapter = true)
+data class ShkListData(
+    val animeList: List<ShkAnimeItem>?,
+    val pagination: ShkPagination?
+)
+
+// Genres
+@JsonClass(generateAdapter = true)
+data class ShkGenreItem(
+    val name: String,
+    val genreId: String,
+    val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkGenresData(
+    val genreList: List<ShkGenreItem>?
+)
+
+// Schedule
+@JsonClass(generateAdapter = true)
+data class ShkScheduleAnime(
+    val title: String,
+    val animeId: String,
+    val url: String? = null,
+    val poster: String? = null,
+    val score: String? = null,
+    val type: String? = null,
+    val time: String? = null,
+    val genre: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkScheduleDay(
+    val day: String,
+    val animeList: List<ShkScheduleAnime>?
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkScheduleData(
+    val days: List<ShkScheduleDay>?
+)
+
+// Detail
+@JsonClass(generateAdapter = true)
+data class ShkGenreRef(
+    val name: String,
+    val genreId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkEpisodeRef(
+    val episodeId: String,
+    val num: String,
+    val title: String,
+    val date: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkDetailInfo(
+    val released: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkDetailData(
+    val animeId: String,
+    val title: String,
+    val poster: String,
+    val synopsis: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val score: String? = null,
+    val studio: String? = null,
+    val info: ShkDetailInfo? = null,
+    val genres: List<ShkGenreRef>? = null,
+    val episodeList: List<ShkEpisodeRef>? = null
+)
+
+// Episode + Servers
+@JsonClass(generateAdapter = true)
+data class ShkServer(
+    val name: String,
+    val embedUrl: String,
+    val type: String  // "mp4" | "embed" | "blogger" | "mega"
+)
+
+@JsonClass(generateAdapter = true)
+data class ShkEpisodeData(
+    val episodeId: String,
+    val title: String,
+    val animeId: String,
+    val episodeNum: String,
+    val prevEpisode: String? = null,
+    val nextEpisode: String? = null,
+    val defaultEmbed: String? = null,
+    val servers: List<ShkServer>?
+)
+
+// ─────────────────────────────────────────────
+// SUPABASE MODELS (existing)
+// ─────────────────────────────────────────────
+
 @JsonClass(generateAdapter = true)
 data class SignUpRequest(
     val email: String,
@@ -149,7 +312,6 @@ data class RecoverRequest(
     val email: String
 )
 
-// Use Map in AuthResponse since metadata is dynamic
 @JsonClass(generateAdapter = true)
 data class AuthResponse(
     val access_token: String? = null,
@@ -166,7 +328,6 @@ data class AuthUser(
     val user_metadata: Map<String, Any>?
 )
 
-// Supabase Database objects
 @JsonClass(generateAdapter = true)
 data class ProfileDto(
     val id: String,
@@ -206,7 +367,6 @@ data class BlacklistedAnimeDto(
     val created_at: String? = null
 )
 
-// Cloudinary models
 @JsonClass(generateAdapter = true)
 data class CloudinaryResponse(
     val secure_url: String

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 
@@ -32,6 +33,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
         SharingStarted.Eagerly,
         UserSession(null, null, null, null, null, false, false)
     )
+
+    // ── SOURCE STATE ────────────────────────────────────────────────
+    private val _activeSource = MutableStateFlow(AnimeSource.ANIMASU)
+    val activeSource: StateFlow<AnimeSource> = _activeSource.asStateFlow()
+
+    private val _sourcesStatus = MutableStateFlow(
+        AnimeSource.values().map { AnimeSourceInfo(it, SourceStatus.CHECKING) }
+    )
+    val sourcesStatus: StateFlow<List<AnimeSourceInfo>> = _sourcesStatus.asStateFlow()
 
     // Bookmarks state (local)
     private val _bookmarks = MutableStateFlow<List<BookmarkedAnime>>(emptyList())
@@ -66,26 +76,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _homeError = MutableStateFlow<String?>(null)
     val homeError: StateFlow<String?> = _homeError.asStateFlow()
 
-    private suspend fun <T> retryIO(
-        times: Int = 3,
-        initialDelay: Long = 1000,
-        maxDelay: Long = 3000,
-        factor: Double = 2.0,
-        block: suspend () -> T
-    ): T {
-        var currentDelay = initialDelay
-        repeat(times - 1) { attempt ->
-            try {
-                return block()
-            } catch (e: Exception) {
-                Log.w("AnikuVM", "Network call failed (attempt ${attempt + 1}/$times). Retrying...", e)
-                kotlinx.coroutines.delay(currentDelay)
-                currentDelay = (currentDelay * factor).toLong().coerceAtMost(maxDelay)
-            }
-        }
-        return block()
-    }
-
     // Search state
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -100,7 +90,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val isSearchLoading: StateFlow<Boolean> = _isSearchLoading.asStateFlow()
 
     // Explore state
-    private val _exploreTab = MutableStateFlow("Ongoing") // Ongoing | Completed | Movie | Latest
+    private val _exploreTab = MutableStateFlow("Ongoing")
     val exploreTab: StateFlow<String> = _exploreTab.asStateFlow()
 
     private val _selectedGenreSlug = MutableStateFlow<String?>(null)
@@ -120,7 +110,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val exploreHasNext: StateFlow<Boolean> = _exploreHasNext.asStateFlow()
 
     // Schedule state
-    private val _selectedDay = MutableStateFlow("Minggu") // Minggu | Senin | Selasa | Rabu | Kamis | Jumat | Sabtu
+    private val _selectedDay = MutableStateFlow("Minggu")
     val selectedDay: StateFlow<String> = _selectedDay.asStateFlow()
 
     private val _scheduleMap = MutableStateFlow<Map<String, List<AnimeRaw>>>(emptyMap())
@@ -158,6 +148,20 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _streamError = MutableStateFlow<String?>(null)
     val streamError: StateFlow<String?> = _streamError.asStateFlow()
 
+    // Server type ("mp4" → ExoPlayer, lainnya → WebView)
+    private val _activeServerType = MutableStateFlow("embed")
+    val activeServerType: StateFlow<String> = _activeServerType.asStateFlow()
+
+    private val _serverTypes = MutableStateFlow<List<String>>(emptyList())
+    val serverTypes: StateFlow<List<String>> = _serverTypes.asStateFlow()
+
+    // Prev/Next episode (Samehadaku)
+    private val _prevEpisodeSlug = MutableStateFlow<String?>(null)
+    val prevEpisodeSlug: StateFlow<String?> = _prevEpisodeSlug.asStateFlow()
+
+    private val _nextEpisodeSlug = MutableStateFlow<String?>(null)
+    val nextEpisodeSlug: StateFlow<String?> = _nextEpisodeSlug.asStateFlow()
+
     // Auth flows
     private val _authLoading = MutableStateFlow(false)
     val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
@@ -188,7 +192,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val banStatusMessage: StateFlow<String?> = _banStatusMessage.asStateFlow()
 
     init {
-        // Load initial state
         refreshBookmarks()
         loadBlacklistSlugs()
         loadHomeData()
@@ -196,11 +199,70 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadSearchPopular()
     }
 
-    // Helper: Header selection for Supabase DB
     private fun getAuthHeader(): String {
         val currentToken = session.value.token
         return if (!currentToken.isNullOrEmpty()) "Bearer $currentToken" else "Bearer $SUPABASE_ANON_KEY"
     }
+
+    private suspend fun <T> retryIO(
+        times: Int = 3,
+        initialDelay: Long = 1000,
+        maxDelay: Long = 3000,
+        factor: Double = 2.0,
+        block: suspend () -> T
+    ): T {
+        var currentDelay = initialDelay
+        repeat(times - 1) { attempt ->
+            try {
+                return block()
+            } catch (e: Exception) {
+                Log.w("AnikuVM", "Network call failed (attempt ${attempt + 1}/$times). Retrying...", e)
+                kotlinx.coroutines.delay(currentDelay)
+                currentDelay = (currentDelay * factor).toLong().coerceAtMost(maxDelay)
+            }
+        }
+        return block()
+    }
+
+    // ── SOURCE SWITCHING ────────────────────────────────────────────
+
+    fun switchSource(source: AnimeSource) {
+        if (_activeSource.value == source) return
+        _activeSource.value = source
+        _homeOngoing.value = emptyList()
+        _homeRecent.value = emptyList()
+        _homePopular.value = emptyList()
+        _homeMovies.value = emptyList()
+        _exploreAnimes.value = emptyList()
+        _genres.value = emptyList()
+        _searchResults.value = emptyList()
+        loadHomeData()
+        loadGenres()
+        loadSearchPopular()
+    }
+
+    fun checkSourcesStatus() {
+        _sourcesStatus.value = AnimeSource.values().map { AnimeSourceInfo(it, SourceStatus.CHECKING) }
+        viewModelScope.launch {
+            AnimeSource.values().forEach { source ->
+                launch {
+                    val status = try {
+                        val request = Request.Builder().url(source.pingUrl).head().build()
+                        val response = NetworkClient.pingClient.newCall(request).execute()
+                        if (response.isSuccessful || response.code == 404) SourceStatus.ONLINE
+                        else SourceStatus.OFFLINE
+                    } catch (e: Exception) {
+                        SourceStatus.OFFLINE
+                    }
+                    _sourcesStatus.value = _sourcesStatus.value.map {
+                        if (it.source == source) it.copy(status = status) else it
+                    }
+                }
+            }
+        }
+    }
+
+    // ── HOME DATA ───────────────────────────────────────────────────
 
     fun refreshBookmarks() {
         _bookmarks.value = bookmarkManager.getBookmarks()
@@ -209,7 +271,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun loadBlacklistSlugs() {
         viewModelScope.launch {
             try {
-                // Anyone can read blacklisted anime slugs using anon auth
                 val response = NetworkClient.supabaseDbApi.getBlacklistedAnime(
                     authHeader = "Bearer $SUPABASE_ANON_KEY",
                     apiKey = SUPABASE_ANON_KEY
@@ -226,64 +287,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _homeError.value = null
         viewModelScope.launch {
             try {
-                // 1. Fetch Blacklist again to maintain sync
-                val blacklistedResponse = retryIO {
-                    NetworkClient.supabaseDbApi.getBlacklistedAnime(
-                        authHeader = "Bearer $SUPABASE_ANON_KEY",
-                        apiKey = SUPABASE_ANON_KEY
-                    )
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> loadHomeDataShk()
+                    else -> loadHomeDataAnimasu()
                 }
-                val blacklist = blacklistedResponse.map { it.anime_slug }.toSet()
-                _blacklistedSlugs.value = blacklist
-
-                // 2. Load featured slides from Supabase
-                try {
-                    val featured = retryIO {
-                        NetworkClient.supabaseDbApi.getFeaturedAnime(
-                            authHeader = "Bearer $SUPABASE_ANON_KEY",
-                            apiKey = SUPABASE_ANON_KEY
-                        )
-                    }.filterNot { blacklist.contains(it.anime_slug) }
-                    _featuredSlides.value = featured
-                } catch (fe: Exception) {
-                    Log.e("AnikuVM", "Failed to fetch featured slides", fe)
-                }
-
-                // 3. Load active announcements from Supabase
-                try {
-                    val anns = retryIO {
-                        NetworkClient.supabaseDbApi.getAnnouncements(
-                            authHeader = "Bearer $SUPABASE_ANON_KEY",
-                            apiKey = SUPABASE_ANON_KEY
-                        )
-                    }
-                    _activeAnnouncement.value = anns.firstOrNull { it.is_active == true }
-                } catch (ae: Exception) {
-                    Log.e("AnikuVM", "Failed to load announcements", ae)
-                }
-
-                // 4. Load Anime Home API
-                val homeRes = retryIO { NetworkClient.animeApi.getHome() }
-                _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                _homeRecent.value = (homeRes.recent ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-
-                // 5. Load Popular for Section
-                try {
-                    val popularRes = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
-                    _homePopular.value = (popularRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                } catch (pe: Exception) {
-                    Log.e("AnikuVM", "Failed to load home popular", pe)
-                }
-
-                // 6. Load Movies for Section
-                try {
-                    val moviesRes = retryIO { NetworkClient.animeApi.getMovies(page = 1) }
-                    _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                } catch (me: Exception) {
-                    Log.e("AnikuVM", "Failed to load home movies", me)
-                }
-
-                _isHomeLoading.value = false
             } catch (e: Exception) {
                 _isHomeLoading.value = false
                 _homeError.value = "Gagal memuat data. Silakan coba lagi."
@@ -292,12 +299,113 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    private suspend fun loadHomeDataAnimasu() {
+        try {
+            val blacklistedResponse = retryIO {
+                NetworkClient.supabaseDbApi.getBlacklistedAnime(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            }
+            val blacklist = blacklistedResponse.map { it.anime_slug }.toSet()
+            _blacklistedSlugs.value = blacklist
+
+            try {
+                val featured = retryIO {
+                    NetworkClient.supabaseDbApi.getFeaturedAnime(
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }.filterNot { blacklist.contains(it.anime_slug) }
+                _featuredSlides.value = featured
+            } catch (fe: Exception) {
+                Log.e("AnikuVM", "Failed to fetch featured slides", fe)
+            }
+
+            try {
+                val anns = retryIO {
+                    NetworkClient.supabaseDbApi.getAnnouncements(
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+                _activeAnnouncement.value = anns.firstOrNull { it.is_active == true }
+            } catch (ae: Exception) {
+                Log.e("AnikuVM", "Failed to load announcements", ae)
+            }
+
+            val homeRes = retryIO { NetworkClient.animeApi.getHome() }
+            _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+            _homeRecent.value = (homeRes.recent ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+
+            try {
+                val popularRes = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
+                _homePopular.value = (popularRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+            } catch (pe: Exception) {
+                Log.e("AnikuVM", "Failed to load home popular", pe)
+            }
+
+            try {
+                val moviesRes = retryIO { NetworkClient.animeApi.getMovies(page = 1) }
+                _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+            } catch (me: Exception) {
+                Log.e("AnikuVM", "Failed to load home movies", me)
+            }
+
+            _isHomeLoading.value = false
+        } catch (e: Exception) {
+            _isHomeLoading.value = false
+            _homeError.value = "Gagal memuat data. Silakan coba lagi."
+            Log.e("AnikuVM", "Error loading Animasu home data", e)
+        }
+    }
+
+    private suspend fun loadHomeDataShk() {
+        try {
+            val homeRes = retryIO { NetworkClient.samehadakuApi.getHome() }
+            val animeList = homeRes.data?.animeList ?: emptyList()
+            _homeOngoing.value = animeList.map { it.toAnimeRaw() }
+            _homeRecent.value = animeList.map { it.toAnimeRaw() }
+
+            try {
+                val popularRes = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
+                _homePopular.value = (popularRes.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }
+            } catch (pe: Exception) {
+                Log.e("AnikuVM", "Failed SHK popular", pe)
+            }
+
+            try {
+                val moviesRes = retryIO { NetworkClient.samehadakuApi.getMovies(page = 1) }
+                _homeMovies.value = (moviesRes.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }
+            } catch (me: Exception) {
+                Log.e("AnikuVM", "Failed SHK movies", me)
+            }
+
+            _isHomeLoading.value = false
+        } catch (e: Exception) {
+            _isHomeLoading.value = false
+            _homeError.value = "Gagal memuat data Samehadaku."
+            Log.e("AnikuVM", "Error loading SHK home", e)
+        }
+    }
+
+    // ── SEARCH ──────────────────────────────────────────────────────
+
     private fun loadSearchPopular() {
         viewModelScope.launch {
             try {
-                val res = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
-                _searchPopular.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
-            } catch (e: java.lang.Exception) {
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
+                        _searchPopular.value = (res.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }
+                    }
+                    else -> {
+                        val res = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
+                        _searchPopular.value = (res.animes ?: emptyList())
+                            .filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                    }
+                }
+            } catch (e: Exception) {
                 Log.e("AnikuVM", "Failed loading popular list for search background", e)
             }
         }
@@ -312,8 +420,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isSearchLoading.value = true
         viewModelScope.launch {
             try {
-                val res = retryIO { NetworkClient.animeApi.search(query) }
-                _searchResults.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.search(query) }
+                        _searchResults.value = (res.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }
+                    }
+                    else -> {
+                        val res = retryIO { NetworkClient.animeApi.search(query) }
+                        _searchResults.value = (res.animes ?: emptyList())
+                            .filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                    }
+                }
                 _isSearchLoading.value = false
             } catch (e: Exception) {
                 _searchResults.value = emptyList()
@@ -323,11 +440,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    private fun loadGenres() {
+    // ── EXPLORE ─────────────────────────────────────────────────────
+
+    fun loadGenres() {
         viewModelScope.launch {
             try {
-                val list = retryIO { NetworkClient.animeApi.getGenres() }
-                _genres.value = list.genres ?: emptyList()
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.getGenres() }
+                        _genres.value = (res.data?.genreList ?: emptyList()).map {
+                            GenreRaw(name = it.name, slug = it.genreId)
+                        }
+                    }
+                    else -> {
+                        val list = retryIO { NetworkClient.animeApi.getGenres() }
+                        _genres.value = list.genres ?: emptyList()
+                    }
+                }
             } catch (e: Exception) {
                 _genres.value = emptyList()
                 Log.e("AnikuVM", "Failed loading genres list", e)
@@ -367,25 +496,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val blacklist = _blacklistedSlugs.value
                 val page = _explorePage.value
 
-                // If a genre is selected, retrieve genre anime list
-                val response = retryIO {
-                    if (_selectedGenreSlug.value != null) {
-                        NetworkClient.animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
-                    } else {
-                        // Ongoing | Completed | Movie | Latest
-                        when (_exploreTab.value) {
-                            "Ongoing" -> NetworkClient.animeApi.getOngoing(page = page)
-                            "Completed" -> NetworkClient.animeApi.getCompleted(page = page)
-                            "Movie" -> NetworkClient.animeApi.getMovies(page = page)
-                            "Latest" -> NetworkClient.animeApi.getLatest(page = page)
-                            else -> NetworkClient.animeApi.getOngoing(page = page)
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO {
+                            when (_exploreTab.value) {
+                                "Ongoing" -> NetworkClient.samehadakuApi.getOngoing(page)
+                                "Completed" -> NetworkClient.samehadakuApi.getCompleted(page)
+                                "Movie" -> NetworkClient.samehadakuApi.getMovies(page)
+                                else -> NetworkClient.samehadakuApi.getOngoing(page)
+                            }
                         }
+                        val items = (res.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }
+                        _exploreAnimes.value = _exploreAnimes.value + items
+                        _exploreHasNext.value = res.data?.pagination?.hasNextPage ?: false
+                    }
+                    else -> {
+                        val response = retryIO {
+                            if (_selectedGenreSlug.value != null) {
+                                NetworkClient.animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
+                            } else {
+                                when (_exploreTab.value) {
+                                    "Ongoing" -> NetworkClient.animeApi.getOngoing(page = page)
+                                    "Completed" -> NetworkClient.animeApi.getCompleted(page = page)
+                                    "Movie" -> NetworkClient.animeApi.getMovies(page = page)
+                                    "Latest" -> NetworkClient.animeApi.getLatest(page = page)
+                                    else -> NetworkClient.animeApi.getOngoing(page = page)
+                                }
+                            }
+                        }
+                        val netAnimes = (response.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                        _exploreAnimes.value = _exploreAnimes.value + netAnimes
+                        _exploreHasNext.value = response.pagination?.hasNext ?: (netAnimes.isNotEmpty())
                     }
                 }
-
-                val netAnimes = (response.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                _exploreAnimes.value = _exploreAnimes.value + netAnimes
-                _exploreHasNext.value = response.pagination?.hasNext ?: (netAnimes.isNotEmpty())
                 _isExploreLoading.value = false
             } catch (e: Exception) {
                 _exploreAnimes.value = emptyList()
@@ -396,44 +539,53 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── SCHEDULE ────────────────────────────────────────────────────
+
     fun selectDay(day: String) {
         _selectedDay.value = day
     }
 
-    fun loadSchedule() {
-        _isScheduleLoading.value = true
-        viewModelScope.launch {
-            try {
-                val res = NetworkClient.scheduleChallenge()
-                // Fetch schedule data properly
-                _isScheduleLoading.value = false
-            } catch (e: Exception) {
-                _isScheduleLoading.value = false
-                Log.e("AnikuVM", "Failed schedule retrieve", e)
-            }
-        }
-    }
-    
-    // We adjust schedule fetch to parse week's keys dynamically
     fun fetchScheduleData() {
         _isScheduleLoading.value = true
         viewModelScope.launch {
             try {
-                val res = retryIO { NetworkClient.animeApi.getSchedule() }
-                val sched = res.schedule
-                if (sched != null) {
-                    val map = mutableMapOf<String, List<AnimeRaw>>()
-                    val blacklist = _blacklistedSlugs.value
-                    
-                    map["Minggu"] = (sched.minggu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Senin"] = (sched.senin ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Selasa"] = (sched.selasa ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Rabu"] = (sched.rabu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Kamis"] = (sched.kamis ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Jumat"] = ((sched.jumat ?: sched.jumatAlt) ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    map["Sabtu"] = (sched.sabtu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-
-                    _scheduleMap.value = map
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.getSchedule() }
+                        val days = res.data?.days ?: emptyList()
+                        val map = mutableMapOf<String, List<AnimeRaw>>()
+                        days.forEach { day ->
+                            map[day.day] = (day.animeList ?: emptyList()).map { anime ->
+                                AnimeRaw(
+                                    title = anime.title,
+                                    slug = anime.animeId,
+                                    poster = anime.poster ?: "",
+                                    type = anime.type,
+                                    status_or_day = anime.time
+                                )
+                            }
+                        }
+                        _scheduleMap.value = map
+                        if (_scheduleMap.value.isNotEmpty() && !_scheduleMap.value.containsKey(_selectedDay.value)) {
+                            _selectedDay.value = _scheduleMap.value.keys.first()
+                        }
+                    }
+                    else -> {
+                        val res = retryIO { NetworkClient.animeApi.getSchedule() }
+                        val sched = res.schedule
+                        if (sched != null) {
+                            val blacklist = _blacklistedSlugs.value
+                            val map = mutableMapOf<String, List<AnimeRaw>>()
+                            map["Minggu"] = (sched.minggu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Senin"] = (sched.senin ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Selasa"] = (sched.selasa ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Rabu"] = (sched.rabu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Kamis"] = (sched.kamis ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Jumat"] = ((sched.jumat ?: sched.jumatAlt) ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            map["Sabtu"] = (sched.sabtu ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            _scheduleMap.value = map
+                        }
+                    }
                 }
                 _isScheduleLoading.value = false
             } catch (e: Exception) {
@@ -444,20 +596,51 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── DETAIL ──────────────────────────────────────────────────────
+
     fun loadAnimeDetail(slug: String) {
         _isDetailLoading.value = true
         _animeDetail.value = null
         _detailError.value = null
         viewModelScope.launch {
             try {
-                // Sync blacklist check
-                if (_blacklistedSlugs.value.contains(slug)) {
-                    _isDetailLoading.value = false
-                    _detailError.value = "Anime ini disembunyikan oleh Admin."
-                    return@launch
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.getDetail(slug) }
+                        val d = res.data
+                        if (d != null) {
+                            _animeDetail.value = DetailData(
+                                title = d.title,
+                                synonym = null,
+                                poster = d.poster,
+                                rating = d.score,
+                                synopsis = d.synopsis,
+                                trailer = null,
+                                genres = d.genres?.map { DetailGenreRaw(it.name, it.genreId) },
+                                status = d.status,
+                                aired = d.info?.released,
+                                type = d.type,
+                                duration = null,
+                                author = null,
+                                studio = d.studio,
+                                season = null,
+                                episodes = d.episodeList?.map { DetailEpisodeRaw(it.title, it.episodeId) },
+                                characters = null
+                            )
+                        } else {
+                            _detailError.value = "Detail anime tidak ditemukan."
+                        }
+                    }
+                    else -> {
+                        if (_blacklistedSlugs.value.contains(slug)) {
+                            _isDetailLoading.value = false
+                            _detailError.value = "Anime ini disembunyikan oleh Admin."
+                            return@launch
+                        }
+                        val res = retryIO { NetworkClient.animeApi.getDetail(slug) }
+                        _animeDetail.value = res.detail
+                    }
                 }
-                val res = retryIO { NetworkClient.animeApi.getDetail(slug) }
-                _animeDetail.value = res.detail
                 _isDetailLoading.value = false
             } catch (e: Exception) {
                 _isDetailLoading.value = false
@@ -467,6 +650,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── STREAMING ───────────────────────────────────────────────────
+
     fun loadEpisodeStream(slug: String) {
         _isStreamLoading.value = true
         _streams.value = emptyList()
@@ -475,16 +660,51 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _streamError.value = null
         viewModelScope.launch {
             try {
-                val res = retryIO { NetworkClient.animeApi.getEpisode(slug) }
-                _streamEpisodeTitle.value = res.title ?: "Tonton Tayangan"
-                val streamList = res.streams ?: emptyList()
-                _streams.value = streamList
-                
-                if (streamList.isNotEmpty()) {
-                    _selectedStreamIndex.value = 0
-                    _activeStreamUrl.value = streamList[0].url
-                } else {
-                    _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                when (_activeSource.value) {
+                    AnimeSource.SAMEHADAKU -> {
+                        val res = retryIO { NetworkClient.samehadakuApi.getEpisode(slug) }
+                        val epData = res.data
+                        _streamEpisodeTitle.value = epData?.title ?: "Tonton Tayangan"
+
+                        val servers = epData?.servers ?: emptyList()
+                        val streamList = servers.map { server ->
+                            StreamRaw(name = server.name, url = server.embedUrl)
+                        }
+                        _streams.value = streamList
+                        _serverTypes.value = servers.map { it.type }
+
+                        // Prioritaskan mp4 sebagai default
+                        val mp4Index = servers.indexOfFirst { it.type == "mp4" }
+                        val defaultIndex = if (mp4Index >= 0) mp4Index else 0
+
+                        if (streamList.isNotEmpty()) {
+                            _selectedStreamIndex.value = defaultIndex
+                            _activeStreamUrl.value = streamList[defaultIndex].url
+                            _activeServerType.value = servers.getOrNull(defaultIndex)?.type ?: "embed"
+                        } else {
+                            _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                        }
+
+                        _prevEpisodeSlug.value = epData?.prevEpisode
+                        _nextEpisodeSlug.value = epData?.nextEpisode
+                    }
+                    else -> {
+                        val res = retryIO { NetworkClient.animeApi.getEpisode(slug) }
+                        _streamEpisodeTitle.value = res.title ?: "Tonton Tayangan"
+                        val streamList = res.streams ?: emptyList()
+                        _streams.value = streamList
+                        _activeServerType.value = "embed"
+                        _serverTypes.value = streamList.map { "embed" }
+                        _prevEpisodeSlug.value = null
+                        _nextEpisodeSlug.value = null
+
+                        if (streamList.isNotEmpty()) {
+                            _selectedStreamIndex.value = 0
+                            _activeStreamUrl.value = streamList[0].url
+                        } else {
+                            _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                        }
+                    }
                 }
                 _isStreamLoading.value = false
             } catch (e: Exception) {
@@ -500,10 +720,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
         if (index in streamList.indices) {
             _selectedStreamIndex.value = index
             _activeStreamUrl.value = streamList[index].url
+            _activeServerType.value = _serverTypes.value.getOrElse(index) { "embed" }
         }
     }
 
-    // Toggle Bookmarks locally
+    // ── BOOKMARKS ───────────────────────────────────────────────────
+
     fun toggleBookmark(slug: String, title: String, poster: String, type: String? = null, ep: String? = null) {
         val currentlyBookmarked = bookmarkManager.isBookmarked(slug)
         if (currentlyBookmarked) {
@@ -514,7 +736,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
         refreshBookmarks()
     }
 
-    // Auth Actions: Login / Register / Get Profile
+    // ── AUTH ────────────────────────────────────────────────────────
+
     fun login(email: String, password: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
@@ -531,21 +754,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
                 val uId = res.user?.id ?: ""
-                
-                // Fetch profile to get real admin/banned status
                 val profileList = NetworkClient.supabaseDbApi.getProfileByUserId(
                     idQuery = "eq.$uId",
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
-
                 val profile = profileList.firstOrNull()
                 if (profile?.is_banned == true) {
                     _authError.value = "Akun Anda ditangguhkan (Banned) oleh Admin."
                     _authLoading.value = false
                     return@launch
                 }
-
                 val activeSession = UserSession(
                     token = token,
                     userId = uId,
@@ -555,7 +774,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.is_admin ?: false,
                     isBanned = profile?.is_banned ?: false
                 )
-
                 settingsStore.saveSession(activeSession)
                 _authLoading.value = false
                 onSuccess()
@@ -583,19 +801,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
                 val uId = res.user?.id ?: ""
-
-                // Sleep briefly to let handle_new_user trigger execute
                 kotlinx.coroutines.delay(1500)
-
-                // Read own profile
                 val profiles = NetworkClient.supabaseDbApi.getProfileByUserId(
                     idQuery = "eq.$uId",
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
-
                 val profile = profiles.firstOrNull()
-
                 val activeSession = UserSession(
                     token = token,
                     userId = uId,
@@ -605,13 +817,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.is_admin ?: false,
                     isBanned = profile?.is_banned ?: false
                 )
-
                 settingsStore.saveSession(activeSession)
                 _authLoading.value = false
                 onSuccess()
             } catch (e: Exception) {
                 _authLoading.value = false
-                _authError.value = "Daftar gagal. Sandi minimal 6 karakter atau email sudah terdafar."
+                _authError.value = "Daftar gagal. Sandi minimal 6 karakter atau email sudah terdaftar."
                 Log.e("AnikuVM", "Register Exception", e)
             }
         }
@@ -630,10 +841,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
-                val updatedSession = sess.copy(
-                    username = newUsername,
-                    avatarUrl = sess.avatarUrl
-                )
+                val updatedSession = sess.copy(username = newUsername, avatarUrl = sess.avatarUrl)
                 settingsStore.saveSession(updatedSession)
                 onComplete()
             } catch (e: Exception) {
@@ -650,7 +858,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
         onProgress(true)
         viewModelScope.launch {
             try {
-                // 1. Read bytes from URI
                 val contentResolver = appContext.contentResolver
                 val inputStream = contentResolver.openInputStream(uri)
                 val byteBuffer = ByteArrayOutputStream()
@@ -663,31 +870,22 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     inputStream.close()
                 }
                 val fileBytes = byteBuffer.toByteArray()
-                
-                // 2. Prepare multipart request body
                 val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
                 val body = MultipartBody.Part.createFormData("file", "avatar.jpg", requestFile)
                 val presetBody = "aniku_avatar".toRequestBody("text/plain".toMediaTypeOrNull())
-
-                // 3. Upload to Cloudinary unsigned preset
                 val cloudinaryRes = NetworkClient.cloudinaryApi.uploadAvatar(body, presetBody)
                 val secureUrl = cloudinaryRes.secure_url
-
-                // 4. Update url in Supabase profiles
                 NetworkClient.supabaseDbApi.updateProfile(
                     idQuery = "eq.$uId",
                     profile = mapOf("avatar_url" to secureUrl),
                     authHeader = "Bearer $token",
                     apiKey = SUPABASE_ANON_KEY
                 )
-                
-                val updatedSession = sess.copy(
-                    avatarUrl = secureUrl
-                )
+                val updatedSession = sess.copy(avatarUrl = secureUrl)
                 settingsStore.saveSession(updatedSession)
                 _isUploadingAvatar.value = false
                 onProgress(false)
-            } catch (e: java.lang.Exception) {
+            } catch (e: Exception) {
                 _isUploadingAvatar.value = false
                 onProgress(false)
                 Log.e("AnikuVM", "Cloudinary upload failed", e)
@@ -699,61 +897,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             settingsStore.clearSession()
             onComplete()
-        }
-    }
-
-    // Admin Panel Database Operations
-    fun loadAdminDetails() {
-        if (!session.value.isAdmin) return
-        val authHeader = getAuthHeader()
-        _isAdminLoading.value = true
-        viewModelScope.launch {
-            try {
-                // 1. Load users list
-                _adminUsers.value = NetworkClient.supabaseDbApi.getProfiles(authHeader, SUPABASE_ANON_KEY)
-                
-                // 2. Load announcements list (all)
-                _adminAnnouncements.value = NetworkClient.supabaseDbApi.getAllAnnouncements(authHeader, SUPABASE_ANON_KEY)
-                
-                // 3. Load featured slides list
-                _adminFeatured.value = NetworkClient.supabaseDbApi.getFeaturedAnime("*", "order_index.asc", authHeader, SUPABASE_ANON_KEY)
-                
-                // 4. Load blacklisted items list
-                _adminBlacklist.value = NetworkClient.supabaseDbApi.getBlacklistedAnime(authHeader, SUPABASE_ANON_KEY)
-                
-                _isAdminLoading.value = false
-            } catch (e: Exception) {
-                _isAdminLoading.value = false
-                Log.e("AnikuVM", "Failed to retrieve full admin properties", e)
-            }
-        }
-    }
-
-    fun toggleUserBanStatus(profile: ProfileDto) {
-        val authHeader = getAuthHeader()
-        val userIdToModify = profile.id
-        val newBanStatus = !(profile.is_banned ?: false)
-        Log.d("AnikuVM", "Trying ban - token: ${session.value.token?.take(20)} userId: $userIdToModify")
-        viewModelScope.launch {
-            try {
-                val response = NetworkClient.supabaseDbApi.updateProfile(
-                    idQuery = "eq.$userIdToModify",
-                    profile = mapOf("is_banned" to newBanStatus),
-                    authHeader = authHeader,
-                    apiKey = SUPABASE_ANON_KEY
-                )
-                if (response.isSuccessful || response.code() == 204) {
-                    _banStatusMessage.value = if (newBanStatus) "User berhasil dibanned" else "User berhasil diaktifkan"
-                    loadAdminDetails()
-                } else {
-                    val errBody = response.errorBody()?.string() ?: "Unknown error"
-                    _banStatusMessage.value = "Gagal: ${response.code()} - $errBody"
-                    Log.e("AnikuVM", "Ban failed: ${response.code()} $errBody")
-                }
-            } catch (e: java.lang.Exception) {
-                _banStatusMessage.value = "Error: ${e.message}"
-                Log.e("AnikuVM", "Failed updating ban for $userIdToModify", e)
-            }
         }
     }
 
@@ -769,16 +912,59 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Announcements management
+    // ── ADMIN ───────────────────────────────────────────────────────
+
+    fun loadAdminDetails() {
+        if (!session.value.isAdmin) return
+        val authHeader = getAuthHeader()
+        _isAdminLoading.value = true
+        viewModelScope.launch {
+            try {
+                _adminUsers.value = NetworkClient.supabaseDbApi.getProfiles(authHeader, SUPABASE_ANON_KEY)
+                _adminAnnouncements.value = NetworkClient.supabaseDbApi.getAllAnnouncements(authHeader, SUPABASE_ANON_KEY)
+                _adminFeatured.value = NetworkClient.supabaseDbApi.getFeaturedAnime("*", "order_index.asc", authHeader, SUPABASE_ANON_KEY)
+                _adminBlacklist.value = NetworkClient.supabaseDbApi.getBlacklistedAnime(authHeader, SUPABASE_ANON_KEY)
+                _isAdminLoading.value = false
+            } catch (e: Exception) {
+                _isAdminLoading.value = false
+                Log.e("AnikuVM", "Failed to retrieve full admin properties", e)
+            }
+        }
+    }
+
+    fun toggleUserBanStatus(profile: ProfileDto) {
+        val authHeader = getAuthHeader()
+        val userIdToModify = profile.id
+        val newBanStatus = !(profile.is_banned ?: false)
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.$userIdToModify",
+                    profile = mapOf("is_banned" to newBanStatus),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 204) {
+                    _banStatusMessage.value = if (newBanStatus) "User berhasil dibanned" else "User berhasil diaktifkan"
+                    loadAdminDetails()
+                } else {
+                    val errBody = response.errorBody()?.string() ?: "Unknown error"
+                    _banStatusMessage.value = "Gagal: ${response.code()} - $errBody"
+                }
+            } catch (e: Exception) {
+                _banStatusMessage.value = "Error: ${e.message}"
+                Log.e("AnikuVM", "Failed updating ban for $userIdToModify", e)
+            }
+        }
+    }
+
     fun saveAnnouncement(annId: String?, title: String, message: String, active: Boolean, downloadUrl: String? = null) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val inputBody = mapOf<String, @JvmSuppressWildcards Any?>(
-                    "title" to title,
-                    "message" to message,
-                    "is_active" to active,
-                    "download_url" to downloadUrl
+                    "title" to title, "message" to message,
+                    "is_active" to active, "download_url" to downloadUrl
                 )
                 if (annId.isNullOrEmpty()) {
                     NetworkClient.supabaseDbApi.insertAnnouncement(inputBody, authHeader, SUPABASE_ANON_KEY)
@@ -786,7 +972,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     NetworkClient.supabaseDbApi.updateAnnouncement("eq.$annId", inputBody, authHeader, SUPABASE_ANON_KEY)
                 }
                 loadAdminDetails()
-                loadHomeData() // Reload home notifications
+                loadHomeData()
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Failed saving announcement", e)
             }
@@ -806,20 +992,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Featured management
     fun saveFeaturedAnime(slug: String, title: String?, poster: String?, orderIndex: Int) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val inputBody = mapOf<String, Any?>(
-                    "anime_slug" to slug,
-                    "anime_title" to title,
-                    "anime_poster" to poster,
-                    "order_index" to orderIndex
+                    "anime_slug" to slug, "anime_title" to title,
+                    "anime_poster" to poster, "order_index" to orderIndex
                 )
                 NetworkClient.supabaseDbApi.insertFeaturedAnime(inputBody, authHeader, SUPABASE_ANON_KEY)
                 loadAdminDetails()
-                loadHomeData() // Reload home slider
+                loadHomeData()
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Failed insert featured anime", e)
             }
@@ -839,20 +1022,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Blacklist management
     fun saveBlacklistAnime(slug: String, title: String?, reason: String?) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val inputBody = mapOf<String, Any?>(
-                    "anime_slug" to slug,
-                    "anime_title" to title,
-                    "reason" to reason
+                    "anime_slug" to slug, "anime_title" to title, "reason" to reason
                 )
                 NetworkClient.supabaseDbApi.insertBlacklistedAnime(inputBody, authHeader, SUPABASE_ANON_KEY)
                 loadAdminDetails()
-                loadBlacklistSlugs() // Reload local sets
-                loadHomeData() // Reload home sections to filter
+                loadBlacklistSlugs()
+                loadHomeData()
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Failed insert blacklisted", e)
             }
@@ -873,7 +1053,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Edit Settings Details on DataStore
+    // ── SETTINGS ────────────────────────────────────────────────────
+
     fun toggleDarkMode(dark: Boolean) {
         viewModelScope.launch { settingsStore.setTheme(dark) }
     }
@@ -885,8 +1066,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     fun changeAccentColor(colorName: String) {
         viewModelScope.launch { settingsStore.setAccentColor(colorName) }
     }
-
 }
 
-// Simple extension mockup to make schedule challenge call compilable if reference triggers
-private fun NetworkClient.scheduleChallenge() {}
+// Extension function: ShkAnimeItem → AnimeRaw
+fun ShkAnimeItem.toAnimeRaw() = AnimeRaw(
+    title = this.title,
+    slug = this.animeId,
+    poster = this.poster,
+    type = this.type,
+    status_or_day = this.score
+)

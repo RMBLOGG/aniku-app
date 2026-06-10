@@ -10,6 +10,10 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
 import java.util.concurrent.TimeUnit
 
+// ─────────────────────────────────────────────
+// ANIMASU API (existing)
+// ─────────────────────────────────────────────
+
 interface AnimeApi {
     @GET("animasu/home")
     suspend fun getHome(
@@ -88,6 +92,60 @@ interface AnimeApi {
     ): EpisodeResponse
 }
 
+// ─────────────────────────────────────────────
+// SAMEHADAKU API
+// ─────────────────────────────────────────────
+
+interface SamehadakuApi {
+    @GET("shk/anime/home")
+    suspend fun getHome(): ShkResponse<ShkHomeData>
+
+    @GET("shk/anime/ongoing")
+    suspend fun getOngoing(
+        @Query("page") page: Int? = null
+    ): ShkResponse<ShkListData>
+
+    @GET("shk/anime/completed")
+    suspend fun getCompleted(
+        @Query("page") page: Int? = null
+    ): ShkResponse<ShkListData>
+
+    @GET("shk/anime/movies")
+    suspend fun getMovies(
+        @Query("page") page: Int? = null
+    ): ShkResponse<ShkListData>
+
+    @GET("shk/anime/popular")
+    suspend fun getPopular(
+        @Query("page") page: Int? = null
+    ): ShkResponse<ShkListData>
+
+    @GET("shk/anime/search")
+    suspend fun search(
+        @Query("q") query: String
+    ): ShkResponse<ShkListData>
+
+    @GET("shk/anime/genres")
+    suspend fun getGenres(): ShkResponse<ShkGenresData>
+
+    @GET("shk/anime/schedule")
+    suspend fun getSchedule(): ShkResponse<ShkScheduleData>
+
+    @GET("shk/anime/detail/{slug}")
+    suspend fun getDetail(
+        @Path("slug") slug: String
+    ): ShkResponse<ShkDetailData>
+
+    @GET("shk/anime/episode/{slug}")
+    suspend fun getEpisode(
+        @Path("slug") slug: String
+    ): ShkResponse<ShkEpisodeData>
+}
+
+// ─────────────────────────────────────────────
+// SUPABASE AUTH API (existing)
+// ─────────────────────────────────────────────
+
 interface SupabaseAuthApi {
     @POST("auth/v1/signup")
     suspend fun signUp(
@@ -107,6 +165,10 @@ interface SupabaseAuthApi {
         @Header("apikey") apiKey: String
     ): Response<Unit>
 }
+
+// ─────────────────────────────────────────────
+// SUPABASE DB API (existing)
+// ─────────────────────────────────────────────
 
 interface SupabaseDbApi {
     @GET("rest/v1/announcements")
@@ -158,7 +220,6 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): Response<Unit>
 
-    // Admin endpoints: Announcements
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -183,7 +244,6 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): Response<Unit>
 
-    // Admin endpoints: Featured Anime
     @POST("rest/v1/featured_anime")
     suspend fun insertFeaturedAnime(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -199,7 +259,6 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): Response<Unit>
 
-    // Admin endpoints: Blacklist
     @POST("rest/v1/blacklisted_anime")
     suspend fun insertBlacklistedAnime(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -216,6 +275,10 @@ interface SupabaseDbApi {
     ): Response<Unit>
 }
 
+// ─────────────────────────────────────────────
+// CLOUDINARY API (existing)
+// ─────────────────────────────────────────────
+
 interface CloudinaryApi {
     @Multipart
     @POST("v1_1/dzfkklsza/image/upload")
@@ -224,6 +287,10 @@ interface CloudinaryApi {
         @Part("upload_preset") uploadPreset: RequestBody
     ): CloudinaryResponse
 }
+
+// ─────────────────────────────────────────────
+// NETWORK CLIENT
+// ─────────────────────────────────────────────
 
 object NetworkClient {
     private val moshi = com.squareup.moshi.Moshi.Builder()
@@ -241,6 +308,12 @@ object NetworkClient {
         .addInterceptor(loggingInterceptor)
         .build()
 
+    // Ping client: shorter timeout for status checks
+    val pingClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
+
     val animeApi: AnimeApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://www.sankavollerei.com/anime/")
@@ -248,6 +321,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(AnimeApi::class.java)
+    }
+
+    val samehadakuApi: SamehadakuApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://dayynime-api.vercel.app/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(SamehadakuApi::class.java)
     }
 
     val supabaseAuthApi: SupabaseAuthApi by lazy {

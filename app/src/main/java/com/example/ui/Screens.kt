@@ -40,6 +40,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.*
@@ -1794,7 +1797,11 @@ fun WatchScreen(
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
     val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
-    val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
+    val activeServerType by viewModel.activeServerType.collectAsState()
+    val prevEpisodeSlug by viewModel.prevEpisodeSlug.collectAsState()
+    val nextEpisodeSlug by viewModel.nextEpisodeSlug.collectAsState()
+    val activeSource by viewModel.activeSource.collectAsState()
+    val detail by viewModel.animeDetail.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(episodeSlug) {
@@ -1876,70 +1883,90 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
-                // Render embed stream player - otakuzone style fullscreen
-                var customView by remember { mutableStateOf<android.view.View?>(null) }
-                var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+                if (activeServerType == "mp4") {
+                    // ExoPlayer untuk direct MP4 (Samehadaku)
+                    val context = LocalContext.current
+                    val exoPlayer = remember(activeStreamUrl) {
+                        ExoPlayer.Builder(context).build().apply {
+                            setMediaItem(MediaItem.fromUri(activeStreamUrl!!))
+                            prepare()
+                            playWhenReady = true
+                        }
+                    }
+                    DisposableEffect(exoPlayer) {
+                        onDispose { exoPlayer.release() }
+                    }
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // WebView untuk embed / blogger / mega
+                    var customView by remember { mutableStateOf<android.view.View?>(null) }
+                    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
-                val handleHideCustomView = {
-                    customViewCallback?.onCustomViewHidden()
-                    customView = null
-                    customViewCallback = null
-                }
+                    val handleHideCustomView = {
+                        customViewCallback?.onCustomViewHidden()
+                        customView = null
+                        customViewCallback = null
+                    }
 
-                if (customView != null) {
-                    BackHandler { handleHideCustomView() }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black)
-                    ) {
+                    if (customView != null) {
+                        BackHandler { handleHideCustomView() }
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(Color.Black)
+                        ) {
+                            AndroidView(
+                                factory = {
+                                    customView?.apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    } ?: android.view.View(it)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    } else {
                         AndroidView(
-                            factory = {
-                                customView?.apply {
+                            factory = { ctx ->
+                                WebView(ctx).apply {
                                     layoutParams = ViewGroup.LayoutParams(
                                         ViewGroup.LayoutParams.MATCH_PARENT,
                                         ViewGroup.LayoutParams.MATCH_PARENT
                                     )
-                                } ?: android.view.View(it)
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        mediaPlaybackRequiresUserGesture = false
+                                        useWideViewPort = true
+                                        loadWithOverviewMode = true
+                                    }
+                                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                                    webViewClient = WebViewClient()
+                                    webChromeClient = object : WebChromeClient() {
+                                        override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
+                                            super.onShowCustomView(view, callback)
+                                            customView = view
+                                            customViewCallback = callback
+                                        }
+                                        override fun onHideCustomView() {
+                                            super.onHideCustomView()
+                                            handleHideCustomView()
+                                        }
+                                    }
+                                }
                             },
+                            update = { view -> view.loadUrl(activeStreamUrl!!) },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                } else {
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                layoutParams = ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    mediaPlaybackRequiresUserGesture = false
-                                    useWideViewPort = true
-                                    loadWithOverviewMode = true
-                                }
-                                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                                webViewClient = WebViewClient()
-                                webChromeClient = object : WebChromeClient() {
-                                    override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
-                                        super.onShowCustomView(view, callback)
-                                        customView = view
-                                        customViewCallback = callback
-                                    }
-                                    override fun onHideCustomView() {
-                                        super.onHideCustomView()
-                                        handleHideCustomView()
-                                    }
-                                }
-                            }
-                        },
-                        update = { view ->
-                            view.loadUrl(activeStreamUrl!!)
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
                 }
             }
         }
@@ -2000,6 +2027,39 @@ fun WatchScreen(
         }
 
         // Previous and Next Episode controls
+        if (activeSource == AnimeSource.SAMEHADAKU) {
+            // Samehadaku: gunakan prevEpisodeSlug / nextEpisodeSlug dari API
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Button(
+                    onClick = { prevEpisodeSlug?.let { viewModel.loadEpisodeStream(it) } },
+                    enabled = prevEpisodeSlug != null,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("< Sebelumnya") }
+
+                Button(
+                    onClick = { nextEpisodeSlug?.let { viewModel.loadEpisodeStream(it) } },
+                    enabled = nextEpisodeSlug != null,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Selanjutnya >") }
+            }
+        } else {
         detail?.episodes?.let { eps ->
             val currentIndex = eps.indexOfFirst { it.slug == episodeSlug }
             if (currentIndex != -1) {
@@ -2053,6 +2113,7 @@ fun WatchScreen(
                 }
             }
         }
+        } // end else Animasu
 
         Spacer(modifier = Modifier.height(12.dp))
         if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -3283,6 +3344,175 @@ fun SettingsScreen(
                     }
                 ) {
                     Text("Kunjungi Facebook Developer", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
+// SOURCES SCREEN
+// ================================================================
+
+@Composable
+fun SourcesScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val sourcesStatus by viewModel.sourcesStatus.collectAsState()
+    val activeSource by viewModel.activeSource.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.checkSourcesStatus()
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Anime Sources") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "Available Sources",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Text(
+                text = "Pilih sumber untuk mengambil anime. Status menunjukkan apakah sumber sedang aktif.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            sourcesStatus.forEach { info ->
+                SourceItem(
+                    info = info,
+                    isActive = info.source == activeSource,
+                    onClick = {
+                        if (info.status == SourceStatus.ONLINE) {
+                            viewModel.switchSource(info.source)
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun SourceItem(
+    info: AnimeSourceInfo,
+    isActive: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(
+                width = if (isActive) 2.dp else 0.dp,
+                color = if (isActive) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(enabled = info.status == SourceStatus.ONLINE, onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Status icon box
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        when (info.status) {
+                            SourceStatus.ONLINE -> Color(0xFF4CAF50).copy(alpha = 0.15f)
+                            SourceStatus.OFFLINE -> Color(0xFFF44336).copy(alpha = 0.15f)
+                            SourceStatus.CHECKING -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                when (info.status) {
+                    SourceStatus.CHECKING -> CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    SourceStatus.ONLINE -> Icon(
+                        imageVector = Icons.Default.Wifi,
+                        contentDescription = "Online",
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(22.dp)
+                    )
+                    SourceStatus.OFFLINE -> Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Offline",
+                        tint = Color(0xFFF44336),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = info.source.displayName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                    color = if (info.status == SourceStatus.OFFLINE)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Status: ${info.status.name}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (info.status) {
+                        SourceStatus.ONLINE -> Color(0xFF4CAF50)
+                        SourceStatus.OFFLINE -> Color(0xFFF44336)
+                        SourceStatus.CHECKING -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+            }
+
+            if (isActive) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF4CAF50)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Active",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }
