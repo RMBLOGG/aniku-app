@@ -3428,9 +3428,7 @@ fun SourcesScreen(
                     info = info,
                     isActive = info.source == activeSource,
                     onClick = {
-                        if (info.status == SourceStatus.ONLINE) {
-                            viewModel.switchSource(info.source)
-                        }
+                        viewModel.switchSource(info.source)
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -3454,7 +3452,7 @@ fun SourceItem(
                 color = if (isActive) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable(enabled = info.status == SourceStatus.ONLINE, onClick = onClick),
+            .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp)
     ) {

@@ -242,24 +242,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     fun checkSourcesStatus() {
-        _sourcesStatus.value = AnimeSource.values().map { AnimeSourceInfo(it, SourceStatus.CHECKING) }
-        viewModelScope.launch {
-            AnimeSource.values().forEach { source ->
-                launch {
-                    val status = try {
-                        val request = Request.Builder().url(source.pingUrl).head().build()
-                        val response = NetworkClient.pingClient.newCall(request).execute()
-                        if (response.isSuccessful || response.code == 404) SourceStatus.ONLINE
-                        else SourceStatus.OFFLINE
-                    } catch (e: Exception) {
-                        SourceStatus.OFFLINE
-                    }
-                    _sourcesStatus.value = _sourcesStatus.value.map {
-                        if (it.source == source) it.copy(status = status) else it
-                    }
-                }
-            }
-        }
+        _sourcesStatus.value = AnimeSource.values().map { AnimeSourceInfo(it, SourceStatus.ONLINE) }
     }
 
     // ── HOME DATA ───────────────────────────────────────────────────
