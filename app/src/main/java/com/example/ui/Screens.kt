@@ -3354,6 +3354,7 @@ fun SettingsScreen(
 // SOURCES SCREEN
 // ================================================================
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SourcesScreen(
     viewModel: AnikuViewModel,
@@ -3462,7 +3463,7 @@ fun SourceItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     SourceStatus.ONLINE -> Icon(
-                        imageVector = Icons.Default.Wifi,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Online",
                         tint = Color(0xFF4CAF50),
                         modifier = Modifier.size(22.dp)
