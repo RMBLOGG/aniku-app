@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
                                     Triple("explore", "Eksplor", Icons.Default.PlayArrow),
                                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
                                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
-                                    Triple("chat", "Chat", Icons.Default.Message)
+                                    Triple("chat", "Chat", Icons.Default.Chat)
                                 )
 
                                 items.forEach { (route, label, icon) ->
