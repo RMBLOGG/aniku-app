@@ -1212,8 +1212,8 @@ fun AnimeListCard(
             anime.status?.let {
                 Text(it, color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
-            anime.score?.let {
-                Text("⭐ $it", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp)
+            anime.episode?.let {
+                Text("Ep: $it", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp)
             }
         }
         IconButton(
