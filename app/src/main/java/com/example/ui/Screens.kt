@@ -285,6 +285,86 @@ fun HomeScreen(
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val session by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+
+    val updateAvailable by viewModel.updateAvailable.collectAsState()
+    val latestVersion by viewModel.latestVersion.collectAsState()
+    val downloadUrl by viewModel.downloadUrl.collectAsState()
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    // Tampilkan popup sekali saat update tersedia
+    LaunchedEffect(updateAvailable) {
+        if (updateAvailable) showUpdateDialog = true
+    }
+
+    if (showUpdateDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            containerColor = Color(0xFF1A1A2E),
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(accentColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = context.packageManager.getApplicationIcon(context.packageName),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Update Tersedia!",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Versi terbaru $latestVersion sudah tersedia. Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.",
+                        color = Color.LightGray,
+                        fontSize = 14.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUpdateDialog = false
+                        val dm = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        val uri = Uri.parse(downloadUrl)
+                        val request = android.app.DownloadManager.Request(uri).apply {
+                            setTitle("Aniku $latestVersion")
+                            setDescription("Mengunduh update aplikasi...")
+                            setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "Aniku-${latestVersion}.apk")
+                            setMimeType("application/vnd.android.package-archive")
+                            addRequestHeader("Accept", "application/octet-stream")
+                        }
+                        dm.enqueue(request)
+                        Toast.makeText(context, "Download dimulai, cek notifikasi", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Download $latestVersion", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text("Nanti", color = Color.LightGray)
+                }
+            }
+        )
+    }
 
     var slideIndex by remember { mutableStateOf(0) }
 
@@ -3492,7 +3572,11 @@ fun SettingsScreen(
                                 .background(accentColor),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("📦", fontSize = 20.sp)
+                            AsyncImage(
+                                model = context.packageManager.getApplicationIcon(context.packageName),
+                                contentDescription = "App Icon",
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
