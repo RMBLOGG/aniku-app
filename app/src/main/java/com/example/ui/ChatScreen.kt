@@ -246,6 +246,7 @@ fun ChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
@@ -335,7 +336,7 @@ private fun ChatBubble(
                 text = timeStr,
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier.padding(horizontal = 4.dp, top = 2.dp)
+                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 0.dp)
             )
         }
     }

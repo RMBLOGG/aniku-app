@@ -404,7 +404,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isScheduleLoading.value = true
         viewModelScope.launch {
             try {
-                val res = NetworkClient.scheduleChallenge()
+                val res = NetworkClient.animeApi.getSchedule()
                 // Fetch schedule data properly
                 _isScheduleLoading.value = false
             } catch (e: Exception) {
