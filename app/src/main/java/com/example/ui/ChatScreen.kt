@@ -488,7 +488,7 @@ private fun ChatBubble(
                 text = timeStr,
                 fontSize = 9.sp,
                 color = TextDim,
-                modifier = Modifier.padding(horizontal = 2.dp, top = 2.dp)
+                modifier = Modifier.padding(start = 2.dp, end = 2.dp, top = 2.dp)
             )
         }
     }
