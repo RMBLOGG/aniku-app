@@ -1,8 +1,16 @@
 package com.example.network
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ui.theme.SettingsStore
@@ -13,6 +21,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 class AnikuViewModel(context: Context) : ViewModel() {
     private val appContext = context.applicationContext
@@ -242,7 +251,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _latestVersion.value = tagName
                     _downloadUrl.value = dlUrl
                     val latestClean = tagName.trimStart('v')
-                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.2.2" }
+                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.2.3" }
                     if (latestClean.isNotEmpty() && latestClean != appVersion) {
                         _updateAvailable.value = true
                         _updateCheckMessage.value = "Update tersedia: $tagName"
@@ -259,6 +268,106 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 Log.w("AnikuVM", "checkForUpdate failed: ${e.message}")
             } finally {
                 _isCheckingUpdate.value = false
+            }
+        }
+    }
+
+    // Download APK dengan OkHttp + custom notification
+    fun downloadUpdate(url: String, version: String) {
+        viewModelScope.launch {
+            val notifManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channelId = "aniku_update"
+            val notifId = 9901
+
+            // Buat notification channel (Android 8+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Aniku Update",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply { description = "Notifikasi update aplikasi Aniku" }
+                notifManager.createNotificationChannel(channel)
+            }
+
+            val builder = NotificationCompat.Builder(appContext, channelId)
+                .setSmallIcon(appContext.applicationInfo.icon)
+                .setContentTitle("Aniku $version")
+                .setContentText("Mengunduh update...")
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setProgress(100, 0, false)
+
+            notifManager.notify(notifId, builder.build())
+
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val request = okhttp3.Request.Builder()
+                        .url(url)
+                        .header("Accept", "application/octet-stream")
+                        .build()
+                    val response = client.newCall(request).execute()
+                    val body = response.body ?: throw Exception("Empty response body")
+                    val contentLength = body.contentLength()
+
+                    val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                        ?: appContext.filesDir
+                    val outputFile = File(outputDir, "Aniku-${version}.apk")
+
+                    var downloaded = 0L
+                    body.byteStream().use { input ->
+                        outputFile.outputStream().use { output ->
+                            val buffer = ByteArray(8192)
+                            var bytes: Int
+                            while (input.read(buffer).also { bytes = it } != -1) {
+                                output.write(buffer, 0, bytes)
+                                downloaded += bytes
+                                if (contentLength > 0) {
+                                    val progress = (downloaded * 100 / contentLength).toInt()
+                                    builder.setProgress(100, progress, false)
+                                        .setContentText("Mengunduh... $progress%")
+                                    notifManager.notify(notifId, builder.build())
+                                }
+                            }
+                        }
+                    }
+
+                    // Selesai — buat intent install
+                    val apkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        FileProvider.getUriForFile(
+                            appContext,
+                            "${appContext.packageName}.provider",
+                            outputFile
+                        )
+                    } else {
+                        Uri.fromFile(outputFile)
+                    }
+
+                    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(apkUri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    val pendingIntent = PendingIntent.getActivity(
+                        appContext, 0, installIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+
+                    builder.setProgress(0, 0, false)
+                        .setContentText("Download selesai. Tap untuk install.")
+                        .setOngoing(false)
+                        .setAutoCancel(true)
+                        .setContentIntent(pendingIntent)
+                    notifManager.notify(notifId, builder.build())
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "downloadUpdate failed: ${e.message}")
+                builder.setProgress(0, 0, false)
+                    .setContentText("Download gagal: periksa koneksi")
+                    .setOngoing(false)
+                notifManager.notify(notifId, builder.build())
             }
         }
     }
