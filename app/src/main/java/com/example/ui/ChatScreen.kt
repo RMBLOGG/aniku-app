@@ -258,8 +258,11 @@ private fun ChatBubble(
     val timeStr = remember(message.created_at) {
         try {
             val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
             val date = parser.parse(message.created_at.take(19)) ?: Date()
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+            val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
+            formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+            formatter.format(date)
         } catch (e: Exception) {
             "--:--"
         }
