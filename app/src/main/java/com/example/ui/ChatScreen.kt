@@ -7,11 +7,14 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,6 +28,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
+// ── Warna custom biar lepas dari Material3 defaults ──────────────────────────
+private val AksenMerah     = Color(0xFFE5282A)
+private val AksenMerahGelap = Color(0xFF9B1B1C)
+private val BubbleOwn      = Color(0xFFCC2020)
+private val BubbleOther    = Color(0xFF1A1A1A)
+private val BorderOther    = Color(0xFF2E2E2E)
+private val TextDim        = Color(0xFF666666)
+private val TextMain       = Color(0xFFEEEEEE)
+private val BgSurface      = Color(0xFF0D0D0D)
+private val InputBg        = Color(0xFF151515)
+private val DividerColor   = Color(0xFF222222)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +61,6 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Auto-poll setiap 5 detik (Supabase REST polling)
     LaunchedEffect(Unit) {
         viewModel.loadChatMessages()
         while (true) {
@@ -55,14 +69,12 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll ke bawah saat ada pesan baru
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
-    // Tampilkan error via snackbar
     LaunchedEffect(chatError) {
         chatError?.let {
             snackbarHostState.showSnackbar(it)
@@ -71,90 +83,167 @@ fun ChatScreen(
     }
 
     Scaffold(
+        containerColor = BgSurface,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "💬 Chat Room",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            if (isLoggedIn) "Online sebagai ${session.username}" else "Mode tamu — hanya lihat",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.loadChatMessages() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        bottomBar = {
-            // Input bar
-            Column {
-                Divider()
-                if (isLoggedIn) {
-                    // User login — bisa kirim pesan
+            // ── Header custom — bukan Material TopAppBar generik ─────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(BgSurface)
+            ) {
+                // garis aksen merah tipis di bawah header
+                Column {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Kembali",
+                                tint = TextMain
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // aksen slash merah sebelum judul
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(18.dp)
+                                        .background(AksenMerah, RoundedCornerShape(2.dp))
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "CHAT ROOM",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 16.sp,
+                                    letterSpacing = 1.5.sp,
+                                    color = TextMain
+                                )
+                            }
+                            Text(
+                                if (isLoggedIn) "● ${session.username}" else "○ tamu — hanya lihat",
+                                fontSize = 11.sp,
+                                color = if (isLoggedIn) AksenMerah.copy(alpha = 0.85f) else TextDim,
+                                modifier = Modifier.padding(start = 11.dp)
+                            )
+                        }
+                        IconButton(onClick = { viewModel.loadChatMessages() }) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                tint = TextDim
+                            )
+                        }
+                    }
+                    // garis tipis merah-ke-transparan
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(AksenMerah, AksenMerahGelap, Color.Transparent)
+                                )
+                            )
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            Column(
+                modifier = Modifier
+                    .background(BgSurface)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(DividerColor)
+                )
+                if (isLoggedIn) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
                             .navigationBarsPadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = inputText,
-                            onValueChange = { if (it.length <= 300) inputText = it },
-                            placeholder = { Text("Ketik pesan...") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(24.dp),
-                            maxLines = 3,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        // ── Input flat, bukan outlined bulat ─────────────────
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(InputBg)
+                                .border(
+                                    width = 1.dp,
+                                    color = DividerColor,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        ) {
+                            BasicTextField(
+                                value = inputText,
+                                onValueChange = { if (it.length <= 300) inputText = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                textStyle = TextStyle(
+                                    color = TextMain,
+                                    fontSize = 14.sp
+                                ),
+                                maxLines = 3,
+                                decorationBox = { inner ->
+                                    if (inputText.isEmpty()) {
+                                        Text(
+                                            "Ketik pesan...",
+                                            color = TextDim,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    inner()
+                                }
                             )
-                        )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
-                        FilledIconButton(
-                            onClick = {
-                                val msg = inputText.trim()
-                                if (msg.isNotEmpty()) {
-                                    viewModel.sendChatMessage(msg)
-                                    inputText = ""
-                                    coroutineScope.launch {
-                                        delay(300)
-                                        if (messages.isNotEmpty()) {
-                                            listState.animateScrollToItem(messages.size - 1)
+                        // ── Send button — kotak kecil, bukan circle besar ────
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (inputText.trim().isNotEmpty()) AksenMerah
+                                    else Color(0xFF1E1E1E)
+                                )
+                                .clickable(enabled = inputText.trim().isNotEmpty()) {
+                                    val msg = inputText.trim()
+                                    if (msg.isNotEmpty()) {
+                                        viewModel.sendChatMessage(msg)
+                                        inputText = ""
+                                        coroutineScope.launch {
+                                            delay(300)
+                                            if (messages.isNotEmpty()) {
+                                                listState.animateScrollToItem(messages.size - 1)
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            enabled = inputText.trim().isNotEmpty(),
-                            modifier = Modifier.size(48.dp)
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 Icons.Default.Send,
                                 contentDescription = "Kirim",
-                                modifier = Modifier.size(20.dp)
+                                tint = if (inputText.trim().isNotEmpty()) Color.White
+                                       else TextDim,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                 } else {
-                    // Guest — tampilkan CTA login
+                    // ── Guest bar ────────────────────────────────────────────
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -163,24 +252,33 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            "//",
+                            color = AksenMerah,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "Login untuk ikut chat",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontSize = 14.sp
+                            color = TextDim,
+                            fontSize = 13.sp
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        TextButton(
-                            onClick = { navController.navigate("auth") },
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(AksenMerah)
+                                .clickable { navController.navigate("auth") }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
-                            Text("Login", fontWeight = FontWeight.Bold)
+                            Text(
+                                "LOGIN",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 12.sp,
+                                letterSpacing = 1.sp,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -190,34 +288,37 @@ fun ChatScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(BgSurface)
                 .padding(innerPadding)
         ) {
             when {
                 isChatLoading && messages.isEmpty() -> {
-                    // Loading pertama kali
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Memuat pesan...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        }
+                        CircularProgressIndicator(color = AksenMerah, strokeWidth = 2.dp)
                     }
                 }
                 messages.isEmpty() -> {
-                    // Kosong
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("💬", fontSize = 48.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Belum ada pesan",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                "[ ]",
+                                fontSize = 36.sp,
+                                fontWeight = FontWeight.Thin,
+                                color = TextDim,
+                                letterSpacing = 4.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "BELUM ADA PESAN",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 2.sp,
+                                color = TextDim
                             )
                             Text(
-                                if (isLoggedIn) "Jadilah yang pertama chat!" else "Login untuk mulai chat",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                if (isLoggedIn) "jadilah yang pertama" else "login untuk mulai",
+                                fontSize = 11.sp,
+                                color = TextDim.copy(alpha = 0.5f)
                             )
                         }
                     }
@@ -226,8 +327,8 @@ fun ChatScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(messages, key = { it.id }) { message ->
                             val isOwn = message.user_id == currentUserId
@@ -239,7 +340,6 @@ fun ChatScreen(
                                 } else null
                             )
                         }
-                        // Spacer di bawah
                         item { Spacer(modifier = Modifier.height(4.dp)) }
                     }
                 }
@@ -263,9 +363,7 @@ private fun ChatBubble(
             val formatter = SimpleDateFormat("HH:mm", Locale.getDefault())
             formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
             formatter.format(date)
-        } catch (e: Exception) {
-            "--:--"
-        }
+        } catch (e: Exception) { "--:--" }
     }
 
     var showDelete by remember { mutableStateOf(false) }
@@ -274,32 +372,30 @@ private fun ChatBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
     ) {
+        // ── Avatar orang lain — kotak kecil bukan circle besar ───────────────
         if (!isOwnMessage) {
-            // Avatar kiri untuk pesan orang lain
             if (!message.avatar_url.isNullOrEmpty()) {
                 AsyncImage(
                     model = message.avatar_url,
                     contentDescription = message.username,
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    error = null,
-                    fallback = null,
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(AksenMerahGelap),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = message.username.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp,
+                        color = Color.White
                     )
                 }
             }
@@ -308,95 +404,151 @@ private fun ChatBubble(
 
         Column(
             horizontalAlignment = if (isOwnMessage) Alignment.End else Alignment.Start,
-            modifier = Modifier.widthIn(max = 280.dp)
+            modifier = Modifier.widthIn(max = 260.dp)
         ) {
+            // ── Username + badge admin ────────────────────────────────────────
             if (!isOwnMessage) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 3.dp)
                 ) {
                     Text(
                         text = message.username,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AksenMerah,
+                        letterSpacing = 0.5.sp
                     )
                     if (message.is_admin == true) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.error)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(AksenMerah)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
                                 text = "ADMIN",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 7.sp,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = Color.White,
-                                letterSpacing = 0.8.sp
+                                letterSpacing = 1.sp
                             )
                         }
                     }
                 }
             }
 
+            // ── Bubble message ────────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .clip(
                         RoundedCornerShape(
-                            topStart = if (isOwnMessage) 16.dp else 4.dp,
-                            topEnd = if (isOwnMessage) 4.dp else 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 16.dp
+                            topStart = if (isOwnMessage) 12.dp else 2.dp,
+                            topEnd = if (isOwnMessage) 2.dp else 12.dp,
+                            bottomStart = 12.dp,
+                            bottomEnd = 12.dp
                         )
                     )
                     .background(
-                        if (isOwnMessage) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
+                        if (isOwnMessage) BubbleOwn
+                        else BubbleOther
+                    )
+                    .then(
+                        // border tipis untuk bubble orang lain
+                        if (!isOwnMessage)
+                            Modifier.border(
+                                1.dp,
+                                BorderOther,
+                                RoundedCornerShape(
+                                    topStart = 2.dp,
+                                    topEnd = 12.dp,
+                                    bottomStart = 12.dp,
+                                    bottomEnd = 12.dp
+                                )
+                            )
+                        else Modifier
                     )
                     .combinedClickable(
                         onClick = {},
-                        onLongClick = {
-                            if (onDelete != null) showDelete = true
-                        }
+                        onLongClick = { if (onDelete != null) showDelete = true }
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = message.message,
-                    fontSize = 14.sp,
-                    color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 13.sp,
+                    color = if (isOwnMessage) Color.White else TextMain,
+                    lineHeight = 18.sp
                 )
             }
 
+            // ── Timestamp ─────────────────────────────────────────────────────
             Text(
                 text = timeStr,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 0.dp)
+                fontSize = 9.sp,
+                color = TextDim,
+                modifier = Modifier.padding(horizontal = 2.dp, top = 2.dp)
             )
         }
     }
 
-    // Dialog konfirmasi hapus
+    // ── Dialog hapus ─────────────────────────────────────────────────────────
     if (showDelete && onDelete != null) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            title = { Text("Hapus pesan?") },
-            text = { Text("Pesan ini akan dihapus permanen.") },
+            containerColor = Color(0xFF141414),
+            title = {
+                Text(
+                    "HAPUS PESAN",
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
+                    color = TextMain,
+                    fontSize = 14.sp
+                )
+            },
+            text = {
+                Text(
+                    "Pesan ini akan dihapus permanen.",
+                    color = TextDim,
+                    fontSize = 13.sp
+                )
+            },
             confirmButton = {
-                TextButton(onClick = {
-                    onDelete()
-                    showDelete = false
-                }) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(AksenMerah)
+                        .clickable {
+                            onDelete()
+                            showDelete = false
+                        }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        "HAPUS",
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDelete = false }) {
-                    Text("Batal")
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .border(1.dp, DividerColor, RoundedCornerShape(4.dp))
+                        .clickable { showDelete = false }
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        "BATAL",
+                        fontWeight = FontWeight.Bold,
+                        color = TextDim,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
+                    )
                 }
             }
         )
