@@ -348,6 +348,7 @@ fun HomeScreen(
             }
         }
     } else {
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -510,17 +511,14 @@ fun HomeScreen(
                                 }
                             }
 
-                            // Header Bar (logo + profile)
-                            Row(
+                            // Header Bar (logo only - settings button is now a floating overlay)
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .statusBarsPadding()
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    .align(Alignment.TopStart),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .align(Alignment.TopStart)
                             ) {
-                                // Logo
                                 Text(
                                     text = "ANIKU",
                                     color = Color.White,
@@ -534,32 +532,6 @@ fun HomeScreen(
                                         )
                                     )
                                 )
-                                // Avatar / Settings
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                        .clickable { navController.navigate("settings") },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (!session.avatarUrl.isNullOrEmpty()) {
-                                        AsyncImage(
-                                            model = session.avatarUrl,
-                                            contentDescription = "Profile",
-                                            modifier = Modifier
-                                                .size(38.dp)
-                                                .clip(CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            Icons.Default.Settings,
-                                            contentDescription = "Settings",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -830,6 +802,37 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
+
+        // Floating Settings Button (sticky, tidak ikut scroll)
+        Box(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(end = 16.dp, top = 12.dp)
+                .size(38.dp)
+                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                .clickable { navController.navigate("settings") }
+                .align(Alignment.TopEnd),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!session.avatarUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = session.avatarUrl,
+                    contentDescription = "Profile",
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        } // end Box
     }
 }
 
@@ -3312,7 +3315,7 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Aniku v1.0",
+                    text = "Aniku v1.1.0",
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
