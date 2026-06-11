@@ -242,7 +242,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _latestVersion.value = tagName
                     _downloadUrl.value = dlUrl
                     val latestClean = tagName.trimStart('v')
-                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.2.0" }
+                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.1.0" }
                     if (latestClean.isNotEmpty() && latestClean != appVersion) {
                         _updateAvailable.value = true
                         _updateCheckMessage.value = "Update tersedia: $tagName"

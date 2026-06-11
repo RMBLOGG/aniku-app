@@ -3541,8 +3541,18 @@ fun SettingsScreen(
                     if (updateAvailable && downloadUrl.isNotEmpty()) {
                         Button(
                             onClick = {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
-                                context.startActivity(browserIntent)
+                                val dm = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                                val uri = Uri.parse(downloadUrl)
+                                val request = android.app.DownloadManager.Request(uri).apply {
+                                    setTitle("Aniku ${latestVersion}")
+                                    setDescription("Mengunduh update aplikasi...")
+                                    setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                    setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "Aniku-${latestVersion}.apk")
+                                    setMimeType("application/vnd.android.package-archive")
+                                    addRequestHeader("Accept", "application/octet-stream")
+                                }
+                                dm.enqueue(request)
+                                Toast.makeText(context, "Download dimulai, cek notifikasi", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                             modifier = Modifier.fillMaxWidth(),
