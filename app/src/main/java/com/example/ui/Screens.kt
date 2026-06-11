@@ -45,6 +45,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.*
 import com.example.ui.theme.getAccentColor
+import com.example.BuildConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -3162,6 +3163,9 @@ fun SettingsScreen(
     val sess by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
+    val updateAvailable by viewModel.updateAvailable.collectAsState()
+    val latestVersion by viewModel.latestVersion.collectAsState()
+    val downloadUrl by viewModel.downloadUrl.collectAsState()
 
     Column(
         modifier = Modifier
@@ -3466,6 +3470,101 @@ fun SettingsScreen(
                 }
             }
 
+            // Section H: Versi Aplikasi & Cek Update
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDark) Color(0xFF1A1A2E) else Color(0xFFF3E5F5)
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(accentColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("📦", fontSize = 20.sp)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Versi Aplikasi",
+                                color = if (isDark) Color.White else Color(0xFF4A148C),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "Aniku v${BuildConfig.VERSION_NAME}",
+                                color = if (isDark) Color.LightGray else Color(0xFF6A1B9A),
+                                fontSize = 12.sp
+                            )
+                        }
+                        if (updateAvailable) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFD32F2F))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                Text(
+                                    text = "Update Tersedia!",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (updateAvailable && downloadUrl.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                                context.startActivity(browserIntent)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = "Download ${latestVersion}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    } else if (!updateAvailable && latestVersion.isNotEmpty()) {
+                        Text(
+                            text = "Aplikasi sudah versi terbaru ✓",
+                            color = Color(0xFF43A047),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.checkForUpdate() },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor)
+                    ) {
+                        Text(
+                            text = "Cek Update",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
             // Developer Metadata credits block
             Column(
                 modifier = Modifier
@@ -3474,7 +3573,7 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Aniku v1.1.0",
+                    text = "Aniku v${BuildConfig.VERSION_NAME}",
                     color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp

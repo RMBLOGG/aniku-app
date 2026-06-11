@@ -34,6 +34,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
         UserSession(null, null, null, null, null, false, false)
     )
 
+    // Update check state
+    private val _updateAvailable = MutableStateFlow(false)
+    val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
+
+    private val _latestVersion = MutableStateFlow("")
+    val latestVersion: StateFlow<String> = _latestVersion.asStateFlow()
+
+    private val _downloadUrl = MutableStateFlow("")
+    val downloadUrl: StateFlow<String> = _downloadUrl.asStateFlow()
+
     // Bookmarks state (local)
     private val _bookmarks = MutableStateFlow<List<BookmarkedAnime>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkedAnime>> = _bookmarks.asStateFlow()
@@ -195,6 +205,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadHomeData()
         loadGenres()
         loadSearchPopular()
+        checkForUpdate()
+    }
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url("https://api.github.com/repos/RMBLOGG/aniku-app/releases/latest")
+                    .header("Accept", "application/vnd.github+json")
+                    .build()
+                val client = okhttp3.OkHttpClient()
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: return@launch
+                    val json = org.json.JSONObject(body)
+                    val tagName = json.optString("tag_name", "")
+                    val assets = json.optJSONArray("assets")
+                    val dlUrl = if (assets != null && assets.length() > 0) {
+                        assets.getJSONObject(0).optString("browser_download_url", "")
+                    } else ""
+                    _latestVersion.value = tagName
+                    _downloadUrl.value = dlUrl
+                    val currentVersion = tagName.trimStart('v')
+                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.1.0" }
+                    _updateAvailable.value = currentVersion.isNotEmpty() && currentVersion != appVersion
+                }
+            } catch (e: Exception) {
+                Log.w("AnikuVM", "checkForUpdate failed: ${e.message}")
+            }
+        }
     }
 
     // Helper: Header selection for Supabase DB
