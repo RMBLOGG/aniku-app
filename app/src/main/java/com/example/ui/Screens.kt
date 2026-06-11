@@ -304,19 +304,13 @@ fun HomeScreen(
             shape = RoundedCornerShape(20.dp),
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(accentColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AsyncImage(
+                    AsyncImage(
                             model = context.packageManager.getApplicationIcon(context.packageName),
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
                         )
-                    }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Update Tersedia!",
@@ -3565,19 +3559,13 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
+                        AsyncImage(
+                            model = context.packageManager.getApplicationIcon(context.packageName),
+                            contentDescription = "App Icon",
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(accentColor),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AsyncImage(
-                                model = context.packageManager.getApplicationIcon(context.packageName),
-                                contentDescription = "App Icon",
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
