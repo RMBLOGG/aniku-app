@@ -886,7 +886,83 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch { settingsStore.setAccentColor(colorName) }
     }
 
-}
+    // --- CHAT ROOM ---
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
-// Simple extension mockup to make schedule challenge call compilable if reference triggers
-private fun NetworkClient.scheduleChallenge() {}
+    private val _isChatLoading = MutableStateFlow(false)
+    val isChatLoading: StateFlow<Boolean> = _isChatLoading.asStateFlow()
+
+    private val _chatError = MutableStateFlow<String?>(null)
+    val chatError: StateFlow<String?> = _chatError.asStateFlow()
+
+    fun clearChatError() { _chatError.value = null }
+
+    fun loadChatMessages() {
+        viewModelScope.launch {
+            _isChatLoading.value = true
+            try {
+                val messages = NetworkClient.supabaseDbApi.getChatMessages(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _chatMessages.value = messages
+            } catch (e: Exception) {
+                _chatError.value = "Gagal memuat pesan: ${e.message}"
+            } finally {
+                _isChatLoading.value = false
+            }
+        }
+    }
+
+    fun sendChatMessage(message: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _chatError.value = "Kamu harus login untuk mengirim pesan"
+            return
+        }
+        if (currentSession.isBanned) {
+            _chatError.value = "Akunmu dibanned dari chat"
+            return
+        }
+        val trimmed = message.trim()
+        if (trimmed.isEmpty() || trimmed.length > 300) return
+
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.insertChatMessage(
+                    data = ChatMessageRequest(
+                        user_id = currentSession.userId ?: "",
+                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                        avatar_url = currentSession.avatarUrl,
+                        message = trimmed
+                    ),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadChatMessages()
+            } catch (e: Exception) {
+                _chatError.value = "Gagal kirim pesan: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteChatMessage(messageId: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteChatMessage(
+                    idQuery = "eq.$messageId",
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _chatMessages.value = _chatMessages.value.filter { it.id != messageId }
+            } catch (e: Exception) {
+                _chatError.value = "Gagal hapus pesan: ${e.message}"
+            }
+        }
+    }
+
+}

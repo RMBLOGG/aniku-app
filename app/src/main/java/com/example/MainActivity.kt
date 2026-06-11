@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule")
+                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat")
                 val showBottomBar = currentRoute in bottomRoutes
 
                 Scaffold(
@@ -64,7 +64,8 @@ class MainActivity : ComponentActivity() {
                                     Triple("search", "Cari", Icons.Default.Search),
                                     Triple("explore", "Eksplor", Icons.Default.PlayArrow),
                                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
-                                    Triple("schedule", "Jadwal", Icons.Default.DateRange)
+                                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
+                                    Triple("chat", "Chat", Icons.Default.Forum)
                                 )
 
                                 items.forEach { (route, label, icon) ->
@@ -178,6 +179,13 @@ class MainActivity : ComponentActivity() {
                                 episodeSlug = epSlug,
                                 animeTitle = title,
                                 viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("chat") {
+                            ChatScreen(
+                                viewModel = viewModel,
+                                navController = navController,
                                 onBack = { navController.popBackStack() }
                             )
                         }

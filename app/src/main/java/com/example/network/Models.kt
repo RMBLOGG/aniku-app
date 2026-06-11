@@ -211,3 +211,22 @@ data class BlacklistedAnimeDto(
 data class CloudinaryResponse(
     val secure_url: String
 )
+
+// Chat Room models
+@JsonClass(generateAdapter = true)
+data class ChatMessage(
+    val id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String,
+    val created_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ChatMessageRequest(
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String
+)

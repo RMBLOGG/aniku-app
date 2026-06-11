@@ -214,6 +214,30 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): Response<Unit>
+
+    // Chat Room endpoints
+    @GET("rest/v1/chat_messages")
+    suspend fun getChatMessages(
+        @Query("order") order: String = "created_at.asc",
+        @Query("limit") limit: Int = 100,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ChatMessage>
+
+    @POST("rest/v1/chat_messages")
+    suspend fun insertChatMessage(
+        @Body data: ChatMessageRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<ChatMessage>
+
+    @DELETE("rest/v1/chat_messages")
+    suspend fun deleteChatMessage(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): Response<Unit>
 }
 
 interface CloudinaryApi {
