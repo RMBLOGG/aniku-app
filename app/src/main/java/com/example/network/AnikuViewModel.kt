@@ -44,6 +44,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _downloadUrl = MutableStateFlow("")
     val downloadUrl: StateFlow<String> = _downloadUrl.asStateFlow()
 
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
+    private val _updateCheckMessage = MutableStateFlow("")
+    val updateCheckMessage: StateFlow<String> = _updateCheckMessage.asStateFlow()
+
     // Bookmarks state (local)
     private val _bookmarks = MutableStateFlow<List<BookmarkedAnime>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkedAnime>> = _bookmarks.asStateFlow()
@@ -209,16 +215,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     fun checkForUpdate() {
+        if (_isCheckingUpdate.value) return
         viewModelScope.launch {
+            _isCheckingUpdate.value = true
+            _updateCheckMessage.value = ""
             try {
-                val request = okhttp3.Request.Builder()
-                    .url("https://api.github.com/repos/RMBLOGG/aniku-app/releases/latest")
-                    .header("Accept", "application/vnd.github+json")
-                    .build()
-                val client = okhttp3.OkHttpClient()
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: return@launch
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val request = okhttp3.Request.Builder()
+                        .url("https://api.github.com/repos/RMBLOGG/aniku-app/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    client.newCall(request).execute()
+                }
+                if (result.isSuccessful) {
+                    val body = result.body?.string() ?: ""
                     val json = org.json.JSONObject(body)
                     val tagName = json.optString("tag_name", "")
                     val assets = json.optJSONArray("assets")
@@ -227,12 +241,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     } else ""
                     _latestVersion.value = tagName
                     _downloadUrl.value = dlUrl
-                    val currentVersion = tagName.trimStart('v')
+                    val latestClean = tagName.trimStart('v')
                     val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.1.0" }
-                    _updateAvailable.value = currentVersion.isNotEmpty() && currentVersion != appVersion
+                    if (latestClean.isNotEmpty() && latestClean != appVersion) {
+                        _updateAvailable.value = true
+                        _updateCheckMessage.value = "Update tersedia: $tagName"
+                    } else {
+                        _updateAvailable.value = false
+                        _updateCheckMessage.value = "Aplikasi sudah versi terbaru ✓"
+                    }
+                } else {
+                    _updateCheckMessage.value = "Gagal cek update (${result.code})"
+                    Log.w("AnikuVM", "checkForUpdate HTTP ${result.code}")
                 }
             } catch (e: Exception) {
+                _updateCheckMessage.value = "Gagal cek update: periksa koneksi"
                 Log.w("AnikuVM", "checkForUpdate failed: ${e.message}")
+            } finally {
+                _isCheckingUpdate.value = false
             }
         }
     }

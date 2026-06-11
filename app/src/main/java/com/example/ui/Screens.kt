@@ -3166,6 +3166,8 @@ fun SettingsScreen(
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val latestVersion by viewModel.latestVersion.collectAsState()
     val downloadUrl by viewModel.downloadUrl.collectAsState()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
+    val updateCheckMessage by viewModel.updateCheckMessage.collectAsState()
 
     Column(
         modifier = Modifier
@@ -3523,6 +3525,19 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // Feedback message
+                    if (updateCheckMessage.isNotEmpty()) {
+                        Text(
+                            text = updateCheckMessage,
+                            color = if (updateAvailable) Color(0xFFD32F2F) else Color(0xFF43A047),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    // Download button kalau ada update
                     if (updateAvailable && downloadUrl.isNotEmpty()) {
                         Button(
                             onClick = {
@@ -3541,26 +3556,27 @@ fun SettingsScreen(
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
-                    } else if (!updateAvailable && latestVersion.isNotEmpty()) {
-                        Text(
-                            text = "Aplikasi sudah versi terbaru ✓",
-                            color = Color(0xFF43A047),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
                     }
+
+                    // Tombol Cek Update
                     OutlinedButton(
                         onClick = { viewModel.checkForUpdate() },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor)
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor),
+                        enabled = !isCheckingUpdate
                     ) {
-                        Text(
-                            text = "Cek Update",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = accentColor,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Memeriksa...", fontSize = 14.sp)
+                        } else {
+                            Text("Cek Update", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
             }
