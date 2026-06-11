@@ -3,6 +3,7 @@ package com.example.ui
 import android.content.Intent
 import android.net.Uri
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.view.ViewGroup
@@ -1921,7 +1922,53 @@ fun WatchScreen(
                                     loadWithOverviewMode = true
                                 }
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                                webViewClient = WebViewClient()
+                                webViewClient = object : WebViewClient() {
+                                    // Domain video player yang diizinkan
+                                    private val allowedDomains = listOf(
+                                        // Vidhide semua subdomain
+                                        "vidhide.com", "vidhidepro.com", "vidhideplus.com",
+                                        // Filemoon
+                                        "filemoon.sx", "filemoon.in", "filemoon.to",
+                                        // Filedon
+                                        "filedon.co", "filedon.com",
+                                        // Dood
+                                        "dood.watch", "doodstream.com", "dood.to",
+                                        "dood.so", "dood.cx", "dood.la",
+                                        // Streamtape
+                                        "streamtape.com", "streamtape.co",
+                                        // Upload services
+                                        "mp4upload.com", "yourupload.com",
+                                        // Mega
+                                        "mega.nz", "mega.co.nz",
+                                        // Blogger/Google video embed resmi
+                                        "blogger.com", "blogspot.com",
+                                        "googlevideo.com", "googleapis.com",
+                                        // CDN & player assets
+                                        "gstatic.com", "jwplatform.com", "jwpcdn.com",
+                                        "akamaized.net", "cloudfront.net", "fastly.net",
+                                        "cdnjs.cloudflare.com", "cloudflare.com",
+                                        // Animasu & API source
+                                        "animasu.cc", "sanka.my.id",
+                                        // Abysscdn
+                                        "abysscdn.com"
+                                        // NOTE: short.icu dan URL shortener lain SENGAJA tidak dimasukkan
+                                    )
+                                    override fun shouldOverrideUrlLoading(
+                                        view: WebView?,
+                                        request: WebResourceRequest?
+                                    ): Boolean {
+                                        val url = request?.url?.toString() ?: return false
+                                        val host = request.url?.host?.lowercase() ?: return false
+                                        // Izinkan kalau domain cocok dengan whitelist
+                                        val isAllowed = allowedDomains.any { host.endsWith(it) }
+                                        if (!isAllowed) {
+                                            // Block redirect ke luar (google, casino, dsb)
+                                            android.util.Log.w("AnikuWebView", "Blocked redirect: $url")
+                                            return true // true = block navigation
+                                        }
+                                        return false // false = lanjutkan
+                                    }
+                                }
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
                                         super.onShowCustomView(view, callback)
