@@ -970,15 +970,19 @@ fun ExploreScreen(
     val hasNext by viewModel.exploreHasNext.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val gridLayout by viewModel.gridLayout.collectAsState()
 
     val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
 
     // Detect endless scroll
     val shouldLoadMore = remember {
         derivedStateOf {
             val total = gridState.layoutInfo.totalItemsCount
             val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            total > 0 && lastVisible >= total - 2
+            val listTotal = listState.layoutInfo.totalItemsCount
+            val listLastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            (total > 0 && lastVisible >= total - 2) || (listTotal > 0 && listLastVisible >= listTotal - 2)
         }
     }
 
@@ -1072,7 +1076,7 @@ fun ExploreScreen(
             }
         }
 
-        // Two Column Grid
+        // Dynamic Grid / List
         Box(modifier = Modifier.weight(1f)) {
             if (itemsList.isEmpty() && !isLoading) {
                 Column(
@@ -1084,9 +1088,34 @@ fun ExploreScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Daftar anime kosong.", color = Color.Gray)
                 }
+            } else if (gridLayout == "List") {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(itemsList) { anim ->
+                        AnimeListCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                    if (isLoading) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                }
             } else {
+                val columns = if (gridLayout == "3") 3 else 2
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Fixed(columns),
                     state = gridState,
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1103,14 +1132,10 @@ fun ExploreScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-
-                    // Indicator loader at bottom grid
                     if (isLoading) {
-                        item(span = { GridItemSpan(2) }) {
+                        item(span = { GridItemSpan(columns) }) {
                             Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
@@ -1124,8 +1149,88 @@ fun ExploreScreen(
 }
 
 // ================================================================
-// 4. SCHEDULE SCREEN
+// ANIME LIST CARD (untuk layout List)
 // ================================================================
+
+@Composable
+fun AnimeListCard(
+    anime: AnimeRaw,
+    accentColor: Color,
+    onClick: () -> Unit,
+    isBookmarked: Boolean,
+    onBookmarkToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { onClick() }
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(70.dp)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            AsyncImage(
+                model = anime.poster,
+                contentDescription = anime.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            anime.type?.let { typeString ->
+                if (typeString.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFFF8C00))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .align(Alignment.TopStart)
+                    ) {
+                        Text(typeString, color = Color.Black, fontSize = 7.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = anime.title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            anime.status?.let {
+                Text(it, color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+            anime.score?.let {
+                Text("⭐ $it", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp)
+            }
+        }
+        IconButton(
+            onClick = { onBookmarkToggle() },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                contentDescription = null,
+                tint = if (isBookmarked) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+
 
 @Composable
 fun ScheduleScreen(
@@ -3053,6 +3158,7 @@ fun SettingsScreen(
     val isDark by viewModel.isDark.collectAsState()
     val textScale by viewModel.textSize.collectAsState()
     val activeAccent by viewModel.accentColorName.collectAsState()
+    val activeGridLayout by viewModel.gridLayout.collectAsState()
     val sess by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
@@ -3231,7 +3337,60 @@ fun SettingsScreen(
                 }
             }
 
-            // Section E: Color Accent Selector row
+            // Section E: Grid Layout Selector
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Layout Kartu Anime", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val layouts = listOf(
+                            "2" to Icons.Default.GridView,
+                            "3" to Icons.Default.Apps,
+                            "List" to Icons.Default.ViewList
+                        )
+                        layouts.forEach { (layout, icon) ->
+                            val isSelected = activeGridLayout == layout
+                            val label = when (layout) {
+                                "2" -> "Grid 2"
+                                "3" -> "Grid 3"
+                                else -> "List"
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeGridLayout(layout) }
+                                    .padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section F: Color Accent Selector row
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
@@ -3266,7 +3425,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Section F: Support donation Saweria card
+            // Section G: Support donation Saweria card
             Card(
                 colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF162516) else Color(0xFFE8F5E9)),
                 shape = RoundedCornerShape(16.dp),

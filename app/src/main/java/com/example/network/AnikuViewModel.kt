@@ -25,6 +25,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val isDark = settingsStore.isDarkFlow.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     val textSize = settingsStore.textSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Sedang")
     val accentColorName = settingsStore.accentColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Red")
+    val gridLayout = settingsStore.gridLayoutFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "2")
 
     // Session flow
     val session = settingsStore.sessionFlow.stateIn(
@@ -884,6 +885,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun changeAccentColor(colorName: String) {
         viewModelScope.launch { settingsStore.setAccentColor(colorName) }
+    }
+
+    fun changeGridLayout(layout: String) {
+        viewModelScope.launch { settingsStore.setGridLayout(layout) }
     }
 
     // --- CHAT ROOM ---
