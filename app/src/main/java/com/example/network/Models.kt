@@ -219,6 +219,7 @@ data class ChatMessage(
     val user_id: String,
     val username: String,
     val avatar_url: String? = null,
+    val is_admin: Boolean? = false,
     val message: String,
     val created_at: String
 )
@@ -228,5 +229,6 @@ data class ChatMessageRequest(
     val user_id: String,
     val username: String,
     val avatar_url: String? = null,
+    val is_admin: Boolean? = false,
     val message: String
 )

@@ -935,6 +935,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         user_id = currentSession.userId ?: "",
                         username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
                         avatar_url = currentSession.avatarUrl,
+                        is_admin = currentSession.isAdmin,
                         message = trimmed
                     ),
                     authHeader = "Bearer ${currentSession.token}",

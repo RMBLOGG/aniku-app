@@ -308,13 +308,34 @@ private fun ChatBubble(
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
             if (!isOwnMessage) {
-                Text(
-                    text = message.username,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
-                )
+                ) {
+                    Text(
+                        text = message.username,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    if (message.is_admin == true) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.error)
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = "ADMIN",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
+                    }
+                }
             }
 
             Box(
