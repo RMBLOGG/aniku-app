@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.ChatMessage
 import kotlinx.coroutines.delay
@@ -271,19 +273,32 @@ private fun ChatBubble(
     ) {
         if (!isOwnMessage) {
             // Avatar kiri untuk pesan orang lain
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = message.username.take(1).uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary
+            if (!message.avatar_url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = message.avatar_url,
+                    contentDescription = message.username,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                    error = null,
+                    fallback = null,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message.username.take(1).uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(6.dp))
         }
