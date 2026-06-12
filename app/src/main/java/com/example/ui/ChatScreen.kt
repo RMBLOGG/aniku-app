@@ -570,15 +570,52 @@ private fun ChatBubble(
                     }
 
                     // Gambar jika ada
+                    var showFullImage by remember { mutableStateOf(false) }
                     if (!message.image_url.isNullOrEmpty()) {
                         AsyncImage(
                             model = message.image_url,
                             contentDescription = "Foto",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp)),
+                                .heightIn(max = 220.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showFullImage = true },
                             contentScale = ContentScale.FillWidth
                         )
+                        if (showFullImage) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = { showFullImage = false }
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.95f))
+                                        .clickable { showFullImage = false },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = message.image_url,
+                                        contentDescription = "Foto penuh",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp),
+                                        contentScale = ContentScale.FillWidth
+                                    )
+                                    IconButton(
+                                        onClick = { showFullImage = false },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Tutup",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         if (message.message.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
                         }
