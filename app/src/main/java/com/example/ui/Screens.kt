@@ -1520,6 +1520,7 @@ fun BookmarkScreen(
 ) {
     val bookmarksList by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val gridLayout by viewModel.gridLayout.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.refreshBookmarks()
@@ -1570,16 +1571,41 @@ fun BookmarkScreen(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
+        } else if (gridLayout == "List") {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(bookmarksList) { bookmarked ->
+                    val backingRaw = AnimeRaw(
+                        title = bookmarked.title,
+                        slug = bookmarked.slug,
+                        poster = bookmarked.poster,
+                        type = bookmarked.type,
+                        episode = bookmarked.episode
+                    )
+                    AnimeListCard(
+                        anime = backingRaw,
+                        accentColor = accentColor,
+                        onClick = { onNavigateToDetail(bookmarked.slug) },
+                        isBookmarked = true,
+                        onBookmarkToggle = {
+                            viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster)
+                        }
+                    )
+                }
+            }
         } else {
+            val columns = if (gridLayout == "3") 3 else 2
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(columns),
                 contentPadding = PaddingValues(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(bookmarksList) { bookmarked ->
-                    // Construct structural back Raw item compatible with renderer
                     val backingRaw = AnimeRaw(
                         title = bookmarked.title,
                         slug = bookmarked.slug,
