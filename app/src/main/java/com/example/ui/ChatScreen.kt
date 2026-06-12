@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
@@ -13,6 +14,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -321,10 +323,29 @@ private fun ChatBubble(
         }
     }
 
-    var showOptions by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var swipeOffset by remember { mutableStateOf(0f) }
+    val swipeThreshold = 80f
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(onReply) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (swipeOffset > swipeThreshold && onReply != null) {
+                            onReply()
+                        }
+                        swipeOffset = 0f
+                    },
+                    onDragCancel = { swipeOffset = 0f },
+                    onHorizontalDrag = { _, dragAmount ->
+                        if (dragAmount > 0) {
+                            swipeOffset = (swipeOffset + dragAmount).coerceAtMost(swipeThreshold * 1.2f)
+                        }
+                    }
+                )
+            },
         horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
     ) {
         if (!isOwnMessage) {
@@ -395,6 +416,7 @@ private fun ChatBubble(
 
             Box(
                 modifier = Modifier
+                    .offset(x = (swipeOffset * 0.4f).dp)
                     .clip(
                         RoundedCornerShape(
                             topStart = if (isOwnMessage) 16.dp else 4.dp,
@@ -409,7 +431,7 @@ private fun ChatBubble(
                     )
                     .combinedClickable(
                         onClick = {},
-                        onLongClick = { showOptions = true }
+                        onLongClick = { if (onDelete != null) showDeleteDialog = true }
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
@@ -478,47 +500,25 @@ private fun ChatBubble(
         }
     }
 
-    // Bottom sheet opsi: reply & hapus
-    if (showOptions) {
-        ModalBottomSheet(
-            onDismissRequest = { showOptions = false }
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp)
-            ) {
-                if (onReply != null) {
-                    ListItem(
-                        headlineContent = { Text("Balas") },
-                        leadingContent = {
-                            Icon(Icons.Default.Reply, contentDescription = null)
-                        },
-                        modifier = Modifier.clickable {
-                            onReply()
-                            showOptions = false
-                        }
-                    )
+    // Dialog konfirmasi hapus (long press)
+    if (showDeleteDialog && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Hapus pesan?") },
+            text = { Text("Pesan ini akan dihapus permanen.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete()
+                    showDeleteDialog = false
+                }) {
+                    Text("Hapus", color = MaterialTheme.colorScheme.error)
                 }
-                if (onDelete != null) {
-                    ListItem(
-                        headlineContent = {
-                            Text("Hapus pesan", color = MaterialTheme.colorScheme.error)
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            onDelete()
-                            showOptions = false
-                        }
-                    )
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Batal")
                 }
             }
-        }
+        )
     }
 }
