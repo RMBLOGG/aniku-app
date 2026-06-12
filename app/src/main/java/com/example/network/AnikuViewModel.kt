@@ -1056,11 +1056,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    private val _isSendingImage = MutableStateFlow(false)
+    val isSendingImage: StateFlow<Boolean> = _isSendingImage.asStateFlow()
+
     fun sendChatMessage(
         message: String,
         replyToId: String? = null,
         replyToUsername: String? = null,
-        replyToMessage: String? = null
+        replyToMessage: String? = null,
+        imageUrl: String? = null
     ) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) {
@@ -1072,7 +1076,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
             return
         }
         val trimmed = message.trim()
-        if (trimmed.isEmpty() || trimmed.length > 300) return
+        if (trimmed.isEmpty() && imageUrl == null) return
+        if (trimmed.length > 300) return
 
         viewModelScope.launch {
             try {
@@ -1085,7 +1090,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         message = trimmed,
                         reply_to_id = replyToId,
                         reply_to_username = replyToUsername,
-                        reply_to_message = replyToMessage
+                        reply_to_message = replyToMessage,
+                        image_url = imageUrl
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY
@@ -1093,6 +1099,41 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 loadChatMessages()
             } catch (e: Exception) {
                 _chatError.value = "Gagal kirim pesan: ${e.message}"
+            }
+        }
+    }
+
+    fun uploadChatImage(context: Context, uri: Uri, onDone: (String?) -> Unit) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _chatError.value = "Kamu harus login untuk mengirim foto"
+            onDone(null)
+            return
+        }
+        viewModelScope.launch {
+            _isSendingImage.value = true
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(4096)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+                val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", "chat_image.jpg", requestFile)
+                val presetBody = "aniku_avatar".toRequestBody("text/plain".toMediaTypeOrNull())
+                val res = NetworkClient.cloudinaryApi.uploadAvatar(body, presetBody)
+                onDone(res.secure_url)
+            } catch (e: Exception) {
+                _chatError.value = "Gagal upload foto: ${e.message}"
+                onDone(null)
+            } finally {
+                _isSendingImage.value = false
             }
         }
     }

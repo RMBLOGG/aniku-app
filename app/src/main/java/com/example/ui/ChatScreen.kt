@@ -1,5 +1,8 @@
 package com.example.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -15,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,12 +47,21 @@ fun ChatScreen(
 
     val isLoggedIn = !session.token.isNullOrEmpty()
     val currentUserId = session.userId
+    val isSendingImage by viewModel.isSendingImage.collectAsState()
+    val context = LocalContext.current
 
     var inputText by remember { mutableStateOf("") }
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var pendingImageUri by remember { mutableStateOf<Uri?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { pendingImageUri = it }
+    }
 
     // Auto-poll setiap 5 detik
     LaunchedEffect(Unit) {
@@ -110,6 +123,46 @@ fun ChatScreen(
         bottomBar = {
             Column {
                 Divider()
+                // Image preview bar
+                AnimatedVisibility(
+                    visible = pendingImageUri != null,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut()
+                ) {
+                    pendingImageUri?.let { uri ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Foto siap dikirim",
+                                modifier = Modifier.weight(1f),
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            IconButton(onClick = { pendingImageUri = null }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Batalkan foto",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                }
                 // Reply preview bar
                 AnimatedVisibility(
                     visible = replyTarget != null,
@@ -169,6 +222,17 @@ fun ChatScreen(
                             .navigationBarsPadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Tombol pilih foto
+                        IconButton(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            enabled = !isSendingImage
+                        ) {
+                            Icon(
+                                Icons.Default.Image,
+                                contentDescription = "Pilih foto",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         OutlinedTextField(
                             value = inputText,
                             onValueChange = { if (it.length <= 300) inputText = it },
@@ -187,13 +251,28 @@ fun ChatScreen(
                         FilledIconButton(
                             onClick = {
                                 val msg = inputText.trim()
-                                if (msg.isNotEmpty()) {
-                                    viewModel.sendChatMessage(
-                                        message = msg,
-                                        replyToId = replyTarget?.id,
-                                        replyToUsername = replyTarget?.username,
-                                        replyToMessage = replyTarget?.message
-                                    )
+                                val imgUri = pendingImageUri
+                                if (msg.isNotEmpty() || imgUri != null) {
+                                    if (imgUri != null) {
+                                        // Upload foto dulu, lalu kirim pesan
+                                        viewModel.uploadChatImage(context, imgUri) { imageUrl ->
+                                            viewModel.sendChatMessage(
+                                                message = msg,
+                                                replyToId = replyTarget?.id,
+                                                replyToUsername = replyTarget?.username,
+                                                replyToMessage = replyTarget?.message,
+                                                imageUrl = imageUrl
+                                            )
+                                        }
+                                        pendingImageUri = null
+                                    } else {
+                                        viewModel.sendChatMessage(
+                                            message = msg,
+                                            replyToId = replyTarget?.id,
+                                            replyToUsername = replyTarget?.username,
+                                            replyToMessage = replyTarget?.message
+                                        )
+                                    }
                                     inputText = ""
                                     replyTarget = null
                                     coroutineScope.launch {
@@ -204,14 +283,22 @@ fun ChatScreen(
                                     }
                                 }
                             },
-                            enabled = inputText.trim().isNotEmpty(),
+                            enabled = (inputText.trim().isNotEmpty() || pendingImageUri != null) && !isSendingImage,
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(
-                                Icons.Default.Send,
-                                contentDescription = "Kirim",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            if (isSendingImage) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Send,
+                                    contentDescription = "Kirim",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 } else {
@@ -482,12 +569,29 @@ private fun ChatBubble(
                         Spacer(modifier = Modifier.height(6.dp))
                     }
 
-                    Text(
-                        text = message.message,
-                        fontSize = 14.sp,
-                        color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // Gambar jika ada
+                    if (!message.image_url.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = message.image_url,
+                            contentDescription = "Foto",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .heightIn(max = 200.dp),
+                            contentScale = ContentScale.Crop
+                        )
+                        if (message.message.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
+                    if (message.message.isNotEmpty()) {
+                        Text(
+                            text = message.message,
+                            fontSize = 14.sp,
+                            color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
