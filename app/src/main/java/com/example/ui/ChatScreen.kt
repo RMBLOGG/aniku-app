@@ -576,9 +576,8 @@ private fun ChatBubble(
                             contentDescription = "Foto",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .heightIn(max = 200.dp),
-                            contentScale = ContentScale.Crop
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.FillWidth
                         )
                         if (message.message.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
