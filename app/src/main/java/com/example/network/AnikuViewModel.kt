@@ -286,8 +286,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                     val latestParts = parseVersion(latestClean)
                     val appParts = parseVersion(appVersion)
-                    val isNewer = latestParts.zip(appParts).any { (l, a) -> l > a }
-                        || (latestParts.size > appParts.size && latestParts.drop(appParts.size).any { it > 0 })
+
+                    // Bandingkan tiap segment, berhenti di perbedaan pertama
+                    val maxLen = maxOf(latestParts.size, appParts.size)
+                    var isNewer = false
+                    for (i in 0 until maxLen) {
+                        val l = latestParts.getOrElse(i) { 0 }
+                        val a = appParts.getOrElse(i) { 0 }
+                        if (l > a) { isNewer = true; break }
+                        if (l < a) { isNewer = false; break }
+                    }
 
                     if (latestClean.isNotEmpty() && isNewer) {
                         _updateAvailable.value = true
