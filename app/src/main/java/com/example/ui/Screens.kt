@@ -1090,6 +1090,7 @@ fun SearchScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Anime tidak ditemukan.", color = Color.Gray, fontSize = 16.sp)
             }
+        } else {
             // Live Search Query results
             if (gridLayout == "List") {
                 LazyColumn(
@@ -1128,6 +1129,7 @@ fun SearchScreen(
                     }
                 }
             }
+        }
     }
 }
 
