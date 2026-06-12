@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavController
@@ -42,11 +43,12 @@ fun ChatScreen(
     val currentUserId = session.userId
 
     var inputText by remember { mutableStateOf("") }
+    var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Auto-poll setiap 5 detik (Supabase REST polling)
+    // Auto-poll setiap 5 detik
     LaunchedEffect(Unit) {
         viewModel.loadChatMessages()
         while (true) {
@@ -77,12 +79,12 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text(
-                            "💬 Chat Room",
+                            "\uD83D\uDCAC Chat Room",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
                         Text(
-                            if (isLoggedIn) "Online sebagai ${session.username}" else "Mode tamu — hanya lihat",
+                            if (isLoggedIn) "Online sebagai ${session.username}" else "Mode tamu \u2014 hanya lihat",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
@@ -104,11 +106,60 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            // Input bar
             Column {
                 Divider()
+                // Reply preview bar
+                AnimatedVisibility(
+                    visible = replyTarget != null,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut()
+                ) {
+                    replyTarget?.let { target ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(36.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(2.dp)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = target.username,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = target.message,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(onClick = { replyTarget = null }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Batal reply",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (isLoggedIn) {
-                    // User login — bisa kirim pesan
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -119,7 +170,9 @@ fun ChatScreen(
                         OutlinedTextField(
                             value = inputText,
                             onValueChange = { if (it.length <= 300) inputText = it },
-                            placeholder = { Text("Ketik pesan...") },
+                            placeholder = {
+                                Text(if (replyTarget != null) "Balas ${replyTarget!!.username}..." else "Ketik pesan...")
+                            },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
                             maxLines = 3,
@@ -133,8 +186,14 @@ fun ChatScreen(
                             onClick = {
                                 val msg = inputText.trim()
                                 if (msg.isNotEmpty()) {
-                                    viewModel.sendChatMessage(msg)
+                                    viewModel.sendChatMessage(
+                                        message = msg,
+                                        replyToId = replyTarget?.id,
+                                        replyToUsername = replyTarget?.username,
+                                        replyToMessage = replyTarget?.message
+                                    )
                                     inputText = ""
+                                    replyTarget = null
                                     coroutineScope.launch {
                                         delay(300)
                                         if (messages.isNotEmpty()) {
@@ -154,7 +213,6 @@ fun ChatScreen(
                         }
                     }
                 } else {
-                    // Guest — tampilkan CTA login
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -194,20 +252,14 @@ fun ChatScreen(
         ) {
             when {
                 isChatLoading && messages.isEmpty() -> {
-                    // Loading pertama kali
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Memuat pesan...", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                        }
+                        CircularProgressIndicator()
                     }
                 }
                 messages.isEmpty() -> {
-                    // Kosong
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("💬", fontSize = 48.sp)
+                            Text("\uD83D\uDCAC", fontSize = 48.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 "Belum ada pesan",
@@ -234,12 +286,12 @@ fun ChatScreen(
                             ChatBubble(
                                 message = message,
                                 isOwnMessage = isOwn,
+                                onReply = if (isLoggedIn) { { replyTarget = message } } else null,
                                 onDelete = if (isOwn || session.isAdmin) {
                                     { viewModel.deleteChatMessage(message.id) }
                                 } else null
                             )
                         }
-                        // Spacer di bawah
                         item { Spacer(modifier = Modifier.height(4.dp)) }
                     }
                 }
@@ -248,11 +300,12 @@ fun ChatScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
     isOwnMessage: Boolean,
+    onReply: (() -> Unit)?,
     onDelete: (() -> Unit)?
 ) {
     val timeStr = remember(message.created_at) {
@@ -268,14 +321,13 @@ private fun ChatBubble(
         }
     }
 
-    var showDelete by remember { mutableStateOf(false) }
+    var showOptions by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
     ) {
         if (!isOwnMessage) {
-            // Avatar kiri untuk pesan orang lain
             if (!message.avatar_url.isNullOrEmpty()) {
                 AsyncImage(
                     model = message.avatar_url,
@@ -357,18 +409,64 @@ private fun ChatBubble(
                     )
                     .combinedClickable(
                         onClick = {},
-                        onLongClick = {
-                            if (onDelete != null) showDelete = true
-                        }
+                        onLongClick = { showOptions = true }
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = message.message,
-                    fontSize = 14.sp,
-                    color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    // Quoted reply preview
+                    if (!message.reply_to_message.isNullOrEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (isOwnMessage)
+                                        Color.Black.copy(alpha = 0.2f)
+                                    else
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(32.dp)
+                                    .background(
+                                        if (isOwnMessage) Color.White.copy(alpha = 0.7f)
+                                        else MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(1.dp)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = message.reply_to_username ?: "",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isOwnMessage) Color.White.copy(alpha = 0.9f)
+                                            else MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = message.reply_to_message ?: "",
+                                    fontSize = 11.sp,
+                                    color = if (isOwnMessage) Color.White.copy(alpha = 0.7f)
+                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
+                    Text(
+                        text = message.message,
+                        fontSize = 14.sp,
+                        color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Text(
@@ -380,25 +478,47 @@ private fun ChatBubble(
         }
     }
 
-    // Dialog konfirmasi hapus
-    if (showDelete && onDelete != null) {
-        AlertDialog(
-            onDismissRequest = { showDelete = false },
-            title = { Text("Hapus pesan?") },
-            text = { Text("Pesan ini akan dihapus permanen.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDelete()
-                    showDelete = false
-                }) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error)
+    // Bottom sheet opsi: reply & hapus
+    if (showOptions) {
+        ModalBottomSheet(
+            onDismissRequest = { showOptions = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp)
+            ) {
+                if (onReply != null) {
+                    ListItem(
+                        headlineContent = { Text("Balas") },
+                        leadingContent = {
+                            Icon(Icons.Default.Reply, contentDescription = null)
+                        },
+                        modifier = Modifier.clickable {
+                            onReply()
+                            showOptions = false
+                        }
+                    )
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDelete = false }) {
-                    Text("Batal")
+                if (onDelete != null) {
+                    ListItem(
+                        headlineContent = {
+                            Text("Hapus pesan", color = MaterialTheme.colorScheme.error)
+                        },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            onDelete()
+                            showOptions = false
+                        }
+                    )
                 }
             }
-        )
+        }
     }
 }

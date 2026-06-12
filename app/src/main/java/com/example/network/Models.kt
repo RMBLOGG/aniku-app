@@ -221,7 +221,10 @@ data class ChatMessage(
     val avatar_url: String? = null,
     val is_admin: Boolean? = false,
     val message: String,
-    val created_at: String
+    val created_at: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val reply_to_message: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -230,5 +233,8 @@ data class ChatMessageRequest(
     val username: String,
     val avatar_url: String? = null,
     val is_admin: Boolean? = false,
-    val message: String
+    val message: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val reply_to_message: String? = null
 )

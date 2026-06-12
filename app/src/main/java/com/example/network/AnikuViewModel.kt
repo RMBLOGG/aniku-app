@@ -1056,7 +1056,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun sendChatMessage(message: String) {
+    fun sendChatMessage(
+        message: String,
+        replyToId: String? = null,
+        replyToUsername: String? = null,
+        replyToMessage: String? = null
+    ) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) {
             _chatError.value = "Kamu harus login untuk mengirim pesan"
@@ -1077,7 +1082,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
                         avatar_url = currentSession.avatarUrl,
                         is_admin = currentSession.isAdmin,
-                        message = trimmed
+                        message = trimmed,
+                        reply_to_id = replyToId,
+                        reply_to_username = replyToUsername,
+                        reply_to_message = replyToMessage
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY
