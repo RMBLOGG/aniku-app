@@ -17,6 +17,7 @@ import com.example.ui.theme.SettingsStore
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -334,7 +335,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         .header("Accept", "application/octet-stream")
                         .build()
 
-                    kotlinx.coroutines.ensureActive()
+                    ensureActive()
                     val response = client.newCall(request).execute()
                     val body = response.body ?: throw Exception("Empty response body")
                     val contentLength = body.contentLength()
@@ -347,7 +348,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val buffer = ByteArray(8192)
                             var bytes: Int
                             while (input.read(buffer).also { bytes = it } != -1) {
-                                kotlinx.coroutines.ensureActive()
+                                ensureActive()
                                 output.write(buffer, 0, bytes)
                                 downloaded += bytes
                                 if (contentLength > 0) {
