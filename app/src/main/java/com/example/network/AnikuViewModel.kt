@@ -17,6 +17,7 @@ import com.example.ui.theme.SettingsStore
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -27,6 +28,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val appContext = context.applicationContext
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
+
+    companion object {
+        var instance: AnikuViewModel? = null
+    }
 
     private val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjenhhaXlpYm53Z3ljb2R0Y3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MzYxNzAsImV4cCI6MjA5NjQxMjE3MH0.UUPfyZ4GJO6y8I5467p_piCxtyuyM5oYGX_-jPeiZRw"
 
@@ -214,6 +219,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val banStatusMessage: StateFlow<String?> = _banStatusMessage.asStateFlow()
 
     init {
+        instance = this
         // Load initial state
         refreshBookmarks()
         loadBlacklistSlugs()
@@ -252,7 +258,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _downloadUrl.value = dlUrl
                     val latestClean = tagName.trimStart('v')
                     val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.2.3" }
-                    if (latestClean.isNotEmpty() && latestClean != appVersion) {
+
+                    fun parseVersion(v: String): List<Int> =
+                        v.split(".").map { it.toIntOrNull() ?: 0 }
+
+                    val latestParts = parseVersion(latestClean)
+                    val appParts = parseVersion(appVersion)
+                    val isNewer = latestParts.zip(appParts).any { (l, a) -> l > a }
+                        || (latestParts.size > appParts.size && latestParts.drop(appParts.size).any { it > 0 })
+
+                    if (latestClean.isNotEmpty() && isNewer) {
                         _updateAvailable.value = true
                         _updateCheckMessage.value = "Update tersedia: $tagName"
                     } else {
@@ -288,17 +303,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
             val channelId = "aniku_update"
             val notifId = 9901
 
-            // Buat notification channel (Android 8+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
-                    channelId,
-                    "Aniku Update",
-                    NotificationManager.IMPORTANCE_LOW
+                    channelId, "Aniku Update", NotificationManager.IMPORTANCE_LOW
                 ).apply { description = "Notifikasi update aplikasi Aniku" }
                 notifManager.createNotificationChannel(channel)
             }
 
-            // Cancel action intent
             val cancelIntent = Intent("com.example.CANCEL_DOWNLOAD")
             val cancelPendingIntent = PendingIntent.getBroadcast(
                 appContext, 0, cancelIntent,
@@ -316,23 +327,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
             notifManager.notify(notifId, builder.build())
 
+            val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: appContext.filesDir
+            val outputFile = File(outputDir, "Aniku-${version}.apk")
+
             try {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val client = okhttp3.OkHttpClient.Builder()
                         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                        .followRedirects(true)
+                        .followSslRedirects(true)
                         .build()
                     val request = okhttp3.Request.Builder()
                         .url(url)
                         .header("Accept", "application/octet-stream")
                         .build()
+
+                    ensureActive()
                     val response = client.newCall(request).execute()
                     val body = response.body ?: throw Exception("Empty response body")
                     val contentLength = body.contentLength()
 
-                    val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                        ?: appContext.filesDir
-                    val outputFile = File(outputDir, "Aniku-${version}.apk")
+                    if (outputFile.exists()) outputFile.delete()
 
                     var downloaded = 0L
                     body.byteStream().use { input ->
@@ -340,6 +357,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val buffer = ByteArray(8192)
                             var bytes: Int
                             while (input.read(buffer).also { bytes = it } != -1) {
+                                ensureActive()
                                 output.write(buffer, 0, bytes)
                                 downloaded += bytes
                                 if (contentLength > 0) {
@@ -352,7 +370,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         }
                     }
 
-                    // Selesai — buat intent install
                     val apkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         FileProvider.getUriForFile(
                             appContext,
@@ -372,19 +389,31 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                     )
 
-                    builder.setProgress(0, 0, false)
+                    // Buat builder baru tanpa tombol Batal
+                    val doneBuilder = NotificationCompat.Builder(appContext, channelId)
+                        .setSmallIcon(appContext.applicationInfo.icon)
+                        .setContentTitle("Aniku $version")
                         .setContentText("Download selesai. Tap untuk install.")
+                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                         .setOngoing(false)
                         .setAutoCancel(true)
                         .setContentIntent(pendingIntent)
-                    notifManager.notify(notifId, builder.build())
+                    notifManager.notify(notifId, doneBuilder.build())
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                if (outputFile.exists()) outputFile.delete()
+                notifManager.cancel(notifId)
+                Log.d("AnikuVM", "Download dibatalkan user")
             } catch (e: Exception) {
                 Log.e("AnikuVM", "downloadUpdate failed: ${e.message}")
-                builder.setProgress(0, 0, false)
+                if (outputFile.exists()) outputFile.delete()
+                val errBuilder = NotificationCompat.Builder(appContext, channelId)
+                    .setSmallIcon(appContext.applicationInfo.icon)
+                    .setContentTitle("Aniku $version")
                     .setContentText("Download gagal: periksa koneksi")
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setOngoing(false)
-                notifManager.notify(notifId, builder.build())
+                notifManager.notify(notifId, errBuilder.build())
             }
         }
     }
