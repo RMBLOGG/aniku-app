@@ -2054,13 +2054,14 @@ fun WatchScreen(
 
     // Catat riwayat saat episodeTitle sudah tersedia
     LaunchedEffect(episodeTitle) {
-        if (episodeTitle.isNotEmpty()) {
+        val title = episodeTitle ?: ""
+        if (title.isNotEmpty()) {
             viewModel.addToWatchHistory(
                 animeSlug = currentAnimeSlug,
                 animeTitle = animeTitle,
                 animePoster = detail?.poster ?: "",
                 episodeSlug = episodeSlug,
-                episodeTitle = episodeTitle
+                episodeTitle = title
             )
         }
     }
