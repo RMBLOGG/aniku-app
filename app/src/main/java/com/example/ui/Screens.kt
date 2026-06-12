@@ -3437,152 +3437,26 @@ fun SettingsScreen(
                 }
             }
 
-            // Section C: Theme preferences toggle
+            // Section C: Tampilan & Tema navigation card
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navController.navigate("tampilan") }
+                    .testTag("settings_tampilan_btn")
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Pilihan Tema", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Tema Gelap (Dark Mode)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                        Switch(
-                            checked = isDark,
-                            onCheckedChange = { viewModel.toggleDarkMode(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = accentColor, checkedTrackColor = accentColor.copy(alpha = 0.5f))
-                        )
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Palette, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Tampilan & Tema", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Tema, ukuran tulisan, layout kartu, & warna aksen", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
                     }
-                }
-            }
-
-            // Section D: Text size setting selectors
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Ukuran Tulisan", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        val sizes = listOf("Kecil", "Sedang", "Besar")
-                        sizes.forEach { sz ->
-                            val isSelected = textScale == sz
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
-                                    .clickable { viewModel.changeTextSize(sz) }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = sz,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Section E: Grid Layout Selector
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Layout Kartu Anime", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        val layouts = listOf(
-                            "2" to Icons.Default.GridView,
-                            "3" to Icons.Default.Apps,
-                            "List" to Icons.Default.ViewList
-                        )
-                        layouts.forEach { (layout, icon) ->
-                            val isSelected = activeGridLayout == layout
-                            val label = when (layout) {
-                                "2" -> "Grid 2"
-                                "3" -> "Grid 3"
-                                else -> "List"
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
-                                    .clickable { viewModel.changeGridLayout(layout) }
-                                    .padding(vertical = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Section F: Color Accent Selector row
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Pilihan Warna Aksen", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val accentList = listOf(
-                            "Red" to Color(0xFFE53935),
-                            "Green" to Color(0xFF4CAF50),
-                            "Blue" to Color(0xFF2196F3),
-                            "Purple" to Color(0xFF9C27B0),
-                            "Orange" to Color(0xFFFF8C00)
-                        )
-                        accentList.forEach { (name, colHex) ->
-                            val isSelected = activeAccent == name
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(colHex)
-                                    .border(3.dp, if (isSelected) (if (isDark) Color.White else Color.Black) else Color.Transparent, CircleShape)
-                                    .clickable { viewModel.changeAccentColor(name) }
-                            )
-                        }
-                    }
+                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -3760,6 +3634,201 @@ fun SettingsScreen(
                     }
                 ) {
                     Text("Kunjungi Facebook Developer", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TampilanScreen(
+    viewModel: AnikuViewModel,
+    navController: NavController,
+    onBack: () -> Unit
+) {
+    val isDark by viewModel.isDark.collectAsState()
+    val textScale by viewModel.textSize.collectAsState()
+    val activeAccent by viewModel.accentColorName.collectAsState()
+    val activeGridLayout by viewModel.gridLayout.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // TopHeader
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Tampilan & Tema",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Section C: Theme preferences toggle
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Pilihan Tema", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Tema Gelap (Dark Mode)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Switch(
+                            checked = isDark,
+                            onCheckedChange = { viewModel.toggleDarkMode(it) },
+                            colors = SwitchDefaults.colors(checkedThumbColor = accentColor, checkedTrackColor = accentColor.copy(alpha = 0.5f))
+                        )
+                    }
+                }
+            }
+
+            // Section D: Text size setting selectors
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Ukuran Tulisan", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val sizes = listOf("Kecil", "Sedang", "Besar")
+                        sizes.forEach { sz ->
+                            val isSelected = textScale == sz
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeTextSize(sz) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = sz,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section E: Grid Layout Selector
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Layout Kartu Anime", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        val layouts = listOf(
+                            "2" to Icons.Default.GridView,
+                            "3" to Icons.Default.Apps,
+                            "List" to Icons.Default.ViewList
+                        )
+                        layouts.forEach { (layout, icon) ->
+                            val isSelected = activeGridLayout == layout
+                            val label = when (layout) {
+                                "2" -> "Grid 2"
+                                "3" -> "Grid 3"
+                                else -> "List"
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeGridLayout(layout) }
+                                    .padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section F: Color Accent Selector row
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Pilihan Warna Aksen", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val accentList = listOf(
+                            "Red" to Color(0xFFE53935),
+                            "Green" to Color(0xFF4CAF50),
+                            "Blue" to Color(0xFF2196F3),
+                            "Purple" to Color(0xFF9C27B0),
+                            "Orange" to Color(0xFFFF8C00)
+                        )
+                        accentList.forEach { (name, colHex) ->
+                            val isSelected = activeAccent == name
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(colHex)
+                                    .border(3.dp, if (isSelected) (if (isDark) Color.White else Color.Black) else Color.Transparent, CircleShape)
+                                    .clickable { viewModel.changeAccentColor(name) }
+                            )
+                        }
+                    }
                 }
             }
         }
