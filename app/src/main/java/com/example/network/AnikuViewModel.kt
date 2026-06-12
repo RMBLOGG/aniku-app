@@ -19,6 +19,38 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val appContext = context.applicationContext
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
+    val watchHistoryManager = WatchHistoryManager(appContext)
+
+    // Watch history state
+    private val _watchHistory = MutableStateFlow<List<WatchHistoryItem>>(emptyList())
+    val watchHistory: StateFlow<List<WatchHistoryItem>> = _watchHistory.asStateFlow()
+
+    fun refreshWatchHistory() {
+        _watchHistory.value = watchHistoryManager.getHistory()
+    }
+
+    fun addToWatchHistory(
+        animeSlug: String,
+        animeTitle: String,
+        animePoster: String,
+        episodeSlug: String,
+        episodeTitle: String
+    ) {
+        val item = WatchHistoryItem(
+            animeSlug = animeSlug,
+            animeTitle = animeTitle,
+            animePoster = animePoster,
+            episodeSlug = episodeSlug,
+            episodeTitle = episodeTitle
+        )
+        watchHistoryManager.addHistory(item)
+        refreshWatchHistory()
+    }
+
+    fun clearWatchHistory() {
+        watchHistoryManager.clearHistory()
+        refreshWatchHistory()
+    }
 
     private val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjenhhaXlpYm53Z3ljb2R0Y3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MzYxNzAsImV4cCI6MjA5NjQxMjE3MH0.UUPfyZ4GJO6y8I5467p_piCxtyuyM5oYGX_-jPeiZRw"
 
@@ -151,6 +183,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _animeDetail = MutableStateFlow<DetailData?>(null)
     val animeDetail: StateFlow<DetailData?> = _animeDetail.asStateFlow()
 
+    private val _currentAnimeSlug = MutableStateFlow("")
+    val currentAnimeSlug: StateFlow<String> = _currentAnimeSlug.asStateFlow()
+
     private val _isDetailLoading = MutableStateFlow(false)
     val isDetailLoading: StateFlow<Boolean> = _isDetailLoading.asStateFlow()
 
@@ -208,6 +243,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     init {
         // Load initial state
         refreshBookmarks()
+        refreshWatchHistory()
         loadBlacklistSlugs()
         loadHomeData()
         loadGenres()
@@ -243,7 +279,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _latestVersion.value = tagName
                     _downloadUrl.value = dlUrl
                     val latestClean = tagName.trimStart('v')
-                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.2.3" }
+                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.3.0" }
 
                     fun parseVersion(v: String): List<Int> =
                         v.split(".").map { it.toIntOrNull() ?: 0 }
@@ -540,6 +576,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isDetailLoading.value = true
         _animeDetail.value = null
         _detailError.value = null
+        _currentAnimeSlug.value = slug
         viewModelScope.launch {
             try {
                 // Sync blacklist check

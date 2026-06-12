@@ -284,6 +284,7 @@ fun HomeScreen(
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val session by viewModel.session.collectAsState()
+    val watchHistory by viewModel.watchHistory.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
 
@@ -784,6 +785,81 @@ fun HomeScreen(
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section Riwayat: Terakhir Ditonton
+            if (watchHistory.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Terakhir Ditonton",
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        TextButton(onClick = { viewModel.clearWatchHistory() }) {
+                            Text("Hapus", color = accentColor, fontSize = 12.sp)
+                        }
+                    }
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(watchHistory) { item ->
+                            Column(
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .clickable { onNavigateToDetail(item.animeSlug) }
+                            ) {
+                                Box {
+                                    AsyncImage(
+                                        model = item.animePoster,
+                                        contentDescription = item.animeTitle,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .width(110.dp)
+                                            .height(155.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                    )
+                                    // Badge episode
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(4.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color.Black.copy(alpha = 0.75f))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = item.episodeTitle,
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = item.animeTitle,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontSize = 11.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 14.sp
+                                )
                             }
                         }
                     }
@@ -1969,10 +2045,24 @@ fun WatchScreen(
     val streamError by viewModel.streamError.collectAsState()
     val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
     val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
+    val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(episodeSlug) {
         viewModel.loadEpisodeStream(episodeSlug)
+    }
+
+    // Catat riwayat saat episodeTitle sudah tersedia
+    LaunchedEffect(episodeTitle) {
+        if (episodeTitle.isNotEmpty()) {
+            viewModel.addToWatchHistory(
+                animeSlug = currentAnimeSlug,
+                animeTitle = animeTitle,
+                animePoster = detail?.poster ?: "",
+                episodeSlug = episodeSlug,
+                episodeTitle = episodeTitle
+            )
+        }
     }
 
     val activity = LocalContext.current as? android.app.Activity
