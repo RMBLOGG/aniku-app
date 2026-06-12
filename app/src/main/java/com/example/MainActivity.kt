@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat")
+                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat", "feed")
                 val showBottomBar = currentRoute in bottomRoutes
 
                 Scaffold(
@@ -65,7 +65,8 @@ class MainActivity : ComponentActivity() {
                                     Triple("explore", "Eksplor", Icons.Default.PlayArrow),
                                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
                                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
-                                    Triple("chat", "Chat", Icons.Default.Chat)
+                                    Triple("chat", "Chat", Icons.Default.Chat),
+                                    Triple("feed", "Feed", Icons.Default.GridView)
                                 )
 
                                 items.forEach { (route, label, icon) ->
@@ -136,6 +137,31 @@ class MainActivity : ComponentActivity() {
                             ExploreScreen(
                                 viewModel = viewModel,
                                 onNavigateToDetail = { slug -> navController.navigate("detail/$slug") }
+                            )
+                        }
+                        composable("feed") {
+                            FeedScreen(
+                                viewModel = viewModel,
+                                navController = navController,
+                                onCreatePost = { navController.navigate("create_post") },
+                                onOpenPost = { postId -> navController.navigate("post_detail/$postId") }
+                            )
+                        }
+                        composable("create_post") {
+                            CreatePostScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "post_detail/{postId}",
+                            arguments = listOf(navArgument("postId") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val postId = backStackEntry.arguments?.getString("postId") ?: ""
+                            PostDetailScreen(
+                                postId = postId,
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("bookmark") {

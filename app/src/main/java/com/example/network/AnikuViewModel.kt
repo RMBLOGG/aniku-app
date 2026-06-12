@@ -1156,4 +1156,240 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ─────────────── FEED ───────────────
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    val posts: StateFlow<List<Post>> = _posts.asStateFlow()
+
+    private val _isFeedLoading = MutableStateFlow(false)
+    val isFeedLoading: StateFlow<Boolean> = _isFeedLoading.asStateFlow()
+
+    private val _feedError = MutableStateFlow<String?>(null)
+    val feedError: StateFlow<String?> = _feedError.asStateFlow()
+
+    private val _postLikes = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+    val postLikes: StateFlow<Map<String, List<String>>> = _postLikes.asStateFlow()
+
+    private val _postComments = MutableStateFlow<Map<String, List<PostComment>>>(emptyMap())
+    val postComments: StateFlow<Map<String, List<PostComment>>> = _postComments.asStateFlow()
+
+    private val _isCreatingPost = MutableStateFlow(false)
+    val isCreatingPost: StateFlow<Boolean> = _isCreatingPost.asStateFlow()
+
+    fun clearFeedError() { _feedError.value = null }
+
+    fun loadFeed() {
+        viewModelScope.launch {
+            _isFeedLoading.value = true
+            try {
+                val fetchedPosts = NetworkClient.supabaseDbApi.getPosts(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _posts.value = fetchedPosts
+                val likesMap = mutableMapOf<String, List<String>>()
+                fetchedPosts.forEach { post ->
+                    val likes = NetworkClient.supabaseDbApi.getLikes(
+                        postIdQuery = "eq.${post.id}",
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    likesMap[post.id] = likes.map { it.user_id }
+                }
+                _postLikes.value = likesMap
+            } catch (e: Exception) {
+                _feedError.value = "Gagal memuat feed: ${e.message}"
+            } finally {
+                _isFeedLoading.value = false
+            }
+        }
+    }
+
+    fun createPost(caption: String?, imageUrl: String?) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _feedError.value = "Kamu harus login untuk posting"
+            return
+        }
+        if (caption.isNullOrBlank() && imageUrl == null) {
+            _feedError.value = "Post harus ada caption atau foto"
+            return
+        }
+        viewModelScope.launch {
+            _isCreatingPost.value = true
+            try {
+                NetworkClient.supabaseDbApi.insertPost(
+                    data = PostRequest(
+                        user_id = currentSession.userId ?: "",
+                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                        avatar_url = currentSession.avatarUrl,
+                        is_admin = currentSession.isAdmin,
+                        caption = caption?.trim(),
+                        image_url = imageUrl
+                    ),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadFeed()
+            } catch (e: Exception) {
+                _feedError.value = "Gagal membuat post: ${e.message}"
+            } finally {
+                _isCreatingPost.value = false
+            }
+        }
+    }
+
+    fun deletePost(postId: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deletePost(
+                    idQuery = "eq.$postId",
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _posts.value = _posts.value.filter { it.id != postId }
+            } catch (e: Exception) {
+                _feedError.value = "Gagal hapus post: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleLike(postId: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _feedError.value = "Login dulu untuk like"
+            return
+        }
+        val userId = currentSession.userId ?: return
+        val currentLikes = _postLikes.value[postId] ?: emptyList()
+        val alreadyLiked = userId in currentLikes
+
+        _postLikes.value = _postLikes.value.toMutableMap().apply {
+            put(postId, if (alreadyLiked) currentLikes - userId else currentLikes + userId)
+        }
+
+        viewModelScope.launch {
+            try {
+                if (alreadyLiked) {
+                    NetworkClient.supabaseDbApi.deleteLike(
+                        postIdQuery = "eq.$postId",
+                        userIdQuery = "eq.$userId",
+                        authHeader = "Bearer ${currentSession.token}",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                } else {
+                    NetworkClient.supabaseDbApi.insertLike(
+                        data = PostLikeRequest(post_id = postId, user_id = userId),
+                        authHeader = "Bearer ${currentSession.token}",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+            } catch (e: Exception) {
+                _postLikes.value = _postLikes.value.toMutableMap().apply {
+                    put(postId, currentLikes)
+                }
+                _feedError.value = "Gagal like: ${e.message}"
+            }
+        }
+    }
+
+    fun loadComments(postId: String) {
+        viewModelScope.launch {
+            try {
+                val comments = NetworkClient.supabaseDbApi.getComments(
+                    postIdQuery = "eq.$postId",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _postComments.value = _postComments.value.toMutableMap().apply {
+                    put(postId, comments)
+                }
+            } catch (e: Exception) {
+                _feedError.value = "Gagal memuat komentar: ${e.message}"
+            }
+        }
+    }
+
+    fun addComment(
+        postId: String,
+        message: String,
+        replyToId: String? = null,
+        replyToUsername: String? = null
+    ) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _feedError.value = "Login dulu untuk komentar"
+            return
+        }
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.insertComment(
+                    data = PostCommentRequest(
+                        post_id = postId,
+                        user_id = currentSession.userId ?: "",
+                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                        avatar_url = currentSession.avatarUrl,
+                        message = trimmed,
+                        reply_to_id = replyToId,
+                        reply_to_username = replyToUsername
+                    ),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadComments(postId)
+            } catch (e: Exception) {
+                _feedError.value = "Gagal kirim komentar: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteComment(postId: String, commentId: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteComment(
+                    idQuery = "eq.$commentId",
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadComments(postId)
+            } catch (e: Exception) {
+                _feedError.value = "Gagal hapus komentar: ${e.message}"
+            }
+        }
+    }
+
+    fun uploadPostImage(context: Context, uri: Uri, onDone: (String?) -> Unit) {
+        viewModelScope.launch {
+            _isCreatingPost.value = true
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(4096)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+                val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", "post_image.jpg", requestFile)
+                val presetBody = "aniku_avatar".toRequestBody("text/plain".toMediaTypeOrNull())
+                val res = NetworkClient.cloudinaryApi.uploadAvatar(body, presetBody)
+                onDone(res.secure_url)
+            } catch (e: Exception) {
+                _feedError.value = "Gagal upload foto: ${e.message}"
+                onDone(null)
+            } finally {
+                _isCreatingPost.value = false
+            }
+        }
+    }
+
 }

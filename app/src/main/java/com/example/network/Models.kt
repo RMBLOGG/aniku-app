@@ -240,3 +240,63 @@ data class ChatMessageRequest(
     val reply_to_message: String? = null,
     val image_url: String? = null
 )
+
+// Feed / Post models
+@JsonClass(generateAdapter = true)
+data class Post(
+    val id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val is_admin: Boolean? = false,
+    val caption: String? = null,
+    val image_url: String? = null,
+    val created_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PostRequest(
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val is_admin: Boolean? = false,
+    val caption: String? = null,
+    val image_url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class PostLike(
+    val id: String,
+    val post_id: String,
+    val user_id: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PostLikeRequest(
+    val post_id: String,
+    val user_id: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PostComment(
+    val id: String,
+    val post_id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val created_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PostCommentRequest(
+    val post_id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null
+)

@@ -238,6 +238,78 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): Response<Unit>
+
+    // Posts
+    @GET("rest/v1/posts")
+    suspend fun getPosts(
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 50,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<Post>
+
+    @POST("rest/v1/posts")
+    suspend fun insertPost(
+        @Body data: PostRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<Post>
+
+    @DELETE("rest/v1/posts")
+    suspend fun deletePost(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): Response<Unit>
+
+    // Likes
+    @GET("rest/v1/post_likes")
+    suspend fun getLikes(
+        @Query("post_id") postIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PostLike>
+
+    @POST("rest/v1/post_likes")
+    suspend fun insertLike(
+        @Body data: PostLikeRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<PostLike>
+
+    @DELETE("rest/v1/post_likes")
+    suspend fun deleteLike(
+        @Query("post_id") postIdQuery: String,
+        @Query("user_id") userIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): Response<Unit>
+
+    // Comments
+    @GET("rest/v1/post_comments")
+    suspend fun getComments(
+        @Query("post_id") postIdQuery: String,
+        @Query("order") order: String = "created_at.asc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PostComment>
+
+    @POST("rest/v1/post_comments")
+    suspend fun insertComment(
+        @Body data: PostCommentRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<PostComment>
+
+    @DELETE("rest/v1/post_comments")
+    suspend fun deleteComment(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): Response<Unit>
 }
 
 interface CloudinaryApi {
