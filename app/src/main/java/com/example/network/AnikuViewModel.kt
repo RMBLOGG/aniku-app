@@ -28,6 +28,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
 
+    companion object {
+        var instance: AnikuViewModel? = null
+    }
+
     private val SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjenhhaXlpYm53Z3ljb2R0Y3ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4MzYxNzAsImV4cCI6MjA5NjQxMjE3MH0.UUPfyZ4GJO6y8I5467p_piCxtyuyM5oYGX_-jPeiZRw"
 
     // Settings flows
@@ -214,6 +218,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val banStatusMessage: StateFlow<String?> = _banStatusMessage.asStateFlow()
 
     init {
+        instance = this
         // Load initial state
         refreshBookmarks()
         loadBlacklistSlugs()
@@ -273,21 +278,33 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Download APK dengan OkHttp + custom notification
+    private var downloadJob: kotlinx.coroutines.Job? = null
+
+    fun cancelDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        val notifManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notifManager.cancel(9901)
+    }
+
     fun downloadUpdate(url: String, version: String) {
-        viewModelScope.launch {
+        downloadJob = viewModelScope.launch {
             val notifManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channelId = "aniku_update"
             val notifId = 9901
 
-            // Buat notification channel (Android 8+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
-                    channelId,
-                    "Aniku Update",
-                    NotificationManager.IMPORTANCE_LOW
+                    channelId, "Aniku Update", NotificationManager.IMPORTANCE_LOW
                 ).apply { description = "Notifikasi update aplikasi Aniku" }
                 notifManager.createNotificationChannel(channel)
             }
+
+            val cancelIntent = Intent("com.example.CANCEL_DOWNLOAD")
+            val cancelPendingIntent = PendingIntent.getBroadcast(
+                appContext, 0, cancelIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
             val builder = NotificationCompat.Builder(appContext, channelId)
                 .setSmallIcon(appContext.applicationInfo.icon)
@@ -296,26 +313,33 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .setProgress(100, 0, false)
+                .addAction(0, "Batal", cancelPendingIntent)
 
             notifManager.notify(notifId, builder.build())
+
+            val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: appContext.filesDir
+            val outputFile = File(outputDir, "Aniku-${version}.apk")
 
             try {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val client = okhttp3.OkHttpClient.Builder()
                         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                        .followRedirects(true)
+                        .followSslRedirects(true)
                         .build()
                     val request = okhttp3.Request.Builder()
                         .url(url)
                         .header("Accept", "application/octet-stream")
                         .build()
+
+                    kotlinx.coroutines.ensureActive()
                     val response = client.newCall(request).execute()
                     val body = response.body ?: throw Exception("Empty response body")
                     val contentLength = body.contentLength()
 
-                    val outputDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                        ?: appContext.filesDir
-                    val outputFile = File(outputDir, "Aniku-${version}.apk")
+                    if (outputFile.exists()) outputFile.delete()
 
                     var downloaded = 0L
                     body.byteStream().use { input ->
@@ -323,6 +347,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val buffer = ByteArray(8192)
                             var bytes: Int
                             while (input.read(buffer).also { bytes = it } != -1) {
+                                kotlinx.coroutines.ensureActive()
                                 output.write(buffer, 0, bytes)
                                 downloaded += bytes
                                 if (contentLength > 0) {
@@ -335,7 +360,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         }
                     }
 
-                    // Selesai — buat intent install
                     val apkUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         FileProvider.getUriForFile(
                             appContext,
@@ -359,14 +383,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         .setContentText("Download selesai. Tap untuk install.")
                         .setOngoing(false)
                         .setAutoCancel(true)
+                        .clearActions()
                         .setContentIntent(pendingIntent)
                     notifManager.notify(notifId, builder.build())
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                if (outputFile.exists()) outputFile.delete()
+                notifManager.cancel(notifId)
+                Log.d("AnikuVM", "Download dibatalkan user")
             } catch (e: Exception) {
                 Log.e("AnikuVM", "downloadUpdate failed: ${e.message}")
+                if (outputFile.exists()) outputFile.delete()
                 builder.setProgress(0, 0, false)
                     .setContentText("Download gagal: periksa koneksi")
                     .setOngoing(false)
+                    .clearActions()
                 notifManager.notify(notifId, builder.build())
             }
         }

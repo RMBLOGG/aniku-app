@@ -37,6 +37,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <receiver
+            android:name=".CancelDownloadReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.CANCEL_DOWNLOAD" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
