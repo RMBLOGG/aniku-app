@@ -992,6 +992,7 @@ fun SearchScreen(
     val isLoading by viewModel.isSearchLoading.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val gridLayout by viewModel.gridLayout.collectAsState()
 
     Column(
         modifier = Modifier
@@ -1042,22 +1043,41 @@ fun SearchScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(popularList) { anim ->
-                    AnimeCard(
-                        anime = anim,
-                        accentColor = accentColor,
-                        onClick = { onNavigateToDetail(anim.slug) },
-                        isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                        onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            if (gridLayout == "List") {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(popularList) { anim ->
+                        AnimeListCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+            } else {
+                val columns = if (gridLayout == "3") 3 else 2
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(popularList) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         } else if (results.isEmpty()) {
@@ -1070,27 +1090,44 @@ fun SearchScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Anime tidak ditemukan.", color = Color.Gray, fontSize = 16.sp)
             }
-        } else {
             // Live Search Query results
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(results) { anim ->
-                    AnimeCard(
-                        anime = anim,
-                        accentColor = accentColor,
-                        onClick = { onNavigateToDetail(anim.slug) },
-                        isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                        onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+            if (gridLayout == "List") {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(results) { anim ->
+                        AnimeListCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                        )
+                    }
+                }
+            } else {
+                val columns = if (gridLayout == "3") 3 else 2
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(results) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
-        }
     }
 }
 
