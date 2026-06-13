@@ -1220,6 +1220,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun clearFeedError() { _feedError.value = null }
 
+    // ─────────────── SECURITY ───────────────
+    val appLockEnabled: StateFlow<Boolean> = settingsStore.appLockEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val appLockType: StateFlow<String> = settingsStore.appLockTypeFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "pin")
+    val appPin: StateFlow<String> = settingsStore.appPinFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+
+    fun saveAppLock(enabled: Boolean, type: String, pin: String) {
+        viewModelScope.launch { settingsStore.saveAppLock(enabled, type, pin) }
+    }
+
     fun loadFeed() {
         viewModelScope.launch {
             _isFeedLoading.value = true

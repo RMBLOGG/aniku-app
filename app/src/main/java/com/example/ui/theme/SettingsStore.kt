@@ -26,6 +26,9 @@ class SettingsStore(private val context: Context) {
         val IS_ADMIN = booleanPreferencesKey("is_admin")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
+        val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+        val APP_LOCK_TYPE = stringPreferencesKey("app_lock_type") // "pin" | "biometric"
+        val APP_PIN = stringPreferencesKey("app_pin")
     }
 
     val isDarkFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -114,6 +117,18 @@ class SettingsStore(private val context: Context) {
     suspend fun saveLastChatRead(timestamp: String) {
         context.dataStore.edit { preferences ->
             preferences[LAST_CHAT_READ] = timestamp
+        }
+    }
+
+    val appLockEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[APP_LOCK_ENABLED] ?: false }
+    val appLockTypeFlow: Flow<String> = context.dataStore.data.map { it[APP_LOCK_TYPE] ?: "pin" }
+    val appPinFlow: Flow<String> = context.dataStore.data.map { it[APP_PIN] ?: "" }
+
+    suspend fun saveAppLock(enabled: Boolean, type: String, pin: String) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_LOCK_ENABLED] = enabled
+            preferences[APP_LOCK_TYPE] = type
+            preferences[APP_PIN] = pin
         }
     }
 }
