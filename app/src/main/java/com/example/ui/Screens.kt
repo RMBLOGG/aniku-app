@@ -3007,41 +3007,66 @@ fun AdminPanelScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Panel Kontrol Admin",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Text(
+                    text = "Panel Kontrol Admin",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Kelola pengguna, konten, dan pengaturan aplikasi",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
 
-        // Subheader Tab selection (horizontal scroll)
+        // Subheader Tab selection (horizontal scroll, pill-style chips)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .horizontalScroll(rememberScrollState())
-                .padding(vertical = 10.dp, horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val sections = listOf("Manajemen User", "Pengumuman", "Hero Slider", "Blacklist Anime")
-            sections.forEachIndexed { index, s ->
+            val sections = listOf(
+                "Manajemen User" to Icons.Default.Group,
+                "Pengumuman" to Icons.Default.Campaign,
+                "Hero Slider" to Icons.Default.ViewCarousel,
+                "Blacklist Anime" to Icons.Default.Block
+            )
+            sections.forEachIndexed { index, (label, icon) ->
                 val isSelected = selectedTab == index
-                Box(
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) accentColor else MaterialTheme.colorScheme.background)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { selectedTab = index }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = s,
+                        text = label,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -3049,6 +3074,7 @@ fun AdminPanelScreen(
                 }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
 
         if (isLoading) {
             LoadingScreen("Memuat data...")
@@ -3062,54 +3088,139 @@ fun AdminPanelScreen(
                 when (selectedTab) {
                     0 -> {
                         // Section A: Users List
-                        Text("List Seluruh Pengguna", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("List Seluruh Pengguna", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text("${users.size} pengguna", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
                         users.forEach { usr ->
+                            val isBanned = usr.is_banned == true
+                            val statusColor = if (isBanned) Color(0xFFFF5252) else Color(0xFF4CAF50)
+
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Mini raw avatar status representation
-                                    AsyncImage(
-                                        model = usr.avatar_url,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.surface)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = usr.username ?: "Tamu", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                                        Text(text = "Tipe: ${if (usr.is_admin == true) "Admin" else "Pengguna"}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 11.sp)
-                                        Text(text = "Status: ${if (usr.is_banned == true) "Banned (Ditangguhkan)" else "Aktif"}", color = if (usr.is_banned == true) Color.Red else Color(0xFF4CAF50), fontSize = 11.sp)
-                                    }
-                                    
-                                    // Ban Action Button
-                                    Button(
-                                        onClick = { viewModel.toggleUserBanStatus(usr) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = if (usr.is_banned == true) Color(0xFF4CAF50) else Color.Red),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text(if (usr.is_banned == true) "Aktifkan" else "Ban")
-                                    }
-                                    
-                                    // Reset password option triggers recovery email link from Supabase auth
-                                    IconButton(
-                                        onClick = {
-                                            viewModel.sendAuthRecovery(usr.id) { sent ->
-                                                if (sent) Toast.makeText(context, "Recovery email sent successfully", Toast.LENGTH_SHORT).show()
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Avatar with status ring
+                                        Box(
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .clip(CircleShape)
+                                                .border(2.dp, statusColor, CircleShape)
+                                                .padding(2.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            AvatarCircle(
+                                                avatarUrl = usr.avatar_url,
+                                                username = usr.username ?: "?",
+                                                size = 44.dp
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = usr.username ?: "Tamu",
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 15.sp
+                                                )
+                                                if (usr.is_admin == true) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    AdminBadge()
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(7.dp)
+                                                        .clip(CircleShape)
+                                                        .background(statusColor)
+                                                )
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Text(
+                                                    text = if (isBanned) "Banned" else "Aktif",
+                                                    color = statusColor,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    text = "  •  ${if (usr.is_admin == true) "Admin" else "Pengguna"}",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                    fontSize = 12.sp
+                                                )
                                             }
                                         }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Action row
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Password reset link", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Button(
+                                            onClick = { viewModel.toggleUserBanStatus(usr) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (isBanned) Color(0xFF4CAF50).copy(alpha = 0.15f) else Color(0xFFFF5252).copy(alpha = 0.15f)
+                                            ),
+                                            shape = RoundedCornerShape(10.dp),
+                                            elevation = ButtonDefaults.buttonElevation(0.dp),
+                                            modifier = Modifier.weight(1f).height(38.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isBanned) Icons.Default.LockOpen else Icons.Default.Block,
+                                                contentDescription = null,
+                                                tint = if (isBanned) Color(0xFF4CAF50) else Color(0xFFFF5252),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isBanned) "Aktifkan" else "Ban",
+                                                color = if (isBanned) Color(0xFF4CAF50) else Color(0xFFFF5252),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+
+                                        // Reset password option triggers recovery email link from Supabase auth
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.sendAuthRecovery(usr.id) { sent ->
+                                                    if (sent) Toast.makeText(context, "Recovery email sent successfully", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Password reset link", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                        }
                                     }
                                 }
                             }
