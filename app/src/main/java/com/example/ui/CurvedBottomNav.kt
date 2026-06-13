@@ -37,6 +37,7 @@ fun CurvedBottomNav(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(surfaceColor)
             .navigationBarsPadding()
     ) {
