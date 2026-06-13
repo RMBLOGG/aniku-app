@@ -2283,6 +2283,8 @@ fun WatchScreen(
                         )
                     }
                 } else {
+                    var isWebViewLoading by remember { mutableStateOf(true) }
+                    Box(modifier = Modifier.fillMaxSize()) {
                     AndroidView(
                         factory = { ctx ->
                             WebView(ctx).apply {
@@ -2361,6 +2363,14 @@ fun WatchScreen(
                                         }
                                         return false
                                     }
+                                    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                        super.onPageStarted(view, url, favicon)
+                                        isWebViewLoading = true
+                                    }
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        isWebViewLoading = false
+                                    }
                                 }
                                 webChromeClient = object : WebChromeClient() {
                                     override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
@@ -2385,6 +2395,29 @@ fun WatchScreen(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+                    // Loading overlay di atas WebView
+                    if (isWebViewLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.85f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
+                                Text(
+                                    "Sedang memuat video...",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    } // end Box wrapper
                 }
             }
         }
@@ -4144,6 +4177,7 @@ fun TampilanScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SumberDataScreen(
     viewModel: AnikuViewModel,
@@ -4153,32 +4187,26 @@ fun SumberDataScreen(
     val accentColorName by viewModel.accentColorName.collectAsState()
     val accentColor = getAccentColor(accentColorName)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Sumber Data",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sumber Data", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
-        }
-
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
