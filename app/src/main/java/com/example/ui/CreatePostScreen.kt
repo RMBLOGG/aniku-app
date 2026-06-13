@@ -34,6 +34,7 @@ fun CreatePostScreen(
     val session by viewModel.session.collectAsState()
     val isCreatingPost by viewModel.isCreatingPost.collectAsState()
     val feedError by viewModel.feedError.collectAsState()
+    val pendingSharedAnime by viewModel.pendingSharedAnime.collectAsState()
     val context = LocalContext.current
 
     var caption by remember { mutableStateOf("") }
@@ -58,7 +59,12 @@ fun CreatePostScreen(
     }
 
     val isBusy = isCreatingPost || isUploadingImage
-    val canPost = (caption.trim().isNotEmpty() || pendingImageUri != null) && !isBusy
+    val canPost = (caption.trim().isNotEmpty() || pendingImageUri != null || pendingSharedAnime != null) && !isBusy
+
+    fun handleBack() {
+        viewModel.clearPendingSharedAnime()
+        onBack()
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -66,7 +72,7 @@ fun CreatePostScreen(
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { handleBack() }) {
                         Icon(Icons.Default.Close, contentDescription = "Tutup")
                     }
                 },
@@ -78,10 +84,10 @@ fun CreatePostScreen(
                                 viewModel.uploadPostImage(context, pendingImageUri!!) { url ->
                                     isUploadingImage = false
                                     uploadedImageUrl = url
-                                    viewModel.createPost(caption.trim().ifEmpty { null }, url)
+                                    viewModel.createPost(caption.trim().ifEmpty { null }, url, pendingSharedAnime)
                                 }
                             } else {
-                                viewModel.createPost(caption.trim().ifEmpty { null }, uploadedImageUrl)
+                                viewModel.createPost(caption.trim().ifEmpty { null }, uploadedImageUrl, pendingSharedAnime)
                             }
                         },
                         enabled = canPost,
@@ -205,6 +211,34 @@ fun CreatePostScreen(
                                     ) {
                                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // Shared anime preview
+                    AnimatedVisibility(
+                        visible = pendingSharedAnime != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        pendingSharedAnime?.let { anime ->
+                            Box(modifier = Modifier.padding(top = 12.dp)) {
+                                SharedAnimeCard(anime = anime)
+                                IconButton(
+                                    onClick = { viewModel.clearPendingSharedAnime() },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(6.dp)
+                                        .size(28.dp)
+                                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Hapus",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                 }
                             }
                         }

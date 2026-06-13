@@ -1947,6 +1947,33 @@ fun AnimeDetailScreen(
                                         tint = if (isBookmarked) accentColor else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
+
+                                Button(
+                                    onClick = {
+                                        if (!isLoggedIn) {
+                                            showLoginDialog = true
+                                        } else {
+                                            viewModel.setPendingSharedAnime(
+                                                com.example.network.SharedAnimeRef(
+                                                    slug = slug,
+                                                    title = d.title,
+                                                    poster = d.poster,
+                                                    type = d.type
+                                                )
+                                            )
+                                            navController.navigate("create_post")
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("detail_share_btn"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Bagikan ke Feed",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(20.dp))

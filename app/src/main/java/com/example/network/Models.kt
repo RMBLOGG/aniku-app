@@ -246,6 +246,14 @@ data class ChatMessageRequest(
     val image_url: String? = null
 )
 
+// Referensi anime yang dibagikan ke feed (dipakai di CreatePostScreen)
+data class SharedAnimeRef(
+    val slug: String,
+    val title: String,
+    val poster: String,
+    val type: String? = null
+)
+
 // Feed / Post models
 @JsonClass(generateAdapter = true)
 data class Post(
@@ -256,6 +264,10 @@ data class Post(
     val is_admin: Boolean? = false,
     val caption: String? = null,
     val image_url: String? = null,
+    val anime_slug: String? = null,
+    val anime_title: String? = null,
+    val anime_poster: String? = null,
+    val anime_type: String? = null,
     val created_at: String
 )
 
@@ -266,7 +278,11 @@ data class PostRequest(
     val avatar_url: String? = null,
     val is_admin: Boolean? = false,
     val caption: String? = null,
-    val image_url: String? = null
+    val image_url: String? = null,
+    val anime_slug: String? = null,
+    val anime_title: String? = null,
+    val anime_poster: String? = null,
+    val anime_type: String? = null
 )
 
 @JsonClass(generateAdapter = true)

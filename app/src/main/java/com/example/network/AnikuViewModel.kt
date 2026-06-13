@@ -1218,6 +1218,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isCreatingPost = MutableStateFlow(false)
     val isCreatingPost: StateFlow<Boolean> = _isCreatingPost.asStateFlow()
 
+    // Anime yang sedang dibagikan ke feed (diisi dari AnimeDetailScreen, dipakai di CreatePostScreen)
+    private val _pendingSharedAnime = MutableStateFlow<SharedAnimeRef?>(null)
+    val pendingSharedAnime: StateFlow<SharedAnimeRef?> = _pendingSharedAnime.asStateFlow()
+
+    fun setPendingSharedAnime(ref: SharedAnimeRef) {
+        _pendingSharedAnime.value = ref
+    }
+
+    fun clearPendingSharedAnime() {
+        _pendingSharedAnime.value = null
+    }
+
     fun clearFeedError() { _feedError.value = null }
 
     // ─────────────── SECURITY ───────────────
@@ -1259,13 +1271,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun createPost(caption: String?, imageUrl: String?) {
+    fun createPost(caption: String?, imageUrl: String?, sharedAnime: SharedAnimeRef? = null) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) {
             _feedError.value = "Kamu harus login untuk posting"
             return
         }
-        if (caption.isNullOrBlank() && imageUrl == null) {
+        if (caption.isNullOrBlank() && imageUrl == null && sharedAnime == null) {
             _feedError.value = "Post harus ada caption atau foto"
             return
         }
@@ -1279,11 +1291,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         avatar_url = currentSession.avatarUrl,
                         is_admin = currentSession.isAdmin,
                         caption = caption?.trim(),
-                        image_url = imageUrl
+                        image_url = imageUrl,
+                        anime_slug = sharedAnime?.slug,
+                        anime_title = sharedAnime?.title,
+                        anime_poster = sharedAnime?.poster,
+                        anime_type = sharedAnime?.type
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY
                 )
+                _pendingSharedAnime.value = null
                 loadFeed()
             } catch (e: Exception) {
                 _feedError.value = "Gagal membuat post: ${e.message}"

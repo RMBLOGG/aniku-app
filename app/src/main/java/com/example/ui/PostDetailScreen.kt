@@ -29,7 +29,8 @@ import java.util.*
 fun PostDetailScreen(
     postId: String,
     viewModel: AnikuViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToDetail: (String) -> Unit = {}
 ) {
     val session by viewModel.session.collectAsState()
     val posts by viewModel.posts.collectAsState()
@@ -229,7 +230,8 @@ fun PostDetailScreen(
                     commentCount = allComments.size,
                     isLiked = isLiked,
                     onLike = { viewModel.toggleLike(postId) },
-                    onShowFullImage = { showFullImage = true }
+                    onShowFullImage = { showFullImage = true },
+                    onOpenAnime = { slug -> onNavigateToDetail(slug) }
                 )
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
@@ -387,7 +389,8 @@ private fun PostHeader(
     commentCount: Int,
     isLiked: Boolean,
     onLike: () -> Unit,
-    onShowFullImage: () -> Unit
+    onShowFullImage: () -> Unit,
+    onOpenAnime: (String) -> Unit
 ) {
     val timeStr = remember(post.created_at) {
         try {
@@ -451,6 +454,19 @@ private fun PostHeader(
                     .heightIn(min = 180.dp, max = 460.dp)
                     .clickable { onShowFullImage() },
                 contentScale = ContentScale.FillWidth
+            )
+        }
+
+        // Shared anime
+        if (!post.anime_slug.isNullOrEmpty() && !post.anime_title.isNullOrEmpty() && !post.anime_poster.isNullOrEmpty()) {
+            SharedAnimeCard(
+                title = post.anime_title,
+                poster = post.anime_poster,
+                type = post.anime_type,
+                modifier = Modifier
+                    .padding(horizontal = 14.dp)
+                    .padding(bottom = 8.dp),
+                onClick = { onOpenAnime(post.anime_slug) }
             )
         }
 

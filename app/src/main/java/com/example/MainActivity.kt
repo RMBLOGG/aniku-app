@@ -269,7 +269,8 @@ class MainActivity : ComponentActivity() {
                             PostDetailScreen(
                                 postId = postId,
                                 viewModel = viewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") }
                             )
                         }
                         composable("bookmark") {

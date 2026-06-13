@@ -147,7 +147,8 @@ fun FeedScreen(
                                 canDelete = canDelete,
                                 onLike = { viewModel.toggleLike(post.id) },
                                 onComment = { onOpenPost(post.id) },
-                                onDelete = { viewModel.deletePost(post.id) }
+                                onDelete = { viewModel.deletePost(post.id) },
+                                onOpenAnime = { slug -> navController.navigate("detail/$slug") }
                             )
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
@@ -171,7 +172,8 @@ private fun TweetCard(
     canDelete: Boolean,
     onLike: () -> Unit,
     onComment: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenAnime: (String) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showFullImage by remember { mutableStateOf(false) }
@@ -268,6 +270,17 @@ private fun TweetCard(
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { showFullImage = true },
                     contentScale = ContentScale.FillWidth
+                )
+            }
+
+            // Shared anime
+            if (!post.anime_slug.isNullOrEmpty() && !post.anime_title.isNullOrEmpty() && !post.anime_poster.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                SharedAnimeCard(
+                    title = post.anime_title,
+                    poster = post.anime_poster,
+                    type = post.anime_type,
+                    onClick = { onOpenAnime(post.anime_slug) }
                 )
             }
 
