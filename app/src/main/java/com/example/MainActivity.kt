@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -43,6 +45,29 @@ class MainActivity : ComponentActivity() {
                 accentName = accentColorName,
                 textScale = textSizeScale
             ) {
+                val appLockEnabled by viewModel.appLockEnabled.collectAsState()
+                val appLockType by viewModel.appLockType.collectAsState()
+                val appPin by viewModel.appPin.collectAsState()
+                var isUnlocked by remember { mutableStateOf(false) }
+
+                // Re-lock saat app kembali dari background
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                            if (appLockEnabled) isUnlocked = false
+                        }
+                    }
+                    lifecycle.addObserver(observer)
+                    onDispose { lifecycle.removeObserver(observer) }
+                }
+
+                if (appLockEnabled && !isUnlocked) {
+                    LockScreen(
+                        lockType = appLockType,
+                        savedPin = appPin,
+                        onUnlocked = { isUnlocked = true }
+                    )
+                } else {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -404,6 +429,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+            } // end else (unlocked)
         }
     }
 }
