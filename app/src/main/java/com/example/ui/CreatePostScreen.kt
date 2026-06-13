@@ -7,6 +7,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,8 +16,10 @@ import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
@@ -40,10 +43,8 @@ fun CreatePostScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { pendingImageUri = it; uploadedImageUrl = null }
-    }
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? -> uri?.let { pendingImageUri = it; uploadedImageUrl = null } }
 
     LaunchedEffect(feedError) {
         feedError?.let { snackbarHostState.showSnackbar(it); viewModel.clearFeedError() }
@@ -57,213 +58,193 @@ fun CreatePostScreen(
     }
 
     val isBusy = isCreatingPost || isUploadingImage
-    val canPost = (caption.trim().isNotEmpty() || uploadedImageUrl != null || pendingImageUri != null) && !isBusy
+    val canPost = (caption.trim().isNotEmpty() || pendingImageUri != null) && !isBusy
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Buat Postingan", fontWeight = FontWeight.Bold) },
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.Close, contentDescription = "Tutup")
                     }
                 },
                 actions = {
-                    TextButton(
+                    Button(
                         onClick = {
                             if (pendingImageUri != null && uploadedImageUrl == null) {
                                 isUploadingImage = true
                                 viewModel.uploadPostImage(context, pendingImageUri!!) { url ->
                                     isUploadingImage = false
                                     uploadedImageUrl = url
-                                    viewModel.createPost(
-                                        caption = caption.trim().ifEmpty { null },
-                                        imageUrl = url
-                                    )
+                                    viewModel.createPost(caption.trim().ifEmpty { null }, url)
                                 }
                             } else {
-                                viewModel.createPost(
-                                    caption = caption.trim().ifEmpty { null },
-                                    imageUrl = uploadedImageUrl
-                                )
+                                viewModel.createPost(caption.trim().ifEmpty { null }, uploadedImageUrl)
                             }
                         },
-                        enabled = canPost
+                        enabled = canPost,
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
                         if (isBusy) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(
-                                "Posting",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = if (canPost) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
                             )
+                        } else {
+                            Text("Posting", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                     }
+                    Spacer(Modifier.width(8.dp))
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
         ) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-            // Avatar + caption
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.Top
             ) {
+                // Avatar
                 AvatarCircle(
                     avatarUrl = session.avatarUrl,
                     username = session.username ?: "A",
                     size = 42.dp
                 )
                 Spacer(modifier = Modifier.width(12.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = session.username ?: session.email?.substringBefore("@") ?: "Kamu",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Caption input
                     BasicTextField(
                         value = caption,
                         onValueChange = { if (it.length <= 500) caption = it },
                         modifier = Modifier.fillMaxWidth(),
-                        textStyle = LocalTextStyle.current.copy(
+                        textStyle = TextStyle(
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 15.sp,
-                            lineHeight = 22.sp
+                            fontSize = 17.sp,
+                            lineHeight = 24.sp
                         ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         decorationBox = { inner ->
-                            if (caption.isEmpty()) {
-                                Text(
-                                    "Apa yang kamu pikirkan?",
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                                    fontSize = 15.sp
-                                )
+                            Box {
+                                if (caption.isEmpty()) {
+                                    Text(
+                                        "Apa yang sedang terjadi?",
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                        fontSize = 17.sp
+                                    )
+                                }
+                                inner()
                             }
-                            inner()
                         }
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "${caption.length}/500",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
-            }
 
-            // Image preview
-            AnimatedVisibility(
-                visible = pendingImageUri != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                pendingImageUri?.let { uri ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 4.dp)
+                    // Image preview
+                    AnimatedVisibility(
+                        visible = pendingImageUri != null,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
                     ) {
-                        AsyncImage(
-                            model = uri,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 320.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentScale = ContentScale.FillWidth
-                        )
-                        IconButton(
-                            onClick = { pendingImageUri = null; uploadedImageUrl = null },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(28.dp)
-                                .background(Color.Black.copy(alpha = 0.55f), CircleShape)
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Hapus foto",
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                        if (isUploadingImage) {
-                            Box(
-                                modifier = Modifier
-                                    .matchParentSize()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.Black.copy(alpha = 0.45f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+                        pendingImageUri?.let { uri ->
+                            Box(modifier = Modifier.padding(top = 12.dp)) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 300.dp)
+                                        .clip(RoundedCornerShape(14.dp)),
+                                    contentScale = ContentScale.FillWidth
+                                )
+                                IconButton(
+                                    onClick = { pendingImageUri = null; uploadedImageUrl = null },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(6.dp)
+                                        .size(28.dp)
+                                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Hapus",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                if (isUploadingImage) {
+                                    Box(
+                                        modifier = Modifier
+                                            .matchParentSize()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(Color.Black.copy(alpha = 0.4f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-            // Pilih foto
+            // Toolbar bawah — pilih foto
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !isBusy) { imagePickerLauncher.launch("image/*") }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    "Foto",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                    fontWeight = FontWeight.Medium
-                )
+                IconButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    enabled = !isBusy
+                ) {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = "Foto",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (caption.isNotEmpty()) {
+                    Text(
+                        "${caption.length}/500",
+                        fontSize = 12.sp,
+                        color = if (caption.length > 450)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                }
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
         }
     }
-}
-
-@Composable
-private fun BasicTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    textStyle: androidx.compose.ui.text.TextStyle = androidx.compose.ui.text.TextStyle.Default,
-    decorationBox: @Composable (innerTextField: @Composable () -> Unit) -> Unit
-) {
-    androidx.compose.foundation.text.BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier,
-        textStyle = textStyle,
-        decorationBox = decorationBox
-    )
 }

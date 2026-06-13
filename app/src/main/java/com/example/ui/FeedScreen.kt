@@ -6,14 +6,17 @@ import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -40,12 +43,8 @@ fun FeedScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) { viewModel.loadFeed() }
-
     LaunchedEffect(feedError) {
-        feedError?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearFeedError()
-        }
+        feedError?.let { snackbarHostState.showSnackbar(it); viewModel.clearFeedError() }
     }
 
     Scaffold(
@@ -55,18 +54,23 @@ fun FeedScreen(
                 title = {
                     Text(
                         "Feed",
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         fontSize = 20.sp,
                         letterSpacing = (-0.5).sp
                     )
                 },
                 actions = {
                     IconButton(onClick = { viewModel.loadFeed() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
@@ -75,48 +79,56 @@ fun FeedScreen(
                 FloatingActionButton(
                     onClick = onCreatePost,
                     containerColor = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(16.dp)
+                    shape = CircleShape,
+                    modifier = Modifier.size(54.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Buat Post", tint = Color.White)
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Buat Post",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
                 isFeedLoading && posts.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(28.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
                 posts.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                Icons.Default.GridView,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                            )
                             Text(
                                 "Belum ada postingan",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 if (isLoggedIn) "Jadilah yang pertama posting"
-                                else "Login untuk mulai posting",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                else "Masuk untuk mulai posting",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                             if (!isLoggedIn) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                TextButton(onClick = { navController.navigate("auth") }) {
-                                    Text("Masuk", fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(4.dp))
+                                Button(
+                                    onClick = { navController.navigate("auth") },
+                                    shape = CircleShape
+                                ) {
+                                    Text("Masuk", fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -125,7 +137,7 @@ fun FeedScreen(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 4.dp)
+                        contentPadding = PaddingValues(bottom = 88.dp)
                     ) {
                         items(posts, key = { it.id }) { post ->
                             val likes = postLikes[post.id] ?: emptyList()
@@ -133,7 +145,7 @@ fun FeedScreen(
                             val isLiked = !session.userId.isNullOrEmpty() && session.userId in likes
                             val canDelete = post.user_id == session.userId || session.isAdmin
 
-                            PostCard(
+                            TweetCard(
                                 post = post,
                                 likeCount = likes.size,
                                 commentCount = commentCount,
@@ -144,11 +156,10 @@ fun FeedScreen(
                                 onDelete = { viewModel.deletePost(post.id) }
                             )
                             HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
                                 thickness = 0.5.dp
                             )
                         }
-                        item { Spacer(modifier = Modifier.height(88.dp)) }
                     }
                 }
             }
@@ -158,7 +169,7 @@ fun FeedScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PostCard(
+private fun TweetCard(
     post: Post,
     likeCount: Int,
     commentCount: Int,
@@ -170,118 +181,129 @@ private fun PostCard(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showFullImage by remember { mutableStateOf(false) }
+    val timeStr = remember(post.created_at) { twitterTime(post.created_at) }
 
-    val timeStr = remember(post.created_at) { relativeTime(post.created_at) }
-
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = {},
+                onClick = { onComment() },
                 onLongClick = { if (canDelete) showDeleteDialog = true }
             )
-            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AvatarCircle(
-                avatarUrl = post.avatar_url,
-                username = post.username,
-                size = 38.dp
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = post.username,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        letterSpacing = 0.sp
-                    )
-                    if (post.is_admin == true) {
-                        Spacer(modifier = Modifier.width(5.dp))
-                        AdminBadge()
+        // Avatar kiri
+        AvatarCircle(
+            avatarUrl = post.avatar_url,
+            username = post.username,
+            size = 42.dp
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Konten kanan
+        Column(modifier = Modifier.weight(1f)) {
+
+            // Baris nama + waktu + more
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = post.username,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    letterSpacing = 0.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (post.is_admin == true) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    AdminBadge()
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "· $timeStr",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (canDelete) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .clickable { showDeleteDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.MoreHoriz,
+                            contentDescription = "Opsi",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
+            }
+
+            // Caption
+            if (!post.caption.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = timeStr,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    text = post.caption,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+                    letterSpacing = 0.sp
                 )
             }
-            if (canDelete) {
-                IconButton(
-                    onClick = { showDeleteDialog = true },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "Opsi",
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+
+            // Image
+            if (!post.image_url.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                AsyncImage(
+                    model = post.image_url,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp, max = 360.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { showFullImage = true },
+                    contentScale = ContentScale.FillWidth
+                )
             }
-        }
 
-        // Caption
-        if (!post.caption.isNullOrEmpty()) {
-            Text(
-                text = post.caption,
-                modifier = Modifier
-                    .padding(horizontal = 14.dp)
-                    .padding(bottom = if (post.image_url.isNullOrEmpty()) 10.dp else 8.dp),
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        // Image
-        if (!post.image_url.isNullOrEmpty()) {
-            AsyncImage(
-                model = post.image_url,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 180.dp, max = 380.dp)
-                    .clickable { showFullImage = true },
-                contentScale = ContentScale.FillWidth
-            )
-        }
-
-        // Action bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 2.dp)
-        ) {
-            ActionButton(
-                icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                label = if (likeCount > 0) likeCount.toString() else "Suka",
-                tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                onClick = onLike
-            )
-            ActionButton(
-                icon = Icons.Default.ChatBubbleOutline,
-                label = if (commentCount > 0) "$commentCount Komentar" else "Komentar",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                onClick = onComment
-            )
+            // Action bar — style Twitter
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TweetAction(
+                    icon = Icons.Outlined.ChatBubbleOutline,
+                    count = commentCount,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    onClick = onComment
+                )
+                Spacer(modifier = Modifier.width(28.dp))
+                TweetAction(
+                    icon = if (isLiked) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                    count = likeCount,
+                    tint = if (isLiked) Color(0xFFE0245E) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    onClick = onLike
+                )
+            }
         }
     }
 
-    // Full screen image
     if (showFullImage && !post.image_url.isNullOrEmpty()) {
         FullScreenImage(url = post.image_url!!, onDismiss = { showFullImage = false })
     }
-
     if (showDeleteDialog) {
         DeleteDialog(
             title = "Hapus postingan?",
@@ -292,10 +314,42 @@ private fun PostCard(
     }
 }
 
+@Composable
+private fun TweetAction(
+    icon: ImageVector,
+    count: Int,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(19.dp)
+        )
+        if (count > 0) {
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = count.toString(),
+                fontSize = 13.sp,
+                color = tint,
+                fontWeight = FontWeight.Normal
+            )
+        }
+    }
+}
+
 // ─── Shared helpers ───────────────────────────────────────
 
 @Composable
-fun AvatarCircle(avatarUrl: String?, username: String, size: androidx.compose.ui.unit.Dp) {
+fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
     if (!avatarUrl.isNullOrEmpty()) {
         AsyncImage(
             model = avatarUrl,
@@ -341,7 +395,7 @@ fun AdminBadge() {
 
 @Composable
 fun ActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     tint: Color,
     onClick: () -> Unit
@@ -353,19 +407,9 @@ fun ActionButton(
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(18.dp)
-        )
+        Icon(imageVector = icon, contentDescription = label, tint = tint, modifier = Modifier.size(18.dp))
         Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            color = tint,
-            fontWeight = FontWeight.Medium
-        )
+        Text(text = label, fontSize = 13.sp, color = tint, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -399,7 +443,7 @@ fun FullScreenImage(url: String, onDismiss: () -> Unit) {
 fun DeleteDialog(title: String, text: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        title = { Text(title, fontWeight = FontWeight.Bold) },
         text = { Text(text, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
@@ -412,22 +456,25 @@ fun DeleteDialog(title: String, text: String, onConfirm: () -> Unit, onDismiss: 
     )
 }
 
-fun relativeTime(createdAt: String): String {
+fun relativeTime(createdAt: String): String = twitterTime(createdAt)
+
+fun twitterTime(createdAt: String): String {
     return try {
         val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
         parser.timeZone = TimeZone.getTimeZone("UTC")
         val date = parser.parse(createdAt.take(19)) ?: Date()
         val now = Date()
-        val diffMin = (now.time - date.time) / 60000
+        val diffSec = (now.time - date.time) / 1000
+        val diffMin = diffSec / 60
         val diffHour = diffMin / 60
         val diffDay = diffHour / 24
         when {
-            diffMin < 1 -> "Baru saja"
-            diffMin < 60 -> "${diffMin} menit lalu"
-            diffHour < 24 -> "${diffHour} jam lalu"
-            diffDay < 7 -> "${diffDay} hari lalu"
+            diffSec < 60 -> "${diffSec}d"
+            diffMin < 60 -> "${diffMin}m"
+            diffHour < 24 -> "${diffHour}j"
+            diffDay < 7 -> "${diffDay}h"
             else -> {
-                val fmt = SimpleDateFormat("d MMM yyyy", Locale("id"))
+                val fmt = SimpleDateFormat("d MMM", Locale("id"))
                 fmt.timeZone = TimeZone.getTimeZone("Asia/Jakarta")
                 fmt.format(date)
             }
