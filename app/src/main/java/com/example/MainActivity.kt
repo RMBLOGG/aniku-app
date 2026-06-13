@@ -194,6 +194,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
                         if (showBottomBar) {
                             CurvedBottomNav(
@@ -217,7 +218,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(
-                            bottom = if (showBottomBar) innerPadding.calculateBottomPadding() else 0.dp
+                            bottom = if (showBottomBar) 88.dp else 0.dp
                         )
                     ) {
                         composable("home") {
