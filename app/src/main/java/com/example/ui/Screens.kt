@@ -2300,11 +2300,9 @@ fun WatchScreen(
                                     cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                                     userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                 }
-                                android.webkit.CookieManager.getInstance().apply {
-                                    setAcceptCookie(true)
-                                    setAcceptThirdPartyCookies(this@apply, true)
-                                }
+                                android.webkit.CookieManager.getInstance().setAcceptCookie(true)
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                                android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                                 webViewClient = object : WebViewClient() {
                                     // Domain video player yang diizinkan
                                     private val allowedDomains = listOf(
