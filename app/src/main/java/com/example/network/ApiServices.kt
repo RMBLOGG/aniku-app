@@ -101,6 +101,12 @@ interface SupabaseAuthApi {
         @Header("apikey") apiKey: String
     ): AuthResponse
 
+    @POST("auth/v1/token?grant_type=refresh_token")
+    suspend fun refreshToken(
+        @Body request: RefreshTokenRequest,
+        @Header("apikey") apiKey: String
+    ): AuthResponse
+
     @POST("auth/v1/recover")
     suspend fun recoverPassword(
         @Body request: RecoverRequest,

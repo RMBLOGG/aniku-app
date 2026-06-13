@@ -149,6 +149,11 @@ data class RecoverRequest(
     val email: String
 )
 
+@JsonClass(generateAdapter = true)
+data class RefreshTokenRequest(
+    val refresh_token: String
+)
+
 // Use Map in AuthResponse since metadata is dynamic
 @JsonClass(generateAdapter = true)
 data class AuthResponse(

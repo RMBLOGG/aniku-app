@@ -18,6 +18,7 @@ class SettingsStore(private val context: Context) {
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
+        val REFRESH_TOKEN = stringPreferencesKey("refresh_token")
         val USER_ID = stringPreferencesKey("user_id")
         val USER_EMAIL = stringPreferencesKey("user_email")
         val USERNAME = stringPreferencesKey("username")
@@ -46,6 +47,7 @@ class SettingsStore(private val context: Context) {
         val token = preferences[AUTH_TOKEN]
         UserSession(
             token = if (token.isNullOrEmpty()) null else token,
+            refreshToken = preferences[REFRESH_TOKEN],
             userId = preferences[USER_ID],
             email = preferences[USER_EMAIL],
             username = preferences[USERNAME],
@@ -82,6 +84,7 @@ class SettingsStore(private val context: Context) {
     suspend fun saveSession(session: UserSession) {
         context.dataStore.edit { preferences ->
             preferences[AUTH_TOKEN] = session.token ?: ""
+            preferences[REFRESH_TOKEN] = session.refreshToken ?: ""
             preferences[USER_ID] = session.userId ?: ""
             preferences[USER_EMAIL] = session.email ?: ""
             preferences[USERNAME] = session.username ?: ""
@@ -106,6 +109,7 @@ class SettingsStore(private val context: Context) {
 
 data class UserSession(
     val token: String?,
+    val refreshToken: String?,
     val userId: String?,
     val email: String?,
     val username: String?,

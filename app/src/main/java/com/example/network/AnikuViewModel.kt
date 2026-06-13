@@ -64,7 +64,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val session = settingsStore.sessionFlow.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        UserSession(null, null, null, null, null, false, false)
+        UserSession(null, null, null, null, null, null, false, false)
     )
 
     // Update check state
@@ -249,6 +249,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadGenres()
         loadSearchPopular()
         checkForUpdate()
+        // Auto-refresh token saat app dibuka
+        viewModelScope.launch {
+            refreshSession()
+        }
     }
 
     fun checkForUpdate() {
@@ -652,6 +656,28 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Auth Actions: Login / Register / Get Profile
+    suspend fun refreshSession() {
+        val currentSession = session.value
+        val refreshToken = currentSession.refreshToken
+        if (refreshToken.isNullOrEmpty()) return
+        try {
+            val res = NetworkClient.supabaseAuthApi.refreshToken(
+                request = RefreshTokenRequest(refresh_token = refreshToken),
+                apiKey = SUPABASE_ANON_KEY
+            )
+            val newToken = res.access_token ?: return
+            val updatedSession = currentSession.copy(
+                token = newToken,
+                refreshToken = res.refresh_token ?: refreshToken
+            )
+            settingsStore.saveSession(updatedSession)
+        } catch (e: Exception) {
+            Log.e("AnikuVM", "Token refresh failed: ${e.message}")
+            // Token sudah tidak bisa di-refresh, clear session → user perlu login ulang
+            settingsStore.clearSession()
+        }
+    }
+
     fun login(email: String, password: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
@@ -685,6 +711,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                 val activeSession = UserSession(
                     token = token,
+                    refreshToken = res.refresh_token,
                     userId = uId,
                     email = email,
                     username = profile?.username ?: (res.user?.user_metadata?.get("username")?.toString() ?: email.substringBefore("@")),
@@ -735,6 +762,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                 val activeSession = UserSession(
                     token = token,
+                    refreshToken = res.refresh_token,
                     userId = uId,
                     email = email,
                     username = profile?.username ?: username,
