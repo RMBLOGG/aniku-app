@@ -30,66 +30,58 @@ fun CurvedBottomNav(
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val primaryColor = MaterialTheme.colorScheme.primary
-    val fabSize = 56.dp
     val navHeight = 64.dp
-    val cutoutRadius = 36.dp
-
-    // Split nav items: 2 kiri + 2 kanan, FAB di tengah
-    val leftItems = mainNavItems.take(2)
-    val rightItems = mainNavItems.drop(2)
+    val fabSize = 52.dp
+    val fabElevation = 8.dp
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
+            .height(navHeight + fabSize / 2)
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        // Background nav dengan cutout lengkung di tengah
-        Box(
+        // Nav bar background dengan canvas cutout
+        androidx.compose.foundation.Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(navHeight)
                 .align(Alignment.BottomCenter)
-                .drawBehind {
-                    drawCurvedNav(
-                        color = surfaceColor,
-                        cutoutRadius = cutoutRadius.toPx(),
-                        cornerRadius = 24.dp.toPx()
-                    )
-                }
-        )
+        ) {
+            drawCurvedNavBackground(color = surfaceColor)
+        }
 
-        // Nav items row
+        // Nav items
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(navHeight)
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Kiri
-            leftItems.forEach { (route, label, icon) ->
-                val isSelected = currentRoute == route
+            // 2 item kiri
+            mainNavItems.take(2).forEach { (route, label, icon) ->
                 NavItem(
                     icon = icon,
                     label = label,
-                    isSelected = isSelected,
+                    isSelected = currentRoute == route,
                     primaryColor = primaryColor,
                     modifier = Modifier.weight(1f),
                     onClick = { onNavigate(route) }
                 )
             }
 
-            // Spacer tengah untuk FAB
-            Spacer(modifier = Modifier.width(fabSize + 16.dp))
+            // Spacer untuk FAB di tengah
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Kanan
-            rightItems.forEach { (route, label, icon) ->
-                val isSelected = currentRoute == route
+            // 2 item kanan (atau 1 + Lainnya)
+            mainNavItems.drop(2).forEach { (route, label, icon) ->
                 NavItem(
                     icon = icon,
                     label = label,
-                    isSelected = isSelected,
+                    isSelected = currentRoute == route,
                     primaryColor = primaryColor,
                     modifier = Modifier.weight(1f),
                     onClick = { onNavigate(route) }
@@ -110,7 +102,7 @@ fun CurvedBottomNav(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) { onMoreClick() }
-                        .padding(vertical = 6.dp, horizontal = 8.dp)
+                        .padding(vertical = 8.dp, horizontal = 6.dp)
                 ) {
                     Box {
                         Icon(
@@ -118,12 +110,12 @@ fun CurvedBottomNav(
                             contentDescription = "Lainnya",
                             tint = if (isSheetRouteActive) primaryColor
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                         if (hasUnreadChat) {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(7.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.error)
                                     .align(Alignment.TopEnd)
@@ -141,22 +133,14 @@ fun CurvedBottomNav(
             }
         }
 
-        // FAB melayang di tengah
+        // FAB melayang di tengah atas
         Box(
             modifier = Modifier
                 .size(fabSize)
                 .align(Alignment.TopCenter)
-                .offset(y = (-fabSize / 2) + 8.dp)
+                .shadow(fabElevation, CircleShape)
                 .clip(CircleShape)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            primaryColor,
-                            primaryColor.copy(red = primaryColor.red * 0.8f)
-                        )
-                    )
-                )
-                .shadow(12.dp, CircleShape)
+                .background(primaryColor)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -171,7 +155,7 @@ fun CurvedBottomNav(
             )
         }
 
-        // Dot indicator kalau FAB/home aktif
+        // Dot indikator home aktif
         if (currentRoute == "home") {
             Box(
                 modifier = Modifier
@@ -179,7 +163,7 @@ fun CurvedBottomNav(
                     .clip(CircleShape)
                     .background(primaryColor)
                     .align(Alignment.BottomCenter)
-                    .offset(y = (-6).dp)
+                    .offset(y = (-8).dp)
             )
         }
     }
@@ -204,108 +188,76 @@ private fun NavItem(
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = 6.dp, horizontal = 4.dp)
+            .padding(vertical = 8.dp, horizontal = 4.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .then(
-                    if (isSelected) Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(primaryColor.copy(alpha = 0.12f))
-                    else Modifier
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.size(22.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isSelected) primaryColor
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            modifier = Modifier.size(22.dp)
+        )
         Text(
             text = label,
             fontSize = 10.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            color = if (isSelected) primaryColor
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+        // Dot indikator aktif
+        Box(
+            modifier = Modifier
+                .size(4.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isSelected) primaryColor else Color.Transparent
+                )
         )
     }
 }
 
-private fun DrawScope.drawCurvedNav(
-    color: Color,
-    cutoutRadius: Float,
-    cornerRadius: Float
-) {
-    val width = size.width
-    val height = size.height
-    val centerX = width / 2f
-    val cutoutTop = 0f
-    val curveWidth = cutoutRadius * 2.2f
+private fun DrawScope.drawCurvedNavBackground(color: Color) {
+    val w = size.width
+    val h = size.height
+    val cx = w / 2f
+    val cutR = 90f      // radius area cutout
+    val curveDepth = 52f // seberapa dalam lekukan ke atas
+    val topY = 0f
 
     val path = Path().apply {
-        // Start top-left dengan rounded corner
-        moveTo(cornerRadius, cutoutTop)
+        moveTo(0f, topY + 28f)
+        // Rounded top-left
+        quadraticBezierTo(0f, topY, 28f, topY)
 
-        // Garis ke awal kurva kiri
-        lineTo(centerX - curveWidth, cutoutTop)
+        // Garis ke kiri kurva
+        lineTo(cx - cutR - 20f, topY)
 
-        // Kurva kiri (naik ke atas untuk cutout)
+        // Kurva naik kiri
         cubicTo(
-            centerX - curveWidth + cutoutRadius * 0.6f, cutoutTop,
-            centerX - cutoutRadius, cutoutTop - cutoutRadius * 0.9f,
-            centerX, cutoutTop - cutoutRadius * 0.9f
+            cx - cutR + 10f, topY,
+            cx - cutR * 0.5f, topY - curveDepth,
+            cx, topY - curveDepth
         )
 
-        // Kurva kanan (turun kembali)
+        // Kurva turun kanan
         cubicTo(
-            centerX + cutoutRadius, cutoutTop - cutoutRadius * 0.9f,
-            centerX + curveWidth - cutoutRadius * 0.6f, cutoutTop,
-            centerX + curveWidth, cutoutTop
+            cx + cutR * 0.5f, topY - curveDepth,
+            cx + cutR - 10f, topY,
+            cx + cutR + 20f, topY
         )
 
         // Garis ke top-right
-        lineTo(width - cornerRadius, cutoutTop)
+        lineTo(w - 28f, topY)
 
-        // Corner kanan atas
-        quadraticBezierTo(width, cutoutTop, width, cutoutTop + cornerRadius)
+        // Rounded top-right
+        quadraticBezierTo(w, topY, w, topY + 28f)
 
-        // Sisi kanan
-        lineTo(width, height)
-
-        // Bawah
-        lineTo(0f, height)
-
-        // Sisi kiri
-        lineTo(0f, cutoutTop + cornerRadius)
-
-        // Corner kiri atas
-        quadraticBezierTo(0f, cutoutTop, cornerRadius, cutoutTop)
-
+        // Sisi kanan & bawah & kiri
+        lineTo(w, h)
+        lineTo(0f, h)
+        lineTo(0f, topY + 28f)
         close()
     }
 
     drawPath(path = path, color = color)
-
-    // Shadow tipis di atas nav
-    drawPath(
-        path = Path().apply {
-            moveTo(0f, cutoutTop)
-            lineTo(centerX - curveWidth, cutoutTop)
-            cubicTo(
-                centerX - curveWidth + cutoutRadius * 0.6f, cutoutTop,
-                centerX - cutoutRadius, cutoutTop - cutoutRadius * 0.9f,
-                centerX, cutoutTop - cutoutRadius * 0.9f
-            )
-            cubicTo(
-                centerX + cutoutRadius, cutoutTop - cutoutRadius * 0.9f,
-                centerX + curveWidth - cutoutRadius * 0.6f, cutoutTop,
-                centerX + curveWidth, cutoutTop
-            )
-            lineTo(width, cutoutTop)
-        },
-        color = Color.Black.copy(alpha = 0.08f),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f)
-    )
 }

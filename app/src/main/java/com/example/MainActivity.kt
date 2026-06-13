@@ -84,11 +84,11 @@ class MainActivity : ComponentActivity() {
                     Triple("search", "Cari", Icons.Default.Search),
                     Triple("explore", "Eksplor", Icons.Default.Apps),
                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
-                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
                 )
                 val sheetNavItems = listOf(
                     Triple("chat", "Chat", Icons.Default.Chat),
                     Triple("feed", "Feed", Icons.Default.GridView),
+                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
                 )
                 val sheetRoutes = sheetNavItems.map { it.first }
                 val isSheetRouteActive = currentRoute in sheetRoutes
@@ -119,6 +119,7 @@ class MainActivity : ComponentActivity() {
                         val sheetItemColors = mapOf(
                             "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
                             "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
+                            "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
                             val meta = sheetItemColors[route]
