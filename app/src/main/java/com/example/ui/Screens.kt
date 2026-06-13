@@ -4144,13 +4144,15 @@ fun TampilanScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SumberDataScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit
 ) {
     val currentSource by viewModel.dataSource.collectAsState()
-    val accentColor = viewModel.accentColorValue.collectAsState().value
+    val accentColorName by viewModel.accentColorName.collectAsState()
+    val accentColor = getAccentColor(accentColorName)
 
     Scaffold(
         topBar = {
