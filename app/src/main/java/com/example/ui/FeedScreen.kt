@@ -248,7 +248,7 @@ private fun TweetCard(
             if (!post.caption.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = post.caption,
+                    text = linkifyText(post.caption),
                     fontSize = 15.sp,
                     lineHeight = 21.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),

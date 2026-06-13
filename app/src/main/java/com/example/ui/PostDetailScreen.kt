@@ -432,7 +432,7 @@ private fun PostHeader(
 
         if (!post.caption.isNullOrEmpty()) {
             Text(
-                text = post.caption,
+                text = linkifyText(post.caption),
                 modifier = Modifier
                     .padding(horizontal = 14.dp)
                     .padding(bottom = if (post.image_url.isNullOrEmpty()) 12.dp else 8.dp),
