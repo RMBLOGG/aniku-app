@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,6 +47,113 @@ class MainActivity : ComponentActivity() {
 
                 val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat", "feed")
                 val showBottomBar = currentRoute in bottomRoutes
+                var showMoreSheet by remember { mutableStateOf(false) }
+
+                // Tutup sheet kalau navigasi berubah
+                LaunchedEffect(currentRoute) { showMoreSheet = false }
+
+                val mainNavItems = listOf(
+                    Triple("home", "Home", Icons.Default.Home),
+                    Triple("search", "Cari", Icons.Default.Search),
+                    Triple("explore", "Eksplor", Icons.Default.PlayArrow),
+                    Triple("bookmark", "Bookmark", Icons.Default.Favorite),
+                )
+                val sheetNavItems = listOf(
+                    Triple("chat", "Chat", Icons.Default.Chat),
+                    Triple("feed", "Feed", Icons.Default.GridView),
+                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
+                )
+                val sheetRoutes = sheetNavItems.map { it.first }
+                val isSheetRouteActive = currentRoute in sheetRoutes
+
+                if (showMoreSheet) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showMoreSheet = false },
+                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        dragHandle = {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = androidx.compose.ui.Modifier
+                                    .padding(vertical = 10.dp)
+                                    .size(width = 32.dp, height = 3.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                            )
+                        }
+                    ) {
+                        Text(
+                            text = "Menu Lainnya",
+                            fontSize = 11.sp,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            letterSpacing = 1.sp,
+                            modifier = androidx.compose.ui.Modifier.padding(start = 18.dp, bottom = 6.dp)
+                        )
+                        val sheetItemColors = mapOf(
+                            "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
+                            "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
+                            "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
+                        )
+                        sheetNavItems.forEach { (route, label, icon) ->
+                            val meta = sheetItemColors[route]
+                            val bgColor = Color(meta?.first ?: 0xFF1e1e1e)
+                            val iconColor = Color(meta?.second ?: 0xFFaaaaaa)
+                            val desc = meta?.third ?: ""
+                            val isActive = currentRoute == route
+                            androidx.compose.foundation.layout.Row(
+                                modifier = androidx.compose.ui.Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        showMoreSheet = false
+                                        navController.navigate(route) {
+                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                    .background(if (isActive) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f) else Color.Transparent)
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = androidx.compose.ui.Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(bgColor),
+                                    contentAlignment = androidx.compose.ui.Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = iconColor,
+                                        modifier = androidx.compose.ui.Modifier.size(22.dp)
+                                    )
+                                }
+                                androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(14.dp))
+                                androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 15.sp,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = desc,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                    modifier = androidx.compose.ui.Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+                    }
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -59,26 +168,15 @@ class MainActivity : ComponentActivity() {
                                 tonalElevation = 8.dp
                             ) {
                                 val currentDestination = navBackStackEntry?.destination
-                                val items = listOf(
-                                    Triple("home", "Home", Icons.Default.Home),
-                                    Triple("search", "Cari", Icons.Default.Search),
-                                    Triple("explore", "Eksplor", Icons.Default.PlayArrow),
-                                    Triple("bookmark", "Bookmark", Icons.Default.Favorite),
-                                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
-                                    Triple("chat", "Chat", Icons.Default.Chat),
-                                    Triple("feed", "Feed", Icons.Default.GridView)
-                                )
 
-                                items.forEach { (route, label, icon) ->
+                                mainNavItems.forEach { (route, label, icon) ->
                                     val isSelected = currentDestination?.route == route
                                     NavigationBarItem(
                                         selected = isSelected,
                                         onClick = {
                                             if (currentDestination?.route != route) {
                                                 navController.navigate(route) {
-                                                    popUpTo(navController.graph.startDestinationId) {
-                                                        saveState = true
-                                                    }
+                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
                                                     launchSingleTop = true
                                                     restoreState = true
                                                 }
@@ -105,6 +203,31 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier.testTag("nav_item_$route")
                                     )
                                 }
+
+                                // Tombol "Lainnya"
+                                NavigationBarItem(
+                                    selected = isSheetRouteActive,
+                                    onClick = { showMoreSheet = true },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.MoreHoriz,
+                                            contentDescription = "Lainnya",
+                                            tint = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "Lainnya",
+                                            color = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSheetRouteActive) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    ),
+                                    modifier = Modifier.testTag("nav_item_more")
+                                )
                             }
                         }
                     }
