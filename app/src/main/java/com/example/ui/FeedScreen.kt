@@ -234,7 +234,9 @@ private fun PostCard(
         if (!post.caption.isNullOrEmpty()) {
             Text(
                 text = post.caption,
-                modifier = Modifier.padding(horizontal = 14.dp, bottom = if (post.image_url.isNullOrEmpty()) 10.dp else 8.dp),
+                modifier = Modifier
+                    .padding(horizontal = 14.dp)
+                    .padding(bottom = if (post.image_url.isNullOrEmpty()) 10.dp else 8.dp),
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 color = MaterialTheme.colorScheme.onSurface
