@@ -66,9 +66,11 @@ fun ChatScreen(
     // Auto-poll setiap 5 detik
     LaunchedEffect(Unit) {
         viewModel.loadChatMessages()
+        viewModel.markChatRead()
         while (true) {
             delay(5000)
             viewModel.loadChatMessages()
+            viewModel.markChatRead()
         }
     }
 

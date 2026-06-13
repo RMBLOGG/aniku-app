@@ -1059,6 +1059,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
+    // Unread chat badge
+    val hasUnreadChat: StateFlow<Boolean> = combine(
+        _chatMessages,
+        settingsStore.lastChatReadFlow
+    ) { messages, lastRead ->
+        if (messages.isEmpty()) return@combine false
+        val latest = messages.maxByOrNull { it.created_at }?.created_at ?: return@combine false
+        lastRead.isEmpty() || latest > lastRead
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun markChatRead() {
+        val latest = _chatMessages.value.maxByOrNull { it.created_at }?.created_at ?: return
+        viewModelScope.launch { settingsStore.saveLastChatRead(latest) }
+    }
+
     private val _isChatLoading = MutableStateFlow(false)
     val isChatLoading: StateFlow<Boolean> = _isChatLoading.asStateFlow()
 

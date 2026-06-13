@@ -25,6 +25,7 @@ class SettingsStore(private val context: Context) {
         val AVATAR_URL = stringPreferencesKey("avatar_url")
         val IS_ADMIN = booleanPreferencesKey("is_admin")
         val IS_BANNED = booleanPreferencesKey("is_banned")
+        val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
     }
 
     val isDarkFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -103,6 +104,16 @@ class SettingsStore(private val context: Context) {
             preferences.remove(AVATAR_URL)
             preferences.remove(IS_ADMIN)
             preferences.remove(IS_BANNED)
+        }
+    }
+
+    val lastChatReadFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[LAST_CHAT_READ] ?: ""
+    }
+
+    suspend fun saveLastChatRead(timestamp: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_CHAT_READ] = timestamp
         }
     }
 }

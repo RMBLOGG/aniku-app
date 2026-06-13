@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
                 val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat", "feed")
                 val showBottomBar = currentRoute in bottomRoutes
                 var showMoreSheet by remember { mutableStateOf(false) }
+                val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
 
                 // Tutup sheet kalau navigasi berubah
                 LaunchedEffect(currentRoute) { showMoreSheet = false }
@@ -129,6 +131,16 @@ class MainActivity : ComponentActivity() {
                                         tint = iconColor,
                                         modifier = androidx.compose.ui.Modifier.size(22.dp)
                                     )
+                                    if (route == "chat" && hasUnreadChat) {
+                                        androidx.compose.foundation.layout.Box(
+                                            modifier = androidx.compose.ui.Modifier
+                                                .size(10.dp)
+                                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                                .background(MaterialTheme.colorScheme.error)
+                                                .align(androidx.compose.ui.Alignment.TopEnd)
+                                                .offset(x = 2.dp, y = (-2).dp)
+                                        )
+                                    }
                                 }
                                 androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(14.dp))
                                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
@@ -210,11 +222,22 @@ class MainActivity : ComponentActivity() {
                                     selected = isSheetRouteActive,
                                     onClick = { showMoreSheet = true },
                                     icon = {
-                                        Icon(
-                                            imageVector = Icons.Default.MoreHoriz,
-                                            contentDescription = "Lainnya",
-                                            tint = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                        )
+                                        androidx.compose.foundation.layout.Box {
+                                            Icon(
+                                                imageVector = Icons.Default.MoreHoriz,
+                                                contentDescription = "Lainnya",
+                                                tint = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            )
+                                            if (hasUnreadChat) {
+                                                androidx.compose.foundation.layout.Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                                        .background(MaterialTheme.colorScheme.error)
+                                                        .align(Alignment.TopEnd)
+                                                )
+                                            }
+                                        }
                                     },
                                     label = {
                                         Text(
