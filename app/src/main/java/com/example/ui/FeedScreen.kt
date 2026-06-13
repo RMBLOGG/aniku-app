@@ -96,13 +96,7 @@ fun FeedScreen(
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             when {
                 isFeedLoading && posts.isEmpty() -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(28.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    LoadingScreen("Memuat postingan...")
                 }
                 posts.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

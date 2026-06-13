@@ -268,6 +268,29 @@ fun SectionHeader(
 // ================================================================
 
 @Composable
+fun LoadingScreen(message: String = "Memuat data anime...") {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.5.dp,
+                modifier = Modifier.size(36.dp)
+            )
+            Text(
+                text = message,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                letterSpacing = 0.sp
+            )
+        }
+    }
+}
+
+@Composable
 fun HomeScreen(
     viewModel: AnikuViewModel,
     navController: NavController,
@@ -386,9 +409,7 @@ fun HomeScreen(
     }
 
     if (isHomeLoading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = accentColor)
-        }
+        LoadingScreen("Memuat data anime...")
     } else if (homeError != null) {
         Column(
             modifier = Modifier
@@ -1032,9 +1053,7 @@ fun SearchScreen(
         )
 
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor)
-            }
+            LoadingScreen("Mencari anime...")
         } else if (query.isEmpty()) {
             // Hot Anime Section
             Text(
@@ -1464,9 +1483,7 @@ fun ScheduleScreen(
         }
 
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor)
-            }
+            LoadingScreen("Memuat jadwal tayang...")
         } else {
             val activeDayList = scheduleMap[activeDay] ?: emptyList()
             if (activeDayList.isEmpty()) {
@@ -1739,7 +1756,10 @@ fun AnimeDetailScreen(
                 .fillMaxSize()
                 .background(Color.Black), contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = accentColor)
+            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                CircularProgressIndicator(color = accentColor, strokeWidth = 2.5.dp, modifier = androidx.compose.ui.Modifier.size(36.dp))
+                androidx.compose.material3.Text("Memuat detail anime...", fontSize = 14.sp, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.45f))
+            }
         }
     } else if (detailError != null) {
         Column(
@@ -3004,9 +3024,7 @@ fun AdminPanelScreen(
         }
 
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor)
-            }
+            LoadingScreen("Memuat data...")
         } else {
             Column(
                 modifier = Modifier
