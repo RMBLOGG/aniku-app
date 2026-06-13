@@ -480,7 +480,7 @@ data class SamehadakuDetailData(
     val recommendedAnimeList: List<SamehadakuAnimeItem>? = null
 ) {
     fun toDetailData() = DetailData(
-        title = title,
+        title = title.ifBlank { english ?: japanese ?: synonyms ?: "" },
         poster = poster,
         synonym = synonyms,
         rating = score?.value,

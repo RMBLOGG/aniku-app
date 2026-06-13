@@ -406,10 +406,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // 4. Load Anime Home API
                 val isSamehadaku = dataSource.value == "Samehadaku"
                 if (isSamehadaku) {
-                    val homeRes = retryIO { NetworkClient.samehadakuApi.getHome() }
-                    _homeOngoing.value = (homeRes.data?.recent?.animeList ?: emptyList())
-                        .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    _homeRecent.value = _homeOngoing.value
+                    // Sedang Tayang → /ongoing
+                    try {
+                        val ongoingRes = retryIO { NetworkClient.samehadakuApi.getOngoing(page = 1) }
+                        _homeOngoing.value = (ongoingRes.data?.animeList ?: emptyList())
+                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                    } catch (oe: Exception) { Log.e("AnikuVM", "Failed samehadaku ongoing", oe) }
+
+                    // Terbaru → /recent
+                    try {
+                        val recentRes = retryIO { NetworkClient.samehadakuApi.getRecent(page = 1) }
+                        _homeRecent.value = (recentRes.data?.animeList ?: emptyList())
+                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                    } catch (re: Exception) { Log.e("AnikuVM", "Failed samehadaku recent", re) }
 
                     try {
                         val popularRes = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
