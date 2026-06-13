@@ -765,7 +765,25 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val streamList = _streams.value
         if (index in streamList.indices) {
             _selectedStreamIndex.value = index
-            _activeStreamUrl.value = streamList[index].url
+            val rawUrl = streamList[index].url
+            if (rawUrl.startsWith("samehadaku_server:")) {
+                val serverId = rawUrl.removePrefix("samehadaku_server:")
+                _isStreamLoading.value = true
+                _activeStreamUrl.value = null
+                viewModelScope.launch {
+                    try {
+                        val linkRes = retryIO { NetworkClient.samehadakuApi.getServerLink(serverId) }
+                        _activeStreamUrl.value = linkRes.data?.url ?: rawUrl
+                    } catch (e: Exception) {
+                        _activeStreamUrl.value = rawUrl
+                        Log.e("AnikuVM", "Failed resolve server $serverId", e)
+                    } finally {
+                        _isStreamLoading.value = false
+                    }
+                }
+            } else {
+                _activeStreamUrl.value = rawUrl
+            }
         }
     }
 
