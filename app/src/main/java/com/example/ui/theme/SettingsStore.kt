@@ -15,6 +15,7 @@ class SettingsStore(private val context: Context) {
         val TEXT_SIZE = stringPreferencesKey("text_size") // "Kecil", "Sedang", "Besar"
         val ACCENT_COLOR = stringPreferencesKey("accent_color") // "Red", "Green", "Blue", "Purple", "Orange"
         val GRID_LAYOUT = stringPreferencesKey("grid_layout") // "2", "3", "List"
+        val DATA_SOURCE = stringPreferencesKey("data_source") // "AnimaSu", "Samehadaku"
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
@@ -45,6 +46,10 @@ class SettingsStore(private val context: Context) {
 
     val gridLayoutFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[GRID_LAYOUT] ?: "2"
+    }
+
+    val dataSourceFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[DATA_SOURCE] ?: "AnimaSu"
     }
 
     val sessionFlow: Flow<UserSession> = context.dataStore.data.map { preferences ->
@@ -82,6 +87,12 @@ class SettingsStore(private val context: Context) {
     suspend fun setGridLayout(layout: String) {
         context.dataStore.edit { preferences ->
             preferences[GRID_LAYOUT] = layout
+        }
+    }
+
+    suspend fun setDataSource(source: String) {
+        context.dataStore.edit { preferences ->
+            preferences[DATA_SOURCE] = source
         }
     }
 

@@ -14,7 +14,9 @@ data class AnimeRaw(
     val genres: List<String>? = null,
     val release: String? = null,
     val status: String? = null,
-    val episode_count: String? = null
+    val episode_count: String? = null,
+    val score: String? = null,
+    val estimation: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -320,4 +322,254 @@ data class PostCommentRequest(
     val message: String,
     val reply_to_id: String? = null,
     val reply_to_username: String? = null
+)
+
+// ================================================================
+// SAMEHADAKU MODELS
+// ================================================================
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuHomeResponse(
+    val status: String,
+    val data: SamehadakuHomeData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuHomeData(
+    val recent: SamehadakuAnimeSection?,
+    val movie: SamehadakuAnimeSection?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuAnimeSection(
+    val animeList: List<SamehadakuAnimeItem>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuAnimeItem(
+    val title: String,
+    val poster: String,
+    val animeId: String,
+    val episodes: String? = null,
+    val releasedOn: String? = null,
+    val releaseDate: String? = null,
+    val type: String? = null,
+    val score: String? = null,
+    val status: String? = null,
+    val genreList: List<SamehadakuGenreItem>? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title,
+        slug = animeId,
+        poster = poster,
+        episode = episodes,
+        type = type,
+        score = score,
+        status = status,
+        release = releaseDate ?: releasedOn,
+        genres = genreList?.map { it.title }
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuListResponse(
+    val status: String,
+    val data: SamehadakuListData?,
+    val pagination: SamehadakuPagination?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuListData(
+    val animeList: List<SamehadakuAnimeItem>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuPagination(
+    val currentPage: Int?,
+    val hasNextPage: Boolean?,
+    val hasPrevPage: Boolean?,
+    val nextPage: Int?,
+    val prevPage: Int?,
+    val totalPages: Int?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuGenresResponse(
+    val status: String,
+    val data: SamehadakuGenresData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuGenresData(
+    val genreList: List<SamehadakuGenreItem>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuGenreItem(
+    val title: String,
+    val genreId: String
+) {
+    fun toGenreRaw() = GenreRaw(name = title, slug = genreId)
+}
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuScheduleResponse(
+    val status: String,
+    val data: SamehadakuScheduleData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuScheduleData(
+    val days: List<SamehadakuScheduleDay>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuScheduleDay(
+    val day: String,
+    val animeList: List<SamehadakuScheduleAnimeItem>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuScheduleAnimeItem(
+    val title: String,
+    val poster: String,
+    val animeId: String,
+    val type: String? = null,
+    val score: String? = null,
+    val estimation: String? = null,
+    val genres: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title,
+        slug = animeId,
+        poster = poster,
+        type = type,
+        score = score,
+        estimation = estimation,
+        genres = genres?.split(", ")
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuDetailResponse(
+    val status: String,
+    val data: SamehadakuDetailData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuDetailData(
+    val title: String,
+    val poster: String,
+    val score: SamehadakuScore? = null,
+    val japanese: String? = null,
+    val synonyms: String? = null,
+    val english: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val source: String? = null,
+    val duration: String? = null,
+    val episodes: String? = null,
+    val season: String? = null,
+    val studios: String? = null,
+    val producers: String? = null,
+    val aired: String? = null,
+    val trailer: String? = null,
+    val synopsis: SamehadakuSynopsis? = null,
+    val genreList: List<SamehadakuGenreItem>? = null,
+    val episodeList: List<SamehadakuEpisodeItem>? = null,
+    val recommendedAnimeList: List<SamehadakuAnimeItem>? = null
+) {
+    fun toDetailData() = DetailData(
+        title = title,
+        poster = poster,
+        synonym = synonyms,
+        rating = score?.value,
+        synopsis = synopsis?.paragraphs?.joinToString("\n\n"),
+        trailer = trailer,
+        genres = genreList?.map { DetailGenreRaw(it.title, it.genreId) },
+        status = status,
+        aired = aired,
+        type = type,
+        duration = duration,
+        author = null,
+        studio = studios,
+        season = season,
+        episodes = episodeList?.map { it.toDetailEpisodeRaw() },
+        characters = null
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuScore(
+    val value: String?,
+    val users: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuSynopsis(
+    val paragraphs: List<String>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuEpisodeItem(
+    val title: String? = null,
+    val episodeId: String
+) {
+    fun toDetailEpisodeRaw() = DetailEpisodeRaw(
+        name = if (title != null) "Episode $title" else episodeId,
+        slug = episodeId
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuEpisodeResponse(
+    val status: String,
+    val data: SamehadakuEpisodeData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuEpisodeData(
+    val title: String? = null,
+    val animeId: String? = null,
+    val poster: String? = null,
+    val defaultStreamingUrl: String? = null,
+    val hasPrevEpisode: Boolean? = null,
+    val prevEpisode: SamehadakuEpisodeNav? = null,
+    val hasNextEpisode: Boolean? = null,
+    val nextEpisode: SamehadakuEpisodeNav? = null,
+    val server: SamehadakuServer? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuEpisodeNav(
+    val title: String? = null,
+    val episodeId: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuServer(
+    val qualities: List<SamehadakuQuality>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuQuality(
+    val title: String,
+    val serverList: List<SamehadakuServerItem>?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuServerItem(
+    val title: String,
+    val serverId: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuServerLinkResponse(
+    val status: String,
+    val data: SamehadakuServerLinkData?
+)
+
+@JsonClass(generateAdapter = true)
+data class SamehadakuServerLinkData(
+    val url: String?
 )

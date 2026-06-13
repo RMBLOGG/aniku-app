@@ -88,6 +88,50 @@ interface AnimeApi {
     ): EpisodeResponse
 }
 
+interface SamehadakuApi {
+    @GET("samehadaku/home")
+    suspend fun getHome(): SamehadakuHomeResponse
+
+    @GET("samehadaku/recent")
+    suspend fun getRecent(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/popular")
+    suspend fun getPopular(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/movies")
+    suspend fun getMovies(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/ongoing")
+    suspend fun getOngoing(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/completed")
+    suspend fun getCompleted(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/search")
+    suspend fun search(@Query("q") keyword: String, @Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/list")
+    suspend fun getAnimeList(@Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/genres")
+    suspend fun getGenres(): SamehadakuGenresResponse
+
+    @GET("samehadaku/genres/{genreId}")
+    suspend fun getAnimeByGenre(@Path("genreId") genreId: String, @Query("page") page: Int? = null): SamehadakuListResponse
+
+    @GET("samehadaku/schedule")
+    suspend fun getSchedule(): SamehadakuScheduleResponse
+
+    @GET("samehadaku/anime/{animeId}")
+    suspend fun getDetail(@Path("animeId") animeId: String): SamehadakuDetailResponse
+
+    @GET("samehadaku/episode/{episodeId}")
+    suspend fun getEpisode(@Path("episodeId") episodeId: String): SamehadakuEpisodeResponse
+
+    @GET("samehadaku/server/{serverId}")
+    suspend fun getServerLink(@Path("serverId") serverId: String): SamehadakuServerLinkResponse
+}
+
 interface SupabaseAuthApi {
     @POST("auth/v1/signup")
     suspend fun signUp(
@@ -350,6 +394,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(AnimeApi::class.java)
+    }
+
+    val samehadakuApi: SamehadakuApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://www.sankavollerei.com/anime/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(SamehadakuApi::class.java)
     }
 
     val supabaseAuthApi: SupabaseAuthApi by lazy {
