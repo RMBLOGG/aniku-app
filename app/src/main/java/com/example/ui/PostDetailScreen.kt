@@ -13,6 +13,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -278,6 +279,7 @@ fun PostDetailScreen(
                 items(topLevel, key = { it.id }) { comment ->
                     val canDelete = comment.user_id == session.userId || session.isAdmin
                     val replies = repliesMap[comment.id] ?: emptyList()
+                    var expanded by remember { mutableStateOf(false) }
 
                     // Komentar utama
                     CommentRow(
@@ -288,28 +290,77 @@ fun PostDetailScreen(
                         onDelete = { viewModel.deleteComment(postId, comment.id) }
                     )
 
-                    // Reply-reply di bawahnya (Facebook style: indent + garis)
+                    // Reply block (Facebook style)
                     if (replies.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .padding(start = 52.dp) // indent sejajar konten komentar induk
-                        ) {
-                            // Garis vertikal kiri
-                            replies.forEachIndexed { index, reply ->
+                        Column(modifier = Modifier.padding(start = 52.dp)) {
+                            // Selalu tampilkan reply pertama
+                            val visibleReplies = if (expanded || replies.size <= 1) replies else replies.take(1)
+
+                            visibleReplies.forEach { reply ->
                                 val canDeleteReply = reply.user_id == session.userId || session.isAdmin
-                                Row(modifier = Modifier.fillMaxWidth()) {
-                                    // Garis vertikal
+                                CommentRow(
+                                    comment = reply,
+                                    isReply = true,
+                                    canDelete = canDeleteReply,
+                                    onReply = if (isLoggedIn) { { replyTarget = comment } } else null,
+                                    onDelete = { viewModel.deleteComment(postId, reply.id) }
+                                )
+                            }
+
+                            // Tombol "Lihat X balasan lainnya"
+                            if (!expanded && replies.size > 1) {
+                                val remaining = replies.size - 1
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expanded = true }
+                                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Garis horizontal kecil seperti FB
                                     Box(
                                         modifier = Modifier
-                                            .width(2.dp)
-                                            .fillMaxHeight()
+                                            .width(18.dp)
+                                            .height(1.5.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                                RoundedCornerShape(2.dp)
+                                            )
                                     )
-                                    CommentRow(
-                                        comment = reply,
-                                        isReply = true,
-                                        canDelete = canDeleteReply,
-                                        onReply = if (isLoggedIn) { { replyTarget = comment } } else null, // reply to parent
-                                        onDelete = { viewModel.deleteComment(postId, reply.id) }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Lihat $remaining balasan lainnya",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                    )
+                                }
+                            }
+
+                            // Tombol sembunyikan
+                            if (expanded && replies.size > 1) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expanded = false }
+                                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(18.dp)
+                                            .height(1.5.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                                RoundedCornerShape(2.dp)
+                                            )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Sembunyikan balasan",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                                     )
                                 }
                             }
