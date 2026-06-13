@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
                 val mainNavItems = listOf(
                     Triple("home", "Home", Icons.Default.Home),
                     Triple("search", "Cari", Icons.Default.Search),
-                    Triple("explore", "Eksplor", Icons.Default.PlayArrow),
+                    Triple("explore", "Eksplor", Icons.Default.Apps),
                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
                 )
                 val sheetNavItems = listOf(
