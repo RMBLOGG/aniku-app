@@ -2296,6 +2296,13 @@ fun WatchScreen(
                                     mediaPlaybackRequiresUserGesture = false
                                     useWideViewPort = true
                                     loadWithOverviewMode = true
+                                    mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                    cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                    userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                }
+                                android.webkit.CookieManager.getInstance().apply {
+                                    setAcceptCookie(true)
+                                    setAcceptThirdPartyCookies(this@apply, true)
                                 }
                                 setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                                 webViewClient = object : WebViewClient() {
@@ -2314,7 +2321,7 @@ fun WatchScreen(
                                         "streamtape.com", "streamtape.co",
                                         // Upload services
                                         "mp4upload.com", "yourupload.com",
-                                        // Mega
+                                        // Mega embed
                                         "mega.nz", "mega.co.nz",
                                         // Blogger/Google video embed resmi
                                         "blogger.com", "blogspot.com",
@@ -2326,8 +2333,22 @@ fun WatchScreen(
                                         // Animasu & API source
                                         "animasu.cc", "sanka.my.id",
                                         // Abysscdn
-                                        "abysscdn.com"
-                                        // NOTE: short.icu dan URL shortener lain SENGAJA tidak dimasukkan
+                                        "abysscdn.com",
+                                        // Samehadaku servers
+                                        "samehadaku.how", "v2.samehadaku.how",
+                                        "wibufile.com", "wibu.io",
+                                        "pixeldrain.com",
+                                        "letsupload.io", "letsupload.cc",
+                                        "krakenfiles.com",
+                                        "gofile.io",
+                                        "acefile.co",
+                                        "mediafire.com",
+                                        "mir.cr",
+                                        "nakamaxyz.com", "nakama.to",
+                                        "premium.to",
+                                        "pucuk.eu.org",
+                                        // General CDN
+                                        "cdn.jsdelivr.net", "unpkg.com"
                                     )
                                     override fun shouldOverrideUrlLoading(
                                         view: WebView?,
@@ -2335,14 +2356,12 @@ fun WatchScreen(
                                     ): Boolean {
                                         val url = request?.url?.toString() ?: return false
                                         val host = request.url?.host?.lowercase() ?: return false
-                                        // Izinkan kalau domain cocok dengan whitelist
                                         val isAllowed = allowedDomains.any { host.endsWith(it) }
                                         if (!isAllowed) {
-                                            // Block redirect ke luar (google, casino, dsb)
                                             android.util.Log.w("AnikuWebView", "Blocked redirect: $url")
-                                            return true // true = block navigation
+                                            return true
                                         }
-                                        return false // false = lanjutkan
+                                        return false
                                     }
                                 }
                                 webChromeClient = object : WebChromeClient() {
@@ -2359,7 +2378,12 @@ fun WatchScreen(
                             }
                         },
                         update = { view ->
-                            view.loadUrl(activeStreamUrl!!)
+                            val headers = mapOf(
+                                "Referer" to "https://v2.samehadaku.how/",
+                                "Origin" to "https://v2.samehadaku.how",
+                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                            )
+                            view.loadUrl(activeStreamUrl!!, headers)
                         },
                         modifier = Modifier.fillMaxSize()
                     )
