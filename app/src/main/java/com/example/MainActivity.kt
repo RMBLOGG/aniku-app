@@ -25,6 +25,7 @@ import com.example.network.AnikuViewModel
 import com.example.ui.*
 import com.example.ui.theme.MyApplicationTheme
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
