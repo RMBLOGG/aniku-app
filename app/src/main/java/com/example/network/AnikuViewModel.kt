@@ -59,7 +59,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val textSize = settingsStore.textSizeFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Sedang")
     val accentColorName = settingsStore.accentColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Red")
     val gridLayout = settingsStore.gridLayoutFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "2")
-    val dataSource = settingsStore.dataSourceFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "AnimaSu")
+    val dataSource = settingsStore.dataSourceFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
 
     // Session flow
     val session = settingsStore.sessionFlow.stateIn(
@@ -404,7 +404,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
 
                 // 4. Load Anime Home API
-                val isSamehadaku = dataSource.value == "Samehadaku"
+                val isSamehadaku = dataSource.value == "Dayynime-v2"
                 if (isSamehadaku) {
                     // Sedang Tayang → /ongoing
                     try {
@@ -465,7 +465,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun loadSearchPopular() {
         viewModelScope.launch {
             try {
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
                     _searchPopular.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -488,7 +488,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isSearchLoading.value = true
         viewModelScope.launch {
             try {
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.search(query) }
                     _searchResults.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -508,7 +508,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun loadGenres() {
         viewModelScope.launch {
             try {
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.getGenres() }
                     _genres.value = (res.data?.genreList ?: emptyList()).map { it.toGenreRaw() }
                 } else {
@@ -556,7 +556,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                 // If a genre is selected, retrieve genre anime list
                 val response = retryIO {
-                    if (dataSource.value == "Samehadaku") {
+                    if (dataSource.value == "Dayynime-v2") {
                         val sRes = if (_selectedGenreSlug.value != null) {
                             NetworkClient.samehadakuApi.getAnimeByGenre(genreId = _selectedGenreSlug.value!!, page = page)
                         } else {
@@ -624,7 +624,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val blacklist = _blacklistedSlugs.value
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.getSchedule() }
                     val days = res.data?.days ?: emptyList()
                     val dayNameMap = mapOf(
@@ -675,7 +675,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _detailError.value = "Anime ini disembunyikan oleh Admin."
                     return@launch
                 }
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.getDetail(slug) }
                     _animeDetail.value = res.data?.toDetailData()
                 } else {
@@ -699,7 +699,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _streamError.value = null
         viewModelScope.launch {
             try {
-                if (dataSource.value == "Samehadaku") {
+                if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { NetworkClient.samehadakuApi.getEpisode(slug) }
                     val epData = res.data
                     _streamEpisodeTitle.value = epData?.title ?: "Tonton Tayangan"

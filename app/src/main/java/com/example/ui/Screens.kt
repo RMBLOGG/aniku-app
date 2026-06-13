@@ -3720,50 +3720,30 @@ fun SettingsScreen(
                 }
             }
 
-            // Section C2: Sumber Data
+            // Section C2: Sumber Data (navigable)
             val currentSource by viewModel.dataSource.collectAsState()
-            val sources = listOf("AnimaSu", "Samehadaku")
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { navController.navigate("sumber_data") }
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Apps, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text("Sumber Data", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text("Pilih sumber anime yang digunakan", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                        }
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Apps, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sumber Data", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text(
+                            "Aktif: $currentSource",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            fontSize = 12.sp
+                        )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        sources.forEach { source ->
-                            val isSelected = currentSource == source
-                            Button(
-                                onClick = {
-                                    viewModel.changeDataSource(source)
-                                    viewModel.loadHomeData()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) accentColor else MaterialTheme.colorScheme.surface
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    source,
-                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 13.sp
-                                )
-                            }
-                        }
-                    }
+                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -4157,6 +4137,104 @@ fun TampilanScreen(
                                     .clickable { viewModel.changeAccentColor(name) }
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SumberDataScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val currentSource by viewModel.dataSource.collectAsState()
+    val accentColor = viewModel.accentColorValue.collectAsState().value
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sumber Data", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "Pilih sumber anime yang digunakan",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
+            val sources = listOf(
+                "Dayynime-v1" to "Sumber utama (server 1)",
+                "Dayynime-v2" to "Sumber alternatif (server 2)"
+            )
+
+            sources.forEach { (sourceKey, sourceDesc) ->
+                val isSelected = currentSource == sourceKey
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected)
+                            accentColor.copy(alpha = 0.12f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, accentColor) else null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            viewModel.changeDataSource(sourceKey)
+                            viewModel.loadHomeData()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                sourceKey,
+                                color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                sourceDesc,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                fontSize = 12.sp
+                            )
+                        }
+                        Switch(
+                            checked = isSelected,
+                            onCheckedChange = {
+                                viewModel.changeDataSource(sourceKey)
+                                viewModel.loadHomeData()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = accentColor,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        )
                     }
                 }
             }

@@ -15,7 +15,7 @@ class SettingsStore(private val context: Context) {
         val TEXT_SIZE = stringPreferencesKey("text_size") // "Kecil", "Sedang", "Besar"
         val ACCENT_COLOR = stringPreferencesKey("accent_color") // "Red", "Green", "Blue", "Purple", "Orange"
         val GRID_LAYOUT = stringPreferencesKey("grid_layout") // "2", "3", "List"
-        val DATA_SOURCE = stringPreferencesKey("data_source") // "AnimaSu", "Samehadaku"
+        val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2"
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
@@ -49,7 +49,7 @@ class SettingsStore(private val context: Context) {
     }
 
     val dataSourceFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[DATA_SOURCE] ?: "AnimaSu"
+        preferences[DATA_SOURCE] ?: "Dayynime-v1"
     }
 
     val sessionFlow: Flow<UserSession> = context.dataStore.data.map { preferences ->
