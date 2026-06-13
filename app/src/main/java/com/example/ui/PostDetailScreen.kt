@@ -17,7 +17,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
-import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.Post
@@ -40,7 +39,11 @@ fun PostDetailScreen(
 
     val post = posts.find { it.id == postId }
     val likes = postLikes[postId] ?: emptyList()
-    val comments = postComments[postId] ?: emptyList()
+    // Build tree: top-level + replies keyed by parent id
+    val allComments = postComments[postId] ?: emptyList()
+    val topLevel = allComments.filter { it.reply_to_id == null }
+    val repliesMap = allComments.filter { it.reply_to_id != null }.groupBy { it.reply_to_id }
+
     val isLoggedIn = !session.token.isNullOrEmpty()
     val isLiked = !session.userId.isNullOrEmpty() && session.userId in likes
 
@@ -51,9 +54,7 @@ fun PostDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadComments(postId)
-    }
+    LaunchedEffect(Unit) { viewModel.loadComments(postId) }
 
     LaunchedEffect(feedError) {
         feedError?.let {
@@ -62,18 +63,11 @@ fun PostDetailScreen(
         }
     }
 
-    // Auto-scroll ke komentar terbaru
-    LaunchedEffect(comments.size) {
-        if (comments.isNotEmpty()) {
-            listState.animateScrollToItem(comments.size + 1)
-        }
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Post", fontWeight = FontWeight.Bold) },
+                title = { Text("Postingan", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
@@ -86,7 +80,7 @@ fun PostDetailScreen(
         },
         bottomBar = {
             Column {
-                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
 
                 // Reply preview bar
                 AnimatedVisibility(
@@ -99,19 +93,19 @@ fun PostDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
                                     .width(3.dp)
-                                    .height(34.dp)
+                                    .height(32.dp)
                                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Balas ${target.username}",
+                                    text = "Membalas ${target.username}",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary
@@ -119,7 +113,7 @@ fun PostDetailScreen(
                                 Text(
                                     text = target.message,
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -127,9 +121,9 @@ fun PostDetailScreen(
                             IconButton(onClick = { replyTarget = null }) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Batal reply",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    contentDescription = "Batal",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                                 )
                             }
                         }
@@ -144,6 +138,12 @@ fun PostDetailScreen(
                             .navigationBarsPadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        AvatarCircle(
+                            avatarUrl = session.avatarUrl,
+                            username = session.username ?: "A",
+                            size = 32.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         OutlinedTextField(
                             value = inputText,
                             onValueChange = { if (it.length <= 300) inputText = it },
@@ -156,10 +156,10 @@ fun PostDetailScreen(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(24.dp),
-                            maxLines = 3,
+                            maxLines = 4,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
                             )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -178,13 +178,9 @@ fun PostDetailScreen(
                                 }
                             },
                             enabled = inputText.trim().isNotEmpty(),
-                            modifier = Modifier.size(46.dp)
+                            modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(
-                                Icons.Default.Send,
-                                contentDescription = "Kirim",
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Icon(Icons.Default.Send, contentDescription = "Kirim", modifier = Modifier.size(18.dp))
                         }
                     }
                 } else {
@@ -199,13 +195,13 @@ fun PostDetailScreen(
                         Icon(
                             Icons.Default.Lock,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Login untuk komentar",
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            "Masuk untuk berkomentar",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             fontSize = 14.sp
                         )
                     }
@@ -214,123 +210,128 @@ fun PostDetailScreen(
         }
     ) { innerPadding ->
         if (post == null) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(strokeWidth = 2.dp)
             }
             return@Scaffold
         }
 
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             // Post header
             item {
-                PostDetailHeader(
+                PostHeader(
                     post = post,
                     likeCount = likes.size,
-                    commentCount = comments.size,
+                    commentCount = allComments.size,
                     isLiked = isLiked,
                     onLike = { viewModel.toggleLike(postId) },
                     onShowFullImage = { showFullImage = true }
                 )
-                Divider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                    thickness = 0.5.dp
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                    thickness = 4.dp
                 )
             }
 
-            // Judul komentar
+            // Section komentar
             item {
-                if (comments.isNotEmpty()) {
-                    Text(
-                        text = "Komentar",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
+                Text(
+                    text = if (allComments.isEmpty()) "Komentar" else "Komentar  •  ${allComments.size}",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    letterSpacing = 0.sp
+                )
             }
 
-            // Komentar list
-            if (comments.isEmpty()) {
+            if (allComments.isEmpty()) {
                 item {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("💬", fontSize = 36.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ChatBubbleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                            )
                             Text(
                                 "Belum ada komentar",
                                 fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                            Text(
-                                if (isLoggedIn) "Jadilah yang pertama komentar!" else "Login untuk komentar",
-                                fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                             )
                         }
                     }
                 }
             } else {
-                items(comments, key = { it.id }) { comment ->
-                    val canDeleteComment = comment.user_id == session.userId || session.isAdmin
-                    CommentItem(
+                // Top-level komentar beserta reply-nya masing-masing
+                items(topLevel, key = { it.id }) { comment ->
+                    val canDelete = comment.user_id == session.userId || session.isAdmin
+                    val replies = repliesMap[comment.id] ?: emptyList()
+
+                    // Komentar utama
+                    CommentRow(
                         comment = comment,
-                        canDelete = canDeleteComment,
+                        isReply = false,
+                        canDelete = canDelete,
                         onReply = if (isLoggedIn) { { replyTarget = comment } } else null,
                         onDelete = { viewModel.deleteComment(postId, comment.id) }
+                    )
+
+                    // Reply-reply di bawahnya (Facebook style: indent + garis)
+                    if (replies.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .padding(start = 52.dp) // indent sejajar konten komentar induk
+                        ) {
+                            // Garis vertikal kiri
+                            replies.forEachIndexed { index, reply ->
+                                val canDeleteReply = reply.user_id == session.userId || session.isAdmin
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    // Garis vertikal
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp)
+                                            .fillMaxHeight()
+                                    )
+                                    CommentRow(
+                                        comment = reply,
+                                        isReply = true,
+                                        canDelete = canDeleteReply,
+                                        onReply = if (isLoggedIn) { { replyTarget = comment } } else null, // reply to parent
+                                        onDelete = { viewModel.deleteComment(postId, reply.id) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.07f),
+                        modifier = Modifier.padding(start = 14.dp)
                     )
                 }
             }
         }
     }
 
-    // Full screen image
     if (showFullImage && !post?.image_url.isNullOrEmpty()) {
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { showFullImage = false }
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.97f))
-                    .clickable { showFullImage = false },
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = post!!.image_url,
-                    contentDescription = "Foto penuh",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    contentScale = ContentScale.FillWidth
-                )
-                IconButton(
-                    onClick = { showFullImage = false },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color.White)
-                }
-            }
-        }
+        FullScreenImage(url = post!!.image_url!!, onDismiss = { showFullImage = false })
     }
 }
 
 @Composable
-private fun PostDetailHeader(
+private fun PostHeader(
     post: Post,
     likeCount: Int,
     commentCount: Int,
@@ -343,279 +344,248 @@ private fun PostDetailHeader(
             val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
             parser.timeZone = TimeZone.getTimeZone("UTC")
             val date = parser.parse(post.created_at.take(19)) ?: Date()
-            val fmt = SimpleDateFormat("d MMM yyyy, HH:mm", Locale("id"))
+            val fmt = SimpleDateFormat("d MMMM yyyy, HH:mm", Locale("id"))
             fmt.timeZone = TimeZone.getTimeZone("Asia/Jakarta")
             fmt.format(date)
         } catch (e: Exception) { "" }
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (!post.avatar_url.isNullOrEmpty()) {
-                AsyncImage(
-                    model = post.avatar_url,
-                    contentDescription = post.username,
-                    modifier = Modifier.size(40.dp).clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        post.username.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+            AvatarCircle(avatarUrl = post.avatar_url, username = post.username, size = 42.dp)
             Spacer(modifier = Modifier.width(10.dp))
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = post.username,
+                        post.username,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        fontSize = 15.sp,
+                        letterSpacing = 0.sp
                     )
                     if (post.is_admin == true) {
                         Spacer(modifier = Modifier.width(5.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.error)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                        ) {
-                            Text("ADMIN", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
+                        AdminBadge()
                     }
                 }
                 Text(
                     text = timeStr,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                 )
             }
-        }
-
-        if (!post.image_url.isNullOrEmpty()) {
-            AsyncImage(
-                model = post.image_url,
-                contentDescription = "Foto post",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 200.dp, max = 450.dp)
-                    .clickable { onShowFullImage() },
-                contentScale = ContentScale.FillWidth
-            )
         }
 
         if (!post.caption.isNullOrEmpty()) {
             Text(
                 text = post.caption,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                fontSize = 15.sp
+                modifier = Modifier.padding(
+                    horizontal = 14.dp,
+                    bottom = if (post.image_url.isNullOrEmpty()) 12.dp else 8.dp
+                ),
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 
+        if (!post.image_url.isNullOrEmpty()) {
+            AsyncImage(
+                model = post.image_url,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp, max = 460.dp)
+                    .clickable { onShowFullImage() },
+                contentScale = ContentScale.FillWidth
+            )
+        }
+
+        // Like + comment count summary (mirip FB)
+        if (likeCount > 0 || commentCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (likeCount > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(10.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = likeCount.toString(),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                } else Spacer(modifier = Modifier.size(1.dp))
+
+                if (commentCount > 0) {
+                    Text(
+                        text = "$commentCount komentar",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+        }
+
+        // Action buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onLike() }
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Like",
-                    tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "$likeCount",
-                    fontSize = 13.sp,
-                    color = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    fontWeight = if (isLiked) FontWeight.SemiBold else FontWeight.Normal
-                )
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    Icons.Default.ChatBubbleOutline,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(5.dp))
-                Text(
-                    text = "$commentCount",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
+            ActionButton(
+                icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                label = "Suka",
+                tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                onClick = onLike
+            )
+            ActionButton(
+                icon = Icons.Default.ChatBubbleOutline,
+                label = "Komentar",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                onClick = {}
+            )
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CommentItem(
+private fun CommentRow(
     comment: PostComment,
+    isReply: Boolean,
     canDelete: Boolean,
     onReply: (() -> Unit)?,
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val isReply = !comment.reply_to_username.isNullOrEmpty()
-
-    val timeStr = remember(comment.created_at) {
-        try {
-            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-            parser.timeZone = TimeZone.getTimeZone("UTC")
-            val date = parser.parse(comment.created_at.take(19)) ?: Date()
-            val now = Date()
-            val diffMin = (now.time - date.time) / 60000
-            val diffHour = diffMin / 60
-            val diffDay = diffHour / 24
-            when {
-                diffMin < 1 -> "Baru saja"
-                diffMin < 60 -> "${diffMin}m"
-                diffHour < 24 -> "${diffHour}j"
-                diffDay < 7 -> "${diffDay}h"
-                else -> {
-                    val fmt = SimpleDateFormat("d MMM", Locale("id"))
-                    fmt.timeZone = TimeZone.getTimeZone("Asia/Jakarta")
-                    fmt.format(date)
-                }
-            }
-        } catch (e: Exception) { "" }
-    }
+    val timeStr = remember(comment.created_at) { relativeTime(comment.created_at) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { onReply?.invoke() },
+                onClick = {},
                 onLongClick = { if (canDelete) showDeleteDialog = true }
             )
             .padding(
-                start = if (isReply) 46.dp else 14.dp,
+                start = if (isReply) 10.dp else 14.dp,
                 end = 14.dp,
                 top = 8.dp,
-                bottom = 8.dp
+                bottom = 6.dp
             ),
         verticalAlignment = Alignment.Top
     ) {
-        // Avatar
-        if (!comment.avatar_url.isNullOrEmpty()) {
-            AsyncImage(
-                model = comment.avatar_url,
-                contentDescription = comment.username,
-                modifier = Modifier
-                    .size(if (isReply) 28.dp else 34.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        } else {
+        AvatarCircle(
+            avatarUrl = comment.avatar_url,
+            username = comment.username,
+            size = if (isReply) 28.dp else 34.dp
+        )
+        Spacer(modifier = Modifier.width(9.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            // Bubble komentar (mirip FB)
             Box(
                 modifier = Modifier
-                    .size(if (isReply) 28.dp else 34.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 4.dp,
+                            topEnd = 14.dp,
+                            bottomStart = 14.dp,
+                            bottomEnd = 14.dp
+                        )
+                    )
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = comment.username.take(1).uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (isReply) 11.sp else 13.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = comment.username,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = if (isReply) 12.sp else 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            letterSpacing = 0.sp
+                        )
+                        if (!comment.reply_to_username.isNullOrEmpty()) {
+                            Text(
+                                text = " -> ${comment.reply_to_username}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = comment.message,
+                        fontSize = if (isReply) 13.sp else 14.sp,
+                        lineHeight = 19.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                    )
+                }
             }
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            // Reply indicator
-            if (isReply) {
-                Text(
-                    text = "↩ @${comment.reply_to_username}",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = comment.username,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+
+            // Waktu + tombol balas
+            Row(
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(
                     text = timeStr,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = comment.message,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
-            )
-            if (onReply != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Balas",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                    modifier = Modifier.clickable { onReply() }
-                )
+                if (onReply != null) {
+                    Text(
+                        text = "Balas",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                        modifier = Modifier.clickable { onReply() }
+                    )
+                }
+                if (canDelete) {
+                    Text(
+                        text = "Hapus",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                        modifier = Modifier.clickable { showDeleteDialog = true }
+                    )
+                }
             }
         }
     }
 
     if (showDeleteDialog && canDelete) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Hapus komentar?") },
-            text = { Text("Komentar ini akan dihapus permanen.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onDelete()
-                    showDeleteDialog = false
-                }) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Batal")
-                }
-            }
+        DeleteDialog(
+            title = "Hapus komentar?",
+            text = "Komentar ini akan dihapus permanen.",
+            onConfirm = { onDelete(); showDeleteDialog = false },
+            onDismiss = { showDeleteDialog = false }
         )
     }
 }
