@@ -81,15 +81,14 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentRoute) { showMoreSheet = false }
 
                 val mainNavItems = listOf(
-                    Triple("home", "Home", Icons.Default.Home),
                     Triple("search", "Cari", Icons.Default.Search),
                     Triple("explore", "Eksplor", Icons.Default.Apps),
                     Triple("bookmark", "Bookmark", Icons.Default.Favorite),
+                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
                 )
                 val sheetNavItems = listOf(
                     Triple("chat", "Chat", Icons.Default.Chat),
                     Triple("feed", "Feed", Icons.Default.GridView),
-                    Triple("schedule", "Jadwal", Icons.Default.DateRange),
                 )
                 val sheetRoutes = sheetNavItems.map { it.first }
                 val isSheetRouteActive = currentRoute in sheetRoutes
@@ -120,7 +119,6 @@ class MainActivity : ComponentActivity() {
                         val sheetItemColors = mapOf(
                             "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
                             "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
-                            "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
                             val meta = sheetItemColors[route]
@@ -197,87 +195,20 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         if (showBottomBar) {
-                            NavigationBar(
-                                modifier = Modifier
-                                    .navigationBarsPadding()
-                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                                    .testTag("bottom_nav_bar"),
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 8.dp
-                            ) {
-                                val currentDestination = navBackStackEntry?.destination
-
-                                mainNavItems.forEach { (route, label, icon) ->
-                                    val isSelected = currentDestination?.route == route
-                                    NavigationBarItem(
-                                        selected = isSelected,
-                                        onClick = {
-                                            if (currentDestination?.route != route) {
-                                                navController.navigate(route) {
-                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            }
-                                        },
-                                        icon = {
-                                            Icon(
-                                                imageVector = icon,
-                                                contentDescription = label,
-                                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = label,
-                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        ),
-                                        modifier = Modifier.testTag("nav_item_$route")
-                                    )
-                                }
-
-                                // Tombol "Lainnya"
-                                NavigationBarItem(
-                                    selected = isSheetRouteActive,
-                                    onClick = { showMoreSheet = true },
-                                    icon = {
-                                        androidx.compose.foundation.layout.Box {
-                                            Icon(
-                                                imageVector = Icons.Default.MoreHoriz,
-                                                contentDescription = "Lainnya",
-                                                tint = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                            )
-                                            if (hasUnreadChat) {
-                                                androidx.compose.foundation.layout.Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                                        .background(MaterialTheme.colorScheme.error)
-                                                        .align(Alignment.TopEnd)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    label = {
-                                        Text(
-                                            text = "Lainnya",
-                                            color = if (isSheetRouteActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isSheetRouteActive) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal
-                                        )
-                                    },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                    ),
-                                    modifier = Modifier.testTag("nav_item_more")
-                                )
-                            }
+                            CurvedBottomNav(
+                                mainNavItems = mainNavItems,
+                                currentRoute = currentRoute,
+                                isSheetRouteActive = isSheetRouteActive,
+                                hasUnreadChat = hasUnreadChat,
+                                onNavigate = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                onMoreClick = { showMoreSheet = true }
+                            )
                         }
                     }
                 ) { innerPadding ->
