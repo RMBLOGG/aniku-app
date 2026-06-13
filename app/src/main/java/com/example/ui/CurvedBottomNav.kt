@@ -35,6 +35,7 @@ fun CurvedBottomNav(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface) // tutup area nav bar sistem
             .navigationBarsPadding()
             .height(navHeight + fabOverhang),
         contentAlignment = Alignment.BottomCenter

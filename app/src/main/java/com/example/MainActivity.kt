@@ -33,6 +33,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Hapus background hitam nav bar sistem
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         val viewModel = AnikuViewModel(this)
 
         setContent {
