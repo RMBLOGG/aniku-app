@@ -1250,7 +1250,7 @@ fun ExploreScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround
@@ -1503,7 +1503,7 @@ fun ScheduleScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .horizontalScroll(rememberScrollState())
                 .padding(vertical = 12.dp, horizontal = 16.dp),
