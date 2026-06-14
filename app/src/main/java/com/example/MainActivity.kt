@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
         // Ambil FCM token
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token ->
-                val prefs = getSharedPreferences("aniku_fcm", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("aniku_fcm", android.content.Context.MODE_PRIVATE)
                 prefs.edit().putString("fcm_token", token).apply()
                 android.util.Log.d("FCM", "Token: $token")
             }
