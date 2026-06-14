@@ -104,7 +104,7 @@ dependencies {
   implementation("androidx.biometric:biometric:1.1.0")
   implementation("androidx.work:work-runtime-ktx:2.9.0")
   implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
-  implementation("com.google.firebase:firebase-messaging-ktx")
+  implementation("com.google.firebase:firebase-messaging:24.0.0")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
