@@ -90,7 +90,9 @@ fun AnimeCard(
     onClick: () -> Unit,
     isBookmarked: Boolean,
     onBookmarkToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoggedIn: Boolean = true,
+    onLoginRequired: () -> Unit = {}
 ) {
     Column(
         modifier = modifier
@@ -152,7 +154,7 @@ fun AnimeCard(
 
             // Bookmark Icon (Top-right)
             IconButton(
-                onClick = { onBookmarkToggle() },
+                onClick = { if (isLoggedIn) onBookmarkToggle() else onLoginRequired() },
                 modifier = Modifier
                     .padding(4.dp)
                     .size(32.dp)
@@ -307,9 +309,28 @@ fun HomeScreen(
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val session by viewModel.session.collectAsState()
+    val isLoggedIn = session.token != null
     val watchHistory by viewModel.watchHistory.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
+    var showLoginDialog by remember { mutableStateOf(false) }
+
+    if (showLoginDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Login Diperlukan", fontWeight = FontWeight.Bold) },
+            text = { Text("Kamu perlu login untuk menggunakan fitur ini. Daftar gratis sekarang!") },
+            confirmButton = {
+                Button(onClick = { showLoginDialog = false; navController.navigate("auth") }, colors = ButtonDefaults.buttonColors(containerColor = accentColor)) {
+                    Text("Login / Daftar", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLoginDialog = false }) { Text("Nanti Saja") }
+            }
+        )
+    }
 
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val latestVersion by viewModel.latestVersion.collectAsState()
@@ -900,7 +921,9 @@ fun HomeScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
                         )
                     }
                 }
@@ -919,7 +942,9 @@ fun HomeScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
                         )
                     }
                 }
@@ -938,7 +963,9 @@ fun HomeScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
                         )
                     }
                 }
@@ -957,7 +984,9 @@ fun HomeScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
                         )
                     }
                 }
@@ -1005,7 +1034,8 @@ fun HomeScreen(
 @Composable
 fun SearchScreen(
     viewModel: AnikuViewModel,
-    onNavigateToDetail: (String) -> Unit
+    onNavigateToDetail: (String) -> Unit,
+    onLoginRequired: () -> Unit = {}
 ) {
     val query by viewModel.searchQuery.collectAsState()
     val results by viewModel.searchResults.collectAsState()
@@ -1014,6 +1044,8 @@ fun SearchScreen(
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
+    val session by viewModel.session.collectAsState()
+    val isLoggedIn = session.token != null
 
     Column(
         modifier = Modifier
@@ -1074,7 +1106,9 @@ fun SearchScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }
@@ -1094,7 +1128,9 @@ fun SearchScreen(
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }
@@ -1123,7 +1159,9 @@ fun SearchScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }
@@ -1143,7 +1181,9 @@ fun SearchScreen(
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }
@@ -1159,7 +1199,8 @@ fun SearchScreen(
 @Composable
 fun ExploreScreen(
     viewModel: AnikuViewModel,
-    onNavigateToDetail: (String) -> Unit
+    onNavigateToDetail: (String) -> Unit,
+    onLoginRequired: () -> Unit = {}
 ) {
     val activeTab by viewModel.exploreTab.collectAsState()
     val activeGenre by viewModel.selectedGenreSlug.collectAsState()
@@ -1170,6 +1211,8 @@ fun ExploreScreen(
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
+    val session by viewModel.session.collectAsState()
+    val isLoggedIn = session.token != null
 
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
@@ -1300,7 +1343,9 @@ fun ExploreScreen(
                             accentColor = accentColor,
                             onClick = { onNavigateToDetail(anim.slug) },
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                     if (isLoading) {
@@ -1358,7 +1403,9 @@ fun AnimeListCard(
     onClick: () -> Unit,
     isBookmarked: Boolean,
     onBookmarkToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoggedIn: Boolean = true,
+    onLoginRequired: () -> Unit = {}
 ) {
     Row(
         modifier = modifier
@@ -1416,7 +1463,7 @@ fun AnimeListCard(
             }
         }
         IconButton(
-            onClick = { onBookmarkToggle() },
+            onClick = { if (isLoggedIn) onBookmarkToggle() else onLoginRequired() },
             modifier = Modifier.size(36.dp)
         ) {
             Icon(
@@ -1705,6 +1752,33 @@ fun AnimeDetailScreen(
     val context = LocalContext.current
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
+    var showLoginDialog by remember { mutableStateOf(false) }
+
+    if (showLoginDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text("Login Diperlukan", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            },
+            text = {
+                Text("Kamu perlu login untuk menggunakan fitur ini. Daftar gratis sekarang!", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showLoginDialog = false; navController.navigate("auth") },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    Text("Login / Daftar", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLoginDialog = false }) {
+                    Text("Nanti Saja", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        )
+    }
 
 
     var isSynopsisExpanded by remember { mutableStateOf(false) }
@@ -1899,7 +1973,10 @@ fun AnimeDetailScreen(
                                 }
 
                                 Button(
-                                    onClick = { viewModel.toggleBookmark(slug, d.title, d.poster, d.type) },
+                                    onClick = {
+                                        if (!isLoggedIn) showLoginDialog = true
+                                        else viewModel.toggleBookmark(slug, d.title, d.poster, d.type)
+                                    },
                                     modifier = Modifier.testTag("detail_bookmark_btn"),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -1914,7 +1991,7 @@ fun AnimeDetailScreen(
                                 Button(
                                     onClick = {
                                         if (!isLoggedIn) {
-                                            navController.navigate("auth")
+                                            showLoginDialog = true
                                         } else {
                                             viewModel.setPendingSharedAnime(
                                                 com.example.network.SharedAnimeRef(

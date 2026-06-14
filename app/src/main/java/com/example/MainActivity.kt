@@ -238,13 +238,15 @@ class MainActivity : ComponentActivity() {
                         composable("search") {
                             SearchScreen(
                                 viewModel = viewModel,
-                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") }
+                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") },
+                                onLoginRequired = { navController.navigate("auth") }
                             )
                         }
                         composable("explore") {
                             ExploreScreen(
                                 viewModel = viewModel,
-                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") }
+                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") },
+                                onLoginRequired = { navController.navigate("auth") }
                             )
                         }
                         composable("feed") {
