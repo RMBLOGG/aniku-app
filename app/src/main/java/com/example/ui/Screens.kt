@@ -273,6 +273,7 @@ fun SectionHeader(
 fun DonationCard(
     donations: List<Donation>,
     onRefresh: () -> Unit,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val latest = donations.firstOrNull() ?: return
@@ -318,6 +319,18 @@ fun DonationCard(
                     Icon(
                         Icons.Default.Refresh,
                         contentDescription = "Refresh",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Tutup",
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         modifier = Modifier.size(16.dp)
                     )
@@ -792,18 +805,23 @@ fun HomeScreen(
                 }
             }
 
-            // Donasi terbaru dari Trakteer
+
+            // Donasi terbaru dari Saweria
             if (donations.isNotEmpty()) {
                 item {
-                    DonationCard(
-                        donations = donations.take(3),
-                        onRefresh = { viewModel.loadDonations() },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
+                    var donationDismissed by remember { mutableStateOf(false) }
+                    if (!donationDismissed) {
+                        DonationCard(
+                            donations = donations.take(3),
+                            onRefresh = { viewModel.loadDonations() },
+                            onDismiss = { donationDismissed = true },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
                 }
             }
 
-            // Active Supabase Announcement banner row (dismissible) - Floating Card Style
+
             activeAnnouncement?.let { ann ->
                 item {
                     var dismissed by remember { mutableStateOf(false) }
