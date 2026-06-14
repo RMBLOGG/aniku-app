@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
   id("com.google.gms.google-services")
+  id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -105,6 +106,7 @@ dependencies {
   implementation("androidx.work:work-runtime-ktx:2.9.0")
   implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
   implementation("com.google.firebase:firebase-messaging:24.0.0")
+  implementation("com.google.firebase:firebase-crashlytics")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
