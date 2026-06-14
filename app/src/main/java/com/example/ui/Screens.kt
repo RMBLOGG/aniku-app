@@ -4016,42 +4016,111 @@ fun SettingsScreen(
                 }
             }
 
-            // Section G: Support donation Saweria card
+            // Section G: Support donation card (Saweria + Trakteer)
             Card(
                 colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF162516) else Color(0xFFE8F5E9)),
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime"))
-                        context.startActivity(browserIntent)
-                    }
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("☕", fontSize = 20.sp)
+                Column(modifier = Modifier.padding(18.dp)) {
+                    // Header
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4CAF50)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("☕", fontSize = 20.sp)
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Dukung Aniku",
+                                color = if (isDark) Color.White else Color(0xFF2E7D32),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "Bantuan Anda sangat berarti bagi kelangsungan aplikasi",
+                                color = if (isDark) Color.LightGray else Color(0xFF43A047),
+                                fontSize = 12.sp
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Dukung kami dengan Saweria",
-                            color = if (isDark) Color.White else Color(0xFF2E7D32),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = Color(0xFF4CAF50).copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(14.dp))
+                    // Tombol Saweria
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDark) Color(0xFF1E3A1E) else Color(0xFFD0F0D0))
+                            .clickable {
+                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime"))
+                                context.startActivity(browserIntent)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("☕", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Saweria",
+                                color = if (isDark) Color.White else Color(0xFF2E7D32),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "saweria.co/Dayynime",
+                                color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047),
+                                fontSize = 11.sp
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(16.dp)
                         )
-                        Text(
-                            text = "Bantuan Anda sangat berarti bagi kelangsungan aplikasi",
-                            color = if (isDark) Color.LightGray else Color(0xFF43A047),
-                            fontSize = 12.sp
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Tombol Trakteer
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDark) Color(0xFF3A1E1E) else Color(0xFFFFE0E0))
+                            .clickable {
+                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://trakteer.id/Dayynimee"))
+                                context.startActivity(browserIntent)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🧡", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Trakteer",
+                                color = if (isDark) Color.White else Color(0xFF7D2E2E),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "trakteer.id/Dayynimee",
+                                color = if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F),
+                                fontSize = 11.sp
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFFE57373),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
