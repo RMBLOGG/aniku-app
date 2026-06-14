@@ -1,6 +1,11 @@
 package com.example
 
 import android.os.Bundle
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -41,6 +46,26 @@ class MainActivity : ComponentActivity() {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         val viewModel = AnikuViewModel(this)
 
+        // Minta izin notifikasi (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    100
+                )
+            }
+        }
+
+        // Jadwalkan pengecekan feed berkala
+        FeedNotificationWorker.schedule(this)
+
+        // Handle deep link dari notifikasi
+        val deepLinkRoute = if (intent?.data?.scheme == "aniku" && intent.data?.host == "feed") {
+            "feed"
+        } else null
+
         setContent {
             val isDark by viewModel.isDark.collectAsState()
             val accentColorName by viewModel.accentColorName.collectAsState()
@@ -77,6 +102,16 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
+
+                // Navigate ke deep link kalau ada (dari notifikasi)
+                LaunchedEffect(deepLinkRoute) {
+                    deepLinkRoute?.let {
+                        navController.navigate(it) {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
 
                 val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "chat", "feed")
                 val showBottomBar = currentRoute in bottomRoutes
