@@ -270,7 +270,6 @@ fun SectionHeader(
 // ================================================================
 
 @Composable
-@Composable
 fun DonationCard(
     donations: List<Donation>,
     onRefresh: () -> Unit,
@@ -383,7 +382,7 @@ fun DonationCard(
                 }
                 if (index < donations.size - 1) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp, start = 42.dp),
+                        modifier = Modifier.padding(start = 42.dp, top = 8.dp, end = 0.dp, bottom = 8.dp),
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
                     )
                 }
