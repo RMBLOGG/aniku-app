@@ -2671,12 +2671,13 @@ fun WatchScreen(
                             }
                         },
                         update = { view ->
+                            val url = activeStreamUrl ?: return@AndroidView
                             val headers = mapOf(
                                 "Referer" to "https://v2.samehadaku.how/",
                                 "Origin" to "https://v2.samehadaku.how",
                                 "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             )
-                            view.loadUrl(activeStreamUrl!!, headers)
+                            view.loadUrl(url, headers)
                         },
                         modifier = Modifier.fillMaxSize()
                     )
