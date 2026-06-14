@@ -774,10 +774,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 viewModelScope.launch {
                     try {
                         val linkRes = retryIO { NetworkClient.samehadakuApi.getServerLink(serverId) }
-                        _activeStreamUrl.value = linkRes.data?.url ?: rawUrl
+                        val resolvedUrl = linkRes.data?.url
+                        if (!resolvedUrl.isNullOrEmpty()) {
+                            _activeStreamUrl.value = resolvedUrl
+                        } else {
+                            Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
+                            _activeStreamUrl.value = rawUrl
+                        }
                     } catch (e: Exception) {
+                        Log.e("AnikuVM", "Failed resolve server $serverId: ${e.message}", e)
                         _activeStreamUrl.value = rawUrl
-                        Log.e("AnikuVM", "Failed resolve server $serverId", e)
                     } finally {
                         _isStreamLoading.value = false
                     }

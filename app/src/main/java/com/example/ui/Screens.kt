@@ -2434,6 +2434,7 @@ fun WatchScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit
 ) {
+    var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
@@ -2444,8 +2445,8 @@ fun WatchScreen(
     val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
-    LaunchedEffect(episodeSlug) {
-        viewModel.loadEpisodeStream(episodeSlug)
+    LaunchedEffect(currentEpisodeSlug) {
+        viewModel.loadEpisodeStream(currentEpisodeSlug)
     }
 
     // Catat riwayat saat episodeTitle sudah tersedia
@@ -2456,7 +2457,7 @@ fun WatchScreen(
                 animeSlug = currentAnimeSlug,
                 animeTitle = animeTitle,
                 animePoster = detail?.poster ?: "",
-                episodeSlug = episodeSlug,
+                episodeSlug = currentEpisodeSlug,
                 episodeTitle = title
             )
         }
@@ -2763,7 +2764,7 @@ fun WatchScreen(
 
         // Previous and Next Episode controls
         detail?.episodes?.let { eps ->
-            val currentIndex = eps.indexOfFirst { it.slug == episodeSlug }
+            val currentIndex = eps.indexOfFirst { it.slug == currentEpisodeSlug }
             if (currentIndex != -1) {
                 Row(
                     modifier = Modifier
@@ -2777,7 +2778,7 @@ fun WatchScreen(
                         onClick = {
                             val newEp = eps.getOrNull(currentIndex - 1)
                             if (newEp != null) {
-                                viewModel.loadEpisodeStream(newEp.slug)
+                                currentEpisodeSlug = newEp.slug
                             }
                         },
                         enabled = hasPrev,
@@ -2798,7 +2799,7 @@ fun WatchScreen(
                         onClick = {
                             val newEp = eps.getOrNull(currentIndex + 1)
                             if (newEp != null) {
-                                viewModel.loadEpisodeStream(newEp.slug)
+                                currentEpisodeSlug = newEp.slug
                             }
                         },
                         enabled = hasNext,
@@ -2892,14 +2893,14 @@ fun WatchScreen(
             modifier = Modifier.weight(1f)
         ) {
             itemsIndexed(displayEps) { idx, item ->
-                val isActive = item.slug == episodeSlug
+                val isActive = item.slug == currentEpisodeSlug
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isActive) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
                         .border(1.dp, if (isActive) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
-                        .clickable { viewModel.loadEpisodeStream(item.slug) }
+                        .clickable { currentEpisodeSlug = item.slug }
                         .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
