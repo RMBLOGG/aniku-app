@@ -61,6 +61,14 @@ class MainActivity : ComponentActivity() {
         // Jadwalkan pengecekan feed berkala
         FeedNotificationWorker.schedule(this)
 
+        // Ambil FCM token
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token ->
+                val prefs = getSharedPreferences("aniku_fcm", Context.MODE_PRIVATE)
+                prefs.edit().putString("fcm_token", token).apply()
+                android.util.Log.d("FCM", "Token: $token")
+            }
+
         // Handle deep link dari notifikasi
         val deepLinkRoute = if (intent?.data?.scheme == "aniku" && intent.data?.host == "feed") {
             "feed"
