@@ -564,7 +564,6 @@ data class SamehadakuServerItem(
 )
 
 @JsonClass(generateAdapter = true)
-@JsonClass(generateAdapter = true)
 data class SamehadakuServerLinkResponse(
     val status: String,
     val data: SamehadakuServerLinkData?
