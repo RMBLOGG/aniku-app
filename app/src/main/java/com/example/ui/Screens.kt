@@ -2772,11 +2772,11 @@ fun WatchScreen(
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Previous ep
-                    val hasPrev = currentIndex > 0
+                    // Previous ep (index + 1 karena list descending)
+                    val hasPrev = currentIndex < eps.size - 1
                     Button(
                         onClick = {
-                            val newEp = eps.getOrNull(currentIndex - 1)
+                            val newEp = eps.getOrNull(currentIndex + 1)
                             if (newEp != null) {
                                 currentEpisodeSlug = newEp.slug
                             }
@@ -2793,11 +2793,11 @@ fun WatchScreen(
                         Text("< Sebelumnya")
                     }
 
-                    // Next ep
-                    val hasNext = currentIndex < eps.size - 1
+                    // Next ep (index - 1 karena list descending)
+                    val hasNext = currentIndex > 0
                     Button(
                         onClick = {
-                            val newEp = eps.getOrNull(currentIndex + 1)
+                            val newEp = eps.getOrNull(currentIndex - 1)
                             if (newEp != null) {
                                 currentEpisodeSlug = newEp.slug
                             }
