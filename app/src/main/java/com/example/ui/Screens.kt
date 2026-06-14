@@ -591,27 +591,97 @@ fun HomeScreen(
     if (isHomeLoading) {
         LoadingScreen("Memuat data anime...")
     } else if (homeError != null) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(56.dp))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = homeError ?: "Gagal memuat data. Periksa koneksi internet Anda.",
-                color = Color.White,
-                fontSize = 16.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = { viewModel.loadHomeData() },
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+        val currentSource by viewModel.dataSource.collectAsState()
+        val servers = listOf(
+            "Dayynime-v1" to "Server 1 (Utama)",
+            "Dayynime-v2" to "Server 2 (Alternatif)"
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Tombol settings tetap bisa diakses di pojok kanan atas
+            IconButton(
+                onClick = { navController.navigate("settings") },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 16.dp, end = 8.dp)
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.8f))
             ) {
-                Text("Coba Lagi", color = Color.White, fontWeight = FontWeight.Bold)
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = "Pengaturan",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = "Error", tint = Color.Red, modifier = Modifier.size(56.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = homeError ?: "Gagal memuat data. Periksa koneksi internet Anda.",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Coba ganti server di bawah ini",
+                    color = Color.Gray,
+                    fontSize = 13.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                // Server switcher
+                servers.forEach { (key, label) ->
+                    val isActive = currentSource == key
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isActive) accentColor.copy(alpha = 0.15f)
+                                else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                            )
+                            .clickable(enabled = !isActive) {
+                                viewModel.changeDataSource(key)
+                                viewModel.loadHomeData()
+                            }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (isActive) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = if (isActive) accentColor else Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                label,
+                                color = if (isActive) accentColor else Color.White,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                            if (isActive) Text("Aktif sekarang", color = accentColor.copy(alpha = 0.7f), fontSize = 11.sp)
+                        }
+                        if (!isActive) Text("Gunakan", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = { viewModel.loadHomeData() },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    Text("Coba Lagi", color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     } else {
