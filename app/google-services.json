@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1050856790349:android:13a2b678e4b132b7d93f04",
+        "mobilesdk_app_id": "1:1050856790349:android:83838dd22fec1ea5d93f04",
         "android_client_info": {
-          "package_name": "com.example"
+          "package_name": "com.aistudio.aniku.plxwzq"
         }
       },
       "oauth_client": [],
