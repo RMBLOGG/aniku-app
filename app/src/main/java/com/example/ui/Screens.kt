@@ -1705,44 +1705,7 @@ fun AnimeDetailScreen(
     val context = LocalContext.current
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
-    var showLoginDialog by remember { mutableStateOf(false) }
 
-    // Login required dialog
-    if (showLoginDialog) {
-        AlertDialog(
-            onDismissRequest = { showLoginDialog = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = {
-                Text(
-                    "Login Diperlukan",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Text(
-                    "Kamu perlu login untuk menonton anime. Daftar gratis sekarang!",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showLoginDialog = false
-                        navController.navigate("auth")
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
-                ) {
-                    Text("Login / Daftar", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLoginDialog = false }) {
-                    Text("Nanti Saja", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                }
-            }
-        )
-    }
 
     var isSynopsisExpanded by remember { mutableStateOf(false) }
 
@@ -1951,7 +1914,7 @@ fun AnimeDetailScreen(
                                 Button(
                                     onClick = {
                                         if (!isLoggedIn) {
-                                            showLoginDialog = true
+                                            navController.navigate("auth")
                                         } else {
                                             viewModel.setPendingSharedAnime(
                                                 com.example.network.SharedAnimeRef(
@@ -2100,8 +2063,7 @@ fun AnimeDetailScreen(
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant)
                                             .clickable {
-                                                if (isLoggedIn) onNavigateToWatch(ep.slug, d.title)
-                                                else showLoginDialog = true
+                                                onNavigateToWatch(ep.slug, d.title)
                                             }
                                             .padding(horizontal = 14.dp, vertical = 14.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
