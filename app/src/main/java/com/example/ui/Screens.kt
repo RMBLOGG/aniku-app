@@ -270,6 +270,151 @@ fun SectionHeader(
 // ================================================================
 
 @Composable
+@Composable
+fun DonationCard(
+    donations: List<Donation>,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val latest = donations.firstOrNull() ?: return
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1a1a1a)
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp, accentColor.copy(alpha = 0.25f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("☕", fontSize = 14.sp)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Support Terbaru",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = accentColor
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onRefresh,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "Refresh",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // List donasi
+            donations.forEachIndexed { index, donation ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            donation.supporter_name.take(1).uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = accentColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            donation.supporter_name,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            buildString {
+                                append("${donation.amount} ${donation.unit ?: "cup"}")
+                                if ((donation.total_amount ?: 0) > 0) {
+                                    append(" · Rp${donation.total_amount?.let { formatRupiah(it) }}")
+                                }
+                            },
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        if (!donation.message.isNullOrEmpty()) {
+                            Text(
+                                "\"${donation.message}\"",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Text(
+                        relativeTimeShort(donation.created_at),
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    )
+                }
+                if (index < donations.size - 1) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp, start = 42.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+fun formatRupiah(amount: Int): String {
+    return when {
+        amount >= 1_000_000 -> "${amount / 1_000_000}jt"
+        amount >= 1_000 -> "${amount / 1_000}rb"
+        else -> amount.toString()
+    }
+}
+
+fun relativeTimeShort(createdAt: String): String {
+    return try {
+        val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+        parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val date = parser.parse(createdAt.take(19)) ?: java.util.Date()
+        val diffMin = (java.util.Date().time - date.time) / 60000
+        when {
+            diffMin < 60 -> "${diffMin}m"
+            diffMin < 1440 -> "${diffMin / 60}j"
+            else -> "${diffMin / 1440}h"
+        }
+    } catch (e: Exception) { "" }
+}
+
+@Composable
 fun LoadingScreen(message: String = "Memuat data anime...") {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -307,6 +452,8 @@ fun HomeScreen(
     val moviesList by viewModel.homeMovies.collectAsState()
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
+    val donations by viewModel.donations.collectAsState()
+    val hasNewDonation by viewModel.hasNewDonation.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
@@ -643,6 +790,17 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Donasi terbaru dari Trakteer
+            if (donations.isNotEmpty()) {
+                item {
+                    DonationCard(
+                        donations = donations.take(3),
+                        onRefresh = { viewModel.loadDonations() },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    )
                 }
             }
 

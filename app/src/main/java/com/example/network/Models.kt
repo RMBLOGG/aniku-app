@@ -573,3 +573,16 @@ data class SamehadakuServerLinkResponse(
 data class SamehadakuServerLinkData(
     val url: String?
 )
+
+// Trakteer Donation
+@JsonClass(generateAdapter = true)
+data class Donation(
+    val id: String,
+    val supporter_name: String,
+    val amount: Int,
+    val unit: String? = "cup",
+    val message: String? = null,
+    val total_amount: Int? = 0,
+    val created_at: String,
+    val is_announced: Boolean? = false
+)

@@ -360,6 +360,15 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): Response<Unit>
+
+    // Donations (Trakteer)
+    @GET("rest/v1/donations")
+    suspend fun getDonations(
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 10,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<Donation>
 }
 
 interface CloudinaryApi {

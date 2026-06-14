@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,8 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavType
@@ -79,6 +82,86 @@ class MainActivity : ComponentActivity() {
                 val showBottomBar = currentRoute in bottomRoutes
                 var showMoreSheet by remember { mutableStateOf(false) }
                 val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
+                val hasNewDonation by viewModel.hasNewDonation.collectAsState()
+                val latestDonation by viewModel.latestDonation.collectAsState()
+                var showDonationBanner by remember { mutableStateOf(false) }
+
+                // Tampilkan banner saat ada donasi baru
+                LaunchedEffect(hasNewDonation) {
+                    if (hasNewDonation) {
+                        showDonationBanner = true
+                        kotlinx.coroutines.delay(5000)
+                        showDonationBanner = false
+                        viewModel.markDonationSeen()
+                    }
+                }
+
+                // Banner donasi popup
+                if (showDonationBanner && latestDonation != null) {
+                    androidx.compose.runtime.DisposableEffect(Unit) { onDispose {} }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                            .zIndex(999f),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showDonationBanner = false
+                                    viewModel.markDonationSeen()
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("☕", fontSize = 20.sp)
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Support baru masuk!",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        "${latestDonation!!.supporter_name} men-support ${latestDonation!!.amount} ${latestDonation!!.unit ?: "cup"}! 🙏",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        showDonationBanner = false
+                                        viewModel.markDonationSeen()
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Tutup",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Tutup sheet kalau navigasi berubah
                 LaunchedEffect(currentRoute) { showMoreSheet = false }

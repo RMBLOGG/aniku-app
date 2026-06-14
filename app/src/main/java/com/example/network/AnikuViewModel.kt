@@ -250,6 +250,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadGenres()
         loadSearchPopular()
         checkForUpdate()
+        loadDonations()
         // Auto-refresh token saat app dibuka
         viewModelScope.launch {
             refreshSession()
@@ -1378,6 +1379,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     fun clearFeedError() { _feedError.value = null }
+
+    // ─────────────── DONATIONS (TRAKTEER) ───────────────
+    private val _donations = MutableStateFlow<List<Donation>>(emptyList())
+    val donations: StateFlow<List<Donation>> = _donations.asStateFlow()
+
+    private val _latestDonation = MutableStateFlow<Donation?>(null)
+    val latestDonation: StateFlow<Donation?> = _latestDonation.asStateFlow()
+
+    private var _lastSeenDonationId = MutableStateFlow<String?>(null)
+
+    // Notifikasi banner — true kalau ada donasi baru yang belum dilihat
+    val hasNewDonation: StateFlow<Boolean> = combine(_donations, _lastSeenDonationId) { list, lastSeen ->
+        list.isNotEmpty() && list.first().id != lastSeen
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun loadDonations() {
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getDonations(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _donations.value = result
+                if (result.isNotEmpty()) _latestDonation.value = result.first()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadDonations error: ${e.message}")
+            }
+        }
+    }
+
+    fun markDonationSeen() {
+        _lastSeenDonationId.value = _donations.value.firstOrNull()?.id
+    }
 
     // ─────────────── SECURITY ───────────────
     val appLockEnabled: StateFlow<Boolean> = settingsStore.appLockEnabledFlow
