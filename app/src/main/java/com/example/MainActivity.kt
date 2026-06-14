@@ -69,6 +69,13 @@ class MainActivity : ComponentActivity() {
                 android.util.Log.d("FCM", "Token: $token")
             }
 
+        // Subscribe ke topic feed_updates
+        com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            .subscribeToTopic("feed_updates")
+            .addOnSuccessListener {
+                android.util.Log.d("FCM", "Subscribed to feed_updates")
+            }
+
         // Handle deep link dari notifikasi
         val deepLinkRoute = if (intent?.data?.scheme == "aniku" && intent.data?.host == "feed") {
             "feed"
