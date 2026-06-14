@@ -76,10 +76,19 @@ class MainActivity : ComponentActivity() {
                 android.util.Log.d("FCM", "Subscribed to feed_updates")
             }
 
+        // Subscribe ke topic chat_updates
+        com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            .subscribeToTopic("chat_updates")
+            .addOnSuccessListener {
+                android.util.Log.d("FCM", "Subscribed to chat_updates")
+            }
+
         // Handle deep link dari notifikasi
-        val deepLinkRoute = if (intent?.data?.scheme == "aniku" && intent.data?.host == "feed") {
-            "feed"
-        } else null
+        val deepLinkRoute = when {
+            intent?.data?.scheme == "aniku" && intent.data?.host == "feed" -> "feed"
+            intent?.data?.scheme == "aniku" && intent.data?.host == "chat" -> "chat"
+            else -> null
+        }
 
         setContent {
             val isDark by viewModel.isDark.collectAsState()

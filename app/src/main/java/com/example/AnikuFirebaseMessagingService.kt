@@ -22,7 +22,12 @@ class AnikuFirebaseMessagingService : FirebaseMessagingService() {
             ?: remoteMessage.data["body"]
             ?: "Ada postingan baru di Feed Aniku"
 
-        sendNotification(title, body)
+        val screen = remoteMessage.data["screen"] ?: "feed"
+        val deepLink = when (screen) {
+            "chat" -> "aniku://chat"
+            else -> "aniku://feed"
+        }
+        sendNotification(title, body, deepLink)
     }
 
     override fun onNewToken(token: String) {
@@ -32,7 +37,7 @@ class AnikuFirebaseMessagingService : FirebaseMessagingService() {
         prefs.edit().putString("fcm_token", token).apply()
     }
 
-    private fun sendNotification(title: String, body: String) {
+    private fun sendNotification(title: String, body: String, deepLink: String = "aniku://feed") {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -49,7 +54,7 @@ class AnikuFirebaseMessagingService : FirebaseMessagingService() {
 
         val intent = Intent(this, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
-            data = android.net.Uri.parse("aniku://feed")
+            data = android.net.Uri.parse(deepLink)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
