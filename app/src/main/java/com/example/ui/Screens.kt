@@ -4638,6 +4638,7 @@ fun SumberDataScreen(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TopSupporterScreen(
     viewModel: AnikuViewModel,
@@ -4645,7 +4646,6 @@ fun TopSupporterScreen(
 ) {
     val donations by viewModel.donations.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
-    val isDark = !MaterialTheme.colorScheme.background.luminance().let { it > 0.5f }
 
     // Group by supporter_name dan jumlahkan total_amount
     val leaderboard = donations
