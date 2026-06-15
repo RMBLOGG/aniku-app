@@ -22,8 +22,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val watchHistoryManager = WatchHistoryManager(appContext)
 
     // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
-    private val animeApi by lazy { animeApi(appContext) }
-    private val samehadakuApi by lazy { samehadakuApi(appContext) }
+    private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
+    private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
 
     // Watch history state
     private val _watchHistory = MutableStateFlow<List<WatchHistoryItem>>(emptyList())
