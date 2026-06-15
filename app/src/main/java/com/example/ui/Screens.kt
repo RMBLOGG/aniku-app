@@ -876,6 +876,21 @@ fun HomeScreen(
             }
 
 
+            // Donasi terbaru dari Saweria
+            if (donations.isNotEmpty()) {
+                item {
+                    var donationDismissed by remember { mutableStateOf(false) }
+                    if (!donationDismissed) {
+                        DonationCard(
+                            donations = donations.take(3),
+                            onRefresh = { viewModel.loadDonations() },
+                            onDismiss = { donationDismissed = true },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
 
             activeAnnouncement?.let { ann ->
                 item {
@@ -4632,6 +4647,7 @@ fun TopSupporterScreen(
     val donations by viewModel.donations.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
+    // Group by supporter_name dan jumlahkan total_amount
     val leaderboard = donations
         .groupBy { it.supporter_name }
         .map { (name, list) -> name to list.sumOf { it.total_amount ?: 0 } }
@@ -4658,262 +4674,114 @@ fun TopSupporterScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            // Hero section
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                colors = listOf(Color(0xFF1a1400), Color.Transparent)
-                            )
-                        )
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🏆", fontSize = 56.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
+        if (leaderboard.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("☕", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Belum ada supporter",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Jadilah yang pertama support Aniku!",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                // Header
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("🏆", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             "Hall of Fame",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp,
+                            fontSize = 20.sp,
                             color = Color(0xFFFFD700)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Orang-orang yang udah bantu Aniku tetap hidup.",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-                    }
-                }
-            }
-
-            if (leaderboard.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 60.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("☕", fontSize = 40.sp)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                "Belum ada supporter nih.",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Jadilah yang pertama!",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                            )
-                        }
-                    }
-                }
-            } else {
-                // Top 3 podium
-                if (leaderboard.size >= 3) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // 2nd place
-                            leaderboard.getOrNull(1)?.let { (name, total) ->
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text("🥈", fontSize = 28.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(90.dp)
-                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                            .background(Color(0xFF2a2a2a)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp,
-                                                color = Color(0xFFB0BEC5),
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 8.dp)
-                                            )
-                                            Text(
-                                                formatRupiah(total),
-                                                fontSize = 11.sp,
-                                                color = Color(0xFFB0BEC5).copy(alpha = 0.7f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            // 1st place
-                            leaderboard.getOrNull(0)?.let { (name, total) ->
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text("🥇", fontSize = 36.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(110.dp)
-                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                            .background(Color(0xFF2a2000))
-                                            .then(
-                                                Modifier.border(
-                                                    1.dp,
-                                                    Color(0xFFFFD700).copy(alpha = 0.3f),
-                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = Color(0xFFFFD700),
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 8.dp)
-                                            )
-                                            Text(
-                                                formatRupiah(total),
-                                                fontSize = 11.sp,
-                                                color = Color(0xFFFFD700).copy(alpha = 0.7f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            // 3rd place
-                            leaderboard.getOrNull(2)?.let { (name, total) ->
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text("🥉", fontSize = 24.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(75.dp)
-                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                            .background(Color(0xFF1a1500)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(
-                                                name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp,
-                                                color = Color(0xFFCD7F32),
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 8.dp)
-                                            )
-                                            Text(
-                                                formatRupiah(total),
-                                                fontSize = 10.sp,
-                                                color = Color(0xFFCD7F32).copy(alpha = 0.7f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Divider + label
-                if (leaderboard.size > 3) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                            Text(
-                                "  Lainnya  ",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                            )
-                            HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
-                        }
-                    }
-                }
-
-                // Rest of leaderboard (4th and beyond)
-                itemsIndexed(leaderboard.drop(3)) { index, (name, total) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "${index + 4}.",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            modifier = Modifier.width(32.dp)
-                        )
-                        Text(
-                            name,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            formatRupiah(total),
-                            fontSize = 13.sp,
+                            "Terima kasih sudah support Aniku!",
+                            fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
 
-                // Footer message
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        "Makasih buat semua yang udah support ❤️",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp)
-                    )
+                itemsIndexed(leaderboard) { index, (name, total) ->
+                    val medal = when (index) {
+                        0 -> "🥇"
+                        1 -> "🥈"
+                        2 -> "🥉"
+                        else -> "${index + 1}."
+                    }
+                    val cardBg = when (index) {
+                        0 -> Color(0xFF2a2000)
+                        1 -> Color(0xFF1a1a1a)
+                        2 -> Color(0xFF1a1500)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+                    val nameColor = when (index) {
+                        0 -> Color(0xFFFFD700)
+                        1 -> Color(0xFFB0BEC5)
+                        2 -> Color(0xFFCD7F32)
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBg),
+                        border = if (index == 0) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)) else null
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                medal,
+                                fontSize = if (index < 3) 24.sp else 16.sp,
+                                modifier = Modifier.width(40.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    name,
+                                    fontWeight = if (index < 3) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 14.sp,
+                                    color = nameColor
+                                )
+                            }
+                            Text(
+                                formatRupiah(total),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = nameColor.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
                 }
             }
         }
