@@ -4637,3 +4637,153 @@ fun SumberDataScreen(
         }
     }
 }
+
+@Composable
+fun TopSupporterScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val donations by viewModel.donations.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+    val isDark = !MaterialTheme.colorScheme.background.luminance().let { it > 0.5f }
+
+    // Group by supporter_name dan jumlahkan total_amount
+    val leaderboard = donations
+        .groupBy { it.supporter_name }
+        .map { (name, list) -> name to list.sumOf { it.total_amount ?: 0 } }
+        .sortedByDescending { it.second }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadDonations()
+    }
+
+    Scaffold(
+        topBar = {
+            androidx.compose.material3.TopAppBar(
+                title = {
+                    Text("Top Supporter", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        }
+    ) { padding ->
+        if (leaderboard.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("☕", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        "Belum ada supporter",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Jadilah yang pertama support Aniku!",
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                // Header
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("🏆", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Hall of Fame",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = Color(0xFFFFD700)
+                        )
+                        Text(
+                            "Terima kasih sudah support Aniku!",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+
+                itemsIndexed(leaderboard) { index, (name, total) ->
+                    val medal = when (index) {
+                        0 -> "🥇"
+                        1 -> "🥈"
+                        2 -> "🥉"
+                        else -> "${index + 1}."
+                    }
+                    val cardBg = when (index) {
+                        0 -> Color(0xFF2a2000)
+                        1 -> Color(0xFF1a1a1a)
+                        2 -> Color(0xFF1a1500)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
+                    val nameColor = when (index) {
+                        0 -> Color(0xFFFFD700)
+                        1 -> Color(0xFFB0BEC5)
+                        2 -> Color(0xFFCD7F32)
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBg),
+                        border = if (index == 0) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)) else null
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                medal,
+                                fontSize = if (index < 3) 24.sp else 16.sp,
+                                modifier = Modifier.width(40.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    name,
+                                    fontWeight = if (index < 3) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 14.sp,
+                                    color = nameColor
+                                )
+                            }
+                            Text(
+                                formatRupiah(total),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = nameColor.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -234,6 +234,7 @@ class MainActivity : ComponentActivity() {
                     Triple("chat", "Chat", Icons.Default.Chat),
                     Triple("feed", "Feed", Icons.Default.GridView),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
+                    Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                 )
                 val sheetRoutes = sheetNavItems.map { it.first }
                 val isSheetRouteActive = currentRoute in sheetRoutes
@@ -265,6 +266,7 @@ class MainActivity : ComponentActivity() {
                             "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
                             "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
                             "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
+                            "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
                             val meta = sheetItemColors[route]
@@ -427,6 +429,12 @@ class MainActivity : ComponentActivity() {
                             ScheduleScreen(
                                 viewModel = viewModel,
                                 onNavigateToDetail = { slug -> navController.navigate("detail/$slug") }
+                            )
+                        }
+                        composable("top_supporter") {
+                            TopSupporterScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable(
