@@ -2030,6 +2030,7 @@ fun AnimeDetailScreen(
 
     LaunchedEffect(slug) {
         viewModel.loadAnimeDetail(slug)
+        AnikuAnalytics.trackAnimeOpened(slug, animeTitle)
     }
 
     if (isDetailLoading) {
@@ -2447,6 +2448,7 @@ fun WatchScreen(
 
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
+        AnikuAnalytics.trackEpisodeWatched(animeTitle, currentEpisodeSlug)
     }
 
     // Catat riwayat saat episodeTitle sudah tersedia

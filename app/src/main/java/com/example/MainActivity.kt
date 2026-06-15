@@ -61,6 +61,9 @@ class MainActivity : ComponentActivity() {
         // Jadwalkan pengecekan feed berkala
         FeedNotificationWorker.schedule(this)
 
+        // Init Analytics
+        AnikuAnalytics.init(this)
+
         // Ambil FCM token
         com.google.firebase.messaging.FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token ->
@@ -223,7 +226,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // Tutup sheet kalau navigasi berubah
-                LaunchedEffect(currentRoute) { showMoreSheet = false }
+                LaunchedEffect(currentRoute) {
+                    showMoreSheet = false
+                    currentRoute?.let { AnikuAnalytics.trackScreen(it) }
+                }
 
                 val mainNavItems = listOf(
                     Triple("search", "Cari", Icons.Default.Search),

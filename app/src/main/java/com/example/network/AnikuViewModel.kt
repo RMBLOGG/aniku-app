@@ -491,6 +491,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
             return
         }
         _isSearchLoading.value = true
+        if (query.length >= 3) {
+            com.example.AnikuAnalytics.trackSearch(query)
+        }
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
