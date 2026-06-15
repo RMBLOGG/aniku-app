@@ -21,6 +21,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val bookmarkManager = BookmarkManager(appContext)
     val watchHistoryManager = WatchHistoryManager(appContext)
 
+    // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
+    private val animeApi by lazy { animeApi(appContext) }
+    private val samehadakuApi by lazy { samehadakuApi(appContext) }
+
     // Watch history state
     private val _watchHistory = MutableStateFlow<List<WatchHistoryItem>>(emptyList())
     val watchHistory: StateFlow<List<WatchHistoryItem>> = _watchHistory.asStateFlow()
@@ -409,37 +413,37 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 if (isSamehadaku) {
                     // Sedang Tayang → /ongoing
                     try {
-                        val ongoingRes = retryIO { NetworkClient.samehadakuApi.getOngoing(page = 1) }
+                        val ongoingRes = retryIO { samehadakuApi.getOngoing(page = 1) }
                         _homeOngoing.value = (ongoingRes.data?.animeList ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     } catch (oe: Exception) { Log.e("AnikuVM", "Failed samehadaku ongoing", oe) }
 
                     // Terbaru → /recent
                     try {
-                        val recentRes = retryIO { NetworkClient.samehadakuApi.getRecent(page = 1) }
+                        val recentRes = retryIO { samehadakuApi.getRecent(page = 1) }
                         _homeRecent.value = (recentRes.data?.animeList ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     } catch (re: Exception) { Log.e("AnikuVM", "Failed samehadaku recent", re) }
 
                     try {
-                        val popularRes = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
+                        val popularRes = retryIO { samehadakuApi.getPopular(page = 1) }
                         _homePopular.value = (popularRes.data?.animeList ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     } catch (pe: Exception) { Log.e("AnikuVM", "Failed samehadaku home popular", pe) }
 
                     try {
-                        val moviesRes = retryIO { NetworkClient.samehadakuApi.getMovies(page = 1) }
+                        val moviesRes = retryIO { samehadakuApi.getMovies(page = 1) }
                         _homeMovies.value = (moviesRes.data?.animeList ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     } catch (me: Exception) { Log.e("AnikuVM", "Failed samehadaku home movies", me) }
                 } else {
-                    val homeRes = retryIO { NetworkClient.animeApi.getHome() }
+                    val homeRes = retryIO { animeApi.getHome() }
                     _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
                     _homeRecent.value = (homeRes.recent ?: emptyList()).filterNot { blacklist.contains(it.slug) }
 
                     // 5. Load Popular for Section
                     try {
-                        val popularRes = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
+                        val popularRes = retryIO { animeApi.getPopular(page = 1) }
                         _homePopular.value = (popularRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
                     } catch (pe: Exception) {
                         Log.e("AnikuVM", "Failed to load home popular", pe)
@@ -447,7 +451,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                     // 6. Load Movies for Section
                     try {
-                        val moviesRes = retryIO { NetworkClient.animeApi.getMovies(page = 1) }
+                        val moviesRes = retryIO { animeApi.getMovies(page = 1) }
                         _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
                     } catch (me: Exception) {
                         Log.e("AnikuVM", "Failed to load home movies", me)
@@ -467,11 +471,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.getPopular(page = 1) }
+                    val res = retryIO { samehadakuApi.getPopular(page = 1) }
                     _searchPopular.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
-                    val res = retryIO { NetworkClient.animeApi.getPopular(page = 1) }
+                    val res = retryIO { animeApi.getPopular(page = 1) }
                     _searchPopular.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 }
             } catch (e: java.lang.Exception) {
@@ -490,11 +494,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.search(query) }
+                    val res = retryIO { samehadakuApi.search(query) }
                     _searchResults.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
-                    val res = retryIO { NetworkClient.animeApi.search(query) }
+                    val res = retryIO { animeApi.search(query) }
                     _searchResults.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 }
                 _isSearchLoading.value = false
@@ -510,10 +514,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.getGenres() }
+                    val res = retryIO { samehadakuApi.getGenres() }
                     _genres.value = (res.data?.genreList ?: emptyList()).map { it.toGenreRaw() }
                 } else {
-                    val list = retryIO { NetworkClient.animeApi.getGenres() }
+                    val list = retryIO { animeApi.getGenres() }
                     _genres.value = list.genres ?: emptyList()
                 }
             } catch (e: Exception) {
@@ -559,14 +563,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val response = retryIO {
                     if (dataSource.value == "Dayynime-v2") {
                         val sRes = if (_selectedGenreSlug.value != null) {
-                            NetworkClient.samehadakuApi.getAnimeByGenre(genreId = _selectedGenreSlug.value!!, page = page)
+                            samehadakuApi.getAnimeByGenre(genreId = _selectedGenreSlug.value!!, page = page)
                         } else {
                             when (_exploreTab.value) {
-                                "Ongoing" -> NetworkClient.samehadakuApi.getOngoing(page = page)
-                                "Completed" -> NetworkClient.samehadakuApi.getCompleted(page = page)
-                                "Movie" -> NetworkClient.samehadakuApi.getMovies(page = page)
-                                "Latest" -> NetworkClient.samehadakuApi.getRecent(page = page)
-                                else -> NetworkClient.samehadakuApi.getOngoing(page = page)
+                                "Ongoing" -> samehadakuApi.getOngoing(page = page)
+                                "Completed" -> samehadakuApi.getCompleted(page = page)
+                                "Movie" -> samehadakuApi.getMovies(page = page)
+                                "Latest" -> samehadakuApi.getRecent(page = page)
+                                else -> samehadakuApi.getOngoing(page = page)
                             }
                         }
                         val items = (sRes.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
@@ -574,14 +578,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         Pair(items, hasNext)
                     } else {
                         val aRes = if (_selectedGenreSlug.value != null) {
-                            NetworkClient.animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
+                            animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
                         } else {
                             when (_exploreTab.value) {
-                                "Ongoing" -> NetworkClient.animeApi.getOngoing(page = page)
-                                "Completed" -> NetworkClient.animeApi.getCompleted(page = page)
-                                "Movie" -> NetworkClient.animeApi.getMovies(page = page)
-                                "Latest" -> NetworkClient.animeApi.getLatest(page = page)
-                                else -> NetworkClient.animeApi.getOngoing(page = page)
+                                "Ongoing" -> animeApi.getOngoing(page = page)
+                                "Completed" -> animeApi.getCompleted(page = page)
+                                "Movie" -> animeApi.getMovies(page = page)
+                                "Latest" -> animeApi.getLatest(page = page)
+                                else -> animeApi.getOngoing(page = page)
                             }
                         }
                         val items = (aRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
@@ -610,7 +614,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isScheduleLoading.value = true
         viewModelScope.launch {
             try {
-                val res = NetworkClient.animeApi.getSchedule()
+                val res = animeApi.getSchedule()
                 // Fetch schedule data properly
                 _isScheduleLoading.value = false
             } catch (e: Exception) {
@@ -626,7 +630,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
             try {
                 val blacklist = _blacklistedSlugs.value
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.getSchedule() }
+                    val res = retryIO { samehadakuApi.getSchedule() }
                     val days = res.data?.days ?: emptyList()
                     val dayNameMap = mapOf(
                         "Sunday" to "Minggu", "Monday" to "Senin", "Tuesday" to "Selasa",
@@ -640,7 +644,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     }
                     _scheduleMap.value = map
                 } else {
-                    val res = retryIO { NetworkClient.animeApi.getSchedule() }
+                    val res = retryIO { animeApi.getSchedule() }
                     val sched = res.schedule
                     if (sched != null) {
                         val map = mutableMapOf<String, List<AnimeRaw>>()
@@ -677,10 +681,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.getDetail(slug) }
+                    val res = retryIO { samehadakuApi.getDetail(slug) }
                     _animeDetail.value = res.data?.toDetailData()
                 } else {
-                    val res = retryIO { NetworkClient.animeApi.getDetail(slug) }
+                    val res = retryIO { animeApi.getDetail(slug) }
                     _animeDetail.value = res.detail
                 }
                 _isDetailLoading.value = false
@@ -701,7 +705,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { NetworkClient.samehadakuApi.getEpisode(slug) }
+                    val res = retryIO { samehadakuApi.getEpisode(slug) }
                     val epData = res.data
                     _streamEpisodeTitle.value = epData?.title ?: "Tonton Tayangan"
 
@@ -730,7 +734,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         if (firstUrl.startsWith("samehadaku_server:")) {
                             val serverId = firstUrl.removePrefix("samehadaku_server:")
                             try {
-                                val linkRes = retryIO { NetworkClient.samehadakuApi.getServerLink(serverId) }
+                                val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                                 _activeStreamUrl.value = linkRes.data?.url ?: firstUrl
                             } catch (e: Exception) {
                                 _activeStreamUrl.value = firstUrl
@@ -742,7 +746,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
                     }
                 } else {
-                    val res = retryIO { NetworkClient.animeApi.getEpisode(slug) }
+                    val res = retryIO { animeApi.getEpisode(slug) }
                     _streamEpisodeTitle.value = res.title ?: "Tonton Tayangan"
                     val streamList = res.streams ?: emptyList()
                     _streams.value = streamList
@@ -773,7 +777,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _activeStreamUrl.value = null
                 viewModelScope.launch {
                     try {
-                        val linkRes = retryIO { NetworkClient.samehadakuApi.getServerLink(serverId) }
+                        val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                         val resolvedUrl = linkRes.data?.url
                         if (!resolvedUrl.isNullOrEmpty()) {
                             _activeStreamUrl.value = resolvedUrl

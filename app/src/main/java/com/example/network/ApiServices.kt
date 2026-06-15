@@ -1,13 +1,18 @@
 package com.example.network
 
+import android.content.Context
+import okhttp3.Cache
+import okhttp3.CacheControl
+import okhttp3.Interceptor
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 interface AnimeApi {
@@ -155,7 +160,7 @@ interface SupabaseAuthApi {
     suspend fun recoverPassword(
         @Body request: RecoverRequest,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 }
 
 interface SupabaseDbApi {
@@ -206,9 +211,8 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=minimal"
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Admin endpoints: Announcements
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -231,9 +235,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Admin endpoints: Featured Anime
     @POST("rest/v1/featured_anime")
     suspend fun insertFeaturedAnime(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -247,9 +250,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Admin endpoints: Blacklist
     @POST("rest/v1/blacklisted_anime")
     suspend fun insertBlacklistedAnime(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
@@ -263,9 +265,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Chat Room endpoints
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
         @Query("order") order: String = "created_at.asc",
@@ -287,9 +288,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Posts
     @GET("rest/v1/posts")
     suspend fun getPosts(
         @Query("order") order: String = "created_at.desc",
@@ -311,9 +311,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Likes
     @GET("rest/v1/post_likes")
     suspend fun getLikes(
         @Query("post_id") postIdQuery: String,
@@ -335,9 +334,8 @@ interface SupabaseDbApi {
         @Query("user_id") userIdQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Comments
     @GET("rest/v1/post_comments")
     suspend fun getComments(
         @Query("post_id") postIdQuery: String,
@@ -359,9 +357,8 @@ interface SupabaseDbApi {
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): Response<Unit>
+    ): retrofit2.Response<Unit>
 
-    // Donations (Trakteer)
     @GET("rest/v1/donations")
     suspend fun getDonations(
         @Query("order") order: String = "created_at.desc",
@@ -380,6 +377,55 @@ interface CloudinaryApi {
     ): CloudinaryResponse
 }
 
+// ─── Cache Interceptor untuk Anime API (Sanka) ───────────────────────────────
+
+/**
+ * Online: paksa cache 1 jam — request ke Sanka dilakukan max 1x per jam
+ * untuk endpoint yang sama. Setelah 1 jam, baru fetch ulang ke server.
+ */
+class OnlineCacheInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val response = chain.proceed(chain.request())
+        val cacheControl = CacheControl.Builder()
+            .maxAge(1, TimeUnit.HOURS)
+            .build()
+        return response.newBuilder()
+            .header("Cache-Control", cacheControl.toString())
+            .removeHeader("Pragma") // Pragma: no-cache bisa block OkHttp cache
+            .build()
+    }
+}
+
+/**
+ * Offline: kalau tidak ada koneksi, pakai cache sampai 7 hari.
+ * User tetap bisa lihat data lama daripada error.
+ */
+class OfflineCacheInterceptor(private val context: Context) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = if (!isNetworkAvailable(context)) {
+            val cacheControl = CacheControl.Builder()
+                .maxStale(7, TimeUnit.DAYS)
+                .build()
+            chain.request().newBuilder()
+                .cacheControl(cacheControl)
+                .build()
+        } else {
+            chain.request()
+        }
+        return chain.proceed(request)
+    }
+
+    private fun isNetworkAvailable(context: Context): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as android.net.ConnectivityManager
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+}
+
+// ─── Network Client ───────────────────────────────────────────────────────────
+
 object NetworkClient {
     private val moshi = com.squareup.moshi.Moshi.Builder()
         .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
@@ -389,35 +435,50 @@ object NetworkClient {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
+    // OkHttpClient khusus Anime API — dengan cache 50MB
+    fun animeOkHttpClient(context: Context): OkHttpClient {
+        val cacheDir = File(context.cacheDir, "anime_api_cache")
+        val cache = Cache(cacheDir, 50L * 1024 * 1024) // 50 MB
+
+        return OkHttpClient.Builder()
+            .cache(cache)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(OfflineCacheInterceptor(context)) // cek offline dulu
+            .addNetworkInterceptor(OnlineCacheInterceptor())  // set cache header saat online
+            .addInterceptor(loggingInterceptor)
+            .build()
+    }
+
+    // OkHttpClient untuk Supabase & Cloudinary — no cache (data realtime)
+    private val defaultOkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(loggingInterceptor)
         .build()
 
-    val animeApi: AnimeApi by lazy {
+    fun animeApi(context: Context): AnimeApi =
         Retrofit.Builder()
             .baseUrl("https://www.sankavollerei.com/anime/")
-            .client(okHttpClient)
+            .client(animeOkHttpClient(context))
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(AnimeApi::class.java)
-    }
 
-    val samehadakuApi: SamehadakuApi by lazy {
+    fun samehadakuApi(context: Context): SamehadakuApi =
         Retrofit.Builder()
             .baseUrl("https://www.sankavollerei.com/anime/")
-            .client(okHttpClient)
+            .client(animeOkHttpClient(context))
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(SamehadakuApi::class.java)
-    }
 
     val supabaseAuthApi: SupabaseAuthApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
-            .client(okHttpClient)
+            .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(SupabaseAuthApi::class.java)
@@ -426,7 +487,7 @@ object NetworkClient {
     val supabaseDbApi: SupabaseDbApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
-            .client(okHttpClient)
+            .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(SupabaseDbApi::class.java)
@@ -435,9 +496,22 @@ object NetworkClient {
     val cloudinaryApi: CloudinaryApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.cloudinary.com/")
-            .client(okHttpClient)
+            .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(CloudinaryApi::class.java)
     }
 }
+
+
+// ─── Cara update AnikuViewModel.kt ───────────────────────────────────────────
+// Tambahkan 2 baris ini di dalam class AnikuViewModel, setelah baris appContext:
+//
+//   private val animeApi by lazy { NetworkClient.animeApi(appContext) }
+//   private val samehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
+//
+// Lalu ganti semua:
+//   NetworkClient.animeApi.xxx  →  animeApi.xxx
+//   NetworkClient.samehadakuApi.xxx  →  samehadakuApi.xxx
+//
+// NetworkClient.supabaseDbApi dan NetworkClient.supabaseAuthApi tidak perlu diubah.
