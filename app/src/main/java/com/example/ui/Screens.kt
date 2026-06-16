@@ -1164,13 +1164,11 @@ fun HomeScreen(
                     }
                 }
                 item {
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        watchHistory.forEach { item ->
+                        items(watchHistory, key = { it.animeSlug }) { item ->
                             Column(
                                 modifier = Modifier
                                     .width(110.dp)
@@ -1222,13 +1220,11 @@ fun HomeScreen(
             // Section 1: Sedang Tayang
             item { SectionHeader(title = "Sedang Tayang", onSeeAllClick = { onSeeAllClicked("Ongoing") }) }
             item {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ongoingList.forEach { anim ->
+                    items(ongoingList, key = { it.slug }) { anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1245,13 +1241,11 @@ fun HomeScreen(
             // Section 2: Terbaru
             item { SectionHeader(title = "Terbaru", onSeeAllClick = { onSeeAllClicked("Latest") }) }
             item {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    recentList.forEach { anim ->
+                    items(recentList, key = { it.slug }) { anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1268,13 +1262,11 @@ fun HomeScreen(
             // Section 3: Terpopuler
             item { SectionHeader(title = "Terpopuler", onSeeAllClick = { onSeeAllClicked("Popular") }) }
             item {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    popularList.forEach { anim ->
+                    items(popularList, key = { it.slug }) { anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1291,13 +1283,11 @@ fun HomeScreen(
             // Section 4: Anime Movie
             item { SectionHeader(title = "Anime Movie", onSeeAllClick = { onSeeAllClicked("Movie") }) }
             item {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    moviesList.forEach { anim ->
+                    items(moviesList, key = { it.slug }) { anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
