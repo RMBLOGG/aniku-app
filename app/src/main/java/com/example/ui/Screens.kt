@@ -503,7 +503,7 @@ fun HomeScreen(
 
     if (showUpdateDialog) {
         AlertDialog(
-            onDismissRequest = { showUpdateDialog = false },
+            onDismissRequest = { /* force update - tidak bisa dismiss */ },
             containerColor = Color(0xFF1A1A2E),
             shape = RoundedCornerShape(20.dp),
             title = {
@@ -517,7 +517,7 @@ fun HomeScreen(
                         )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Update Tersedia!",
+                        text = "Update Diperlukan!",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp
@@ -527,30 +527,33 @@ fun HomeScreen(
             text = {
                 Column {
                     Text(
-                        text = "Versi terbaru $latestVersion sudah tersedia. Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.",
+                        text = "Versi terbaru $latestVersion sudah tersedia dan wajib diinstall. Perbarui sekarang untuk melanjutkan menggunakan Aniku.",
                         color = Color.LightGray,
                         fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "⚠️ Aplikasi tidak bisa digunakan sebelum update.",
+                        color = accentColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        showUpdateDialog = false
                         viewModel.downloadUpdate(downloadUrl, latestVersion)
                         Toast.makeText(context, "Download dimulai, cek notifikasi", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Download $latestVersion", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Update Sekarang $latestVersion", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showUpdateDialog = false }) {
-                    Text("Nanti", color = Color.LightGray)
-                }
-            }
+            dismissButton = null
         )
     }
 
