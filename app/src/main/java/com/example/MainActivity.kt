@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -372,7 +374,27 @@ class MainActivity : ComponentActivity() {
                         startDestination = "home",
                         modifier = Modifier.padding(
                             bottom = if (showBottomBar) 76.dp else 0.dp
-                        )
+                        ),
+                        enterTransition = {
+                            fadeIn(animationSpec = tween(220)) +
+                            slideIntoContainer(
+                                towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                                animationSpec = tween(220)
+                            )
+                        },
+                        exitTransition = {
+                            fadeOut(animationSpec = tween(150))
+                        },
+                        popEnterTransition = {
+                            fadeIn(animationSpec = tween(220))
+                        },
+                        popExitTransition = {
+                            fadeOut(animationSpec = tween(150)) +
+                            slideOutOfContainer(
+                                towards = AnimatedContentTransitionScope.SlideDirection.End,
+                                animationSpec = tween(220)
+                            )
+                        }
                     ) {
                         composable("home") {
                             HomeScreen(
