@@ -13,6 +13,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateDpAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -124,6 +126,16 @@ fun AnimeCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
+                .drawBehind {
+                    // Glow shadow bawah card
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f)),
+                            startY = size.height * 0.6f,
+                            endY = size.height + 12f
+                        )
+                    )
+                }
                 .clip(RoundedCornerShape(16.dp))
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -727,13 +739,23 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .height(460.dp)
                         ) {
+                            // Crossfade antar slide
+                            androidx.compose.animation.Crossfade(
+                                targetState = activeSlide,
+                                animationSpec = tween(600, easing = EaseInOutCubic),
+                                label = "hero_crossfade"
+                            ) { slide ->
                             // Bleeding Poster Graphic
                             AsyncImage(
-                                model = activeSlide.poster,
-                                contentDescription = activeSlide.title,
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(slide.poster)
+                                    .crossfade(400)
+                                    .build(),
+                                contentDescription = slide.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
+                            }
 
                             // Immersive Linear Gradients
                             Box(
@@ -802,14 +824,22 @@ fun HomeScreen(
                                     }
                                 }
 
+                                androidx.compose.animation.AnimatedContent(
+                                    targetState = activeSlide.title,
+                                    transitionSpec = {
+                                        fadeIn(tween(500)) togetherWith fadeOut(tween(200))
+                                    },
+                                    label = "hero_title"
+                                ) { title ->
                                 Text(
-                                    text = activeSlide.title,
+                                    text = title,
                                     color = Color.White,
                                     fontSize = 28.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                }
 
                                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -861,13 +891,23 @@ fun HomeScreen(
                                 ) {
                                     sliderItems.forEachIndexed { idx, _ ->
                                         val isSelected = idx == slideIndex
+                                        val dotWidth by animateDpAsState(
+                                            targetValue = if (isSelected) 20.dp else 6.dp,
+                                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                            label = "dot_width_$idx"
+                                        )
+                                        val dotColor by animateColorAsState(
+                                            targetValue = if (isSelected) accentColor else Color.White.copy(alpha = 0.3f),
+                                            animationSpec = tween(300),
+                                            label = "dot_color_$idx"
+                                        )
                                         Box(
                                             modifier = Modifier
                                                 .padding(horizontal = 3.dp)
-                                                .width(if (isSelected) 20.dp else 6.dp)
+                                                .width(dotWidth)
                                                 .height(6.dp)
                                                 .clip(RoundedCornerShape(50))
-                                                .background(if (isSelected) accentColor else Color.White.copy(alpha = 0.3f))
+                                                .background(dotColor)
                                                 .clickable { slideIndex = idx }
                                         )
                                     }
@@ -2120,6 +2160,7 @@ fun AnimeDetailScreen(
                 )
 
                 // Scrollable details contents
+                val detailVisible = remember { MutableTransitionState(false).apply { targetState = true } }
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -2128,6 +2169,14 @@ fun AnimeDetailScreen(
                     Spacer(modifier = Modifier.height(220.dp))
 
                     // Detail Row Cards
+                    AnimatedVisibility(
+                        visibleState = detailVisible,
+                        enter = fadeIn(tween(400, delayMillis = 100)) +
+                                slideInVertically(
+                                    initialOffsetY = { it / 6 },
+                                    animationSpec = tween(400, delayMillis = 100, easing = EaseOutCubic)
+                                )
+                    ) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2405,6 +2454,15 @@ fun AnimeDetailScreen(
                                 } else episodesList
 
                                 displayEps.forEachIndexed { i, ep ->
+                                    val epVisible = remember(ep.slug) { MutableTransitionState(false).apply { targetState = true } }
+                                    AnimatedVisibility(
+                                        visibleState = epVisible,
+                                        enter = fadeIn(tween(300, delayMillis = (i * 30).coerceAtMost(300))) +
+                                                slideInHorizontally(
+                                                    initialOffsetX = { -it / 4 },
+                                                    animationSpec = tween(300, delayMillis = (i * 30).coerceAtMost(300), easing = EaseOutCubic)
+                                                )
+                                    ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -2427,10 +2485,12 @@ fun AnimeDetailScreen(
                                         )
                                         Icon(Icons.Default.PlayArrow, contentDescription = "Tonton", tint = accentColor)
                                     }
+                                    } // end AnimatedVisibility
                                 }
                             }
                         }
                     }
+                    } // end AnimatedVisibility
                 }
 
                 // Floating controller back button
