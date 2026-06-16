@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 fun CurvedBottomNav(
@@ -125,13 +127,34 @@ private fun FlatNavItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) primaryColor.copy(alpha = 0.12f) else Color.Transparent,
+        animationSpec = tween(250, easing = EaseOutCubic),
+        label = "nav_bg"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        animationSpec = tween(250),
+        label = "nav_tint"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        animationSpec = tween(250),
+        label = "nav_text_color"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.15f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "nav_scale"
+    )
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            .background(
-                if (isSelected) primaryColor.copy(alpha = 0.12f)
-                else Color.Transparent
-            )
+            .background(bgColor)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -147,16 +170,16 @@ private fun FlatNavItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isSelected) primaryColor
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                modifier = Modifier.size(22.dp)
+                tint = iconTint,
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
             )
             Text(
                 text = label,
                 fontSize = 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) primaryColor
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                color = textColor
             )
         }
     }

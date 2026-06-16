@@ -30,8 +30,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.*
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -377,35 +376,31 @@ class MainActivity : ComponentActivity() {
                             bottom = if (showBottomBar) 76.dp else 0.dp
                         ),
                         enterTransition = {
-                            fadeIn(animationSpec = tween(350, easing = FastOutSlowInEasing)) +
-                            slideIntoContainer(
-                                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                                animationSpec = tween(350, easing = FastOutSlowInEasing),
-                                initialOffset = { it / 3 }
+                            fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
+                            scaleIn(
+                                initialScale = 0.94f,
+                                animationSpec = tween(280, easing = EaseOutCubic)
                             )
                         },
                         exitTransition = {
-                            fadeOut(animationSpec = tween(250, easing = FastOutSlowInEasing)) +
-                            slideOutOfContainer(
-                                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                                animationSpec = tween(250, easing = FastOutSlowInEasing),
-                                targetOffset = { -it / 5 }
+                            fadeOut(animationSpec = tween(200, easing = EaseInCubic)) +
+                            scaleOut(
+                                targetScale = 0.97f,
+                                animationSpec = tween(200, easing = EaseInCubic)
                             )
                         },
                         popEnterTransition = {
-                            fadeIn(animationSpec = tween(350, easing = FastOutSlowInEasing)) +
-                            slideIntoContainer(
-                                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                                animationSpec = tween(350, easing = FastOutSlowInEasing),
-                                initialOffset = { -it / 5 }
+                            fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
+                            scaleIn(
+                                initialScale = 0.97f,
+                                animationSpec = tween(280, easing = EaseOutCubic)
                             )
                         },
                         popExitTransition = {
-                            fadeOut(animationSpec = tween(250, easing = FastOutSlowInEasing)) +
-                            slideOutOfContainer(
-                                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                                animationSpec = tween(250, easing = FastOutSlowInEasing),
-                                targetOffset = { it / 3 }
+                            fadeOut(animationSpec = tween(200, easing = EaseInCubic)) +
+                            scaleOut(
+                                targetScale = 0.94f,
+                                animationSpec = tween(200, easing = EaseInCubic)
                             )
                         }
                     ) {
