@@ -13,8 +13,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.ui.unit.animateDpAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -891,23 +889,23 @@ fun HomeScreen(
                                 ) {
                                     sliderItems.forEachIndexed { idx, _ ->
                                         val isSelected = idx == slideIndex
-                                        val dotWidth by animateDpAsState(
-                                            targetValue = if (isSelected) 20.dp else 6.dp,
+                                        val dotWidthPx by animateFloatAsState(
+                                            targetValue = if (isSelected) 20f else 6f,
                                             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
                                             label = "dot_width_$idx"
                                         )
-                                        val dotColor by animateColorAsState(
-                                            targetValue = if (isSelected) accentColor else Color.White.copy(alpha = 0.3f),
+                                        val dotAlpha by animateFloatAsState(
+                                            targetValue = if (isSelected) 1f else 0.3f,
                                             animationSpec = tween(300),
-                                            label = "dot_color_$idx"
+                                            label = "dot_alpha_$idx"
                                         )
                                         Box(
                                             modifier = Modifier
                                                 .padding(horizontal = 3.dp)
-                                                .width(dotWidth)
+                                                .width(dotWidthPx.dp)
                                                 .height(6.dp)
                                                 .clip(RoundedCornerShape(50))
-                                                .background(dotColor)
+                                                .background(if (isSelected) accentColor else Color.White.copy(alpha = dotAlpha))
                                                 .clickable { slideIndex = idx }
                                         )
                                     }
