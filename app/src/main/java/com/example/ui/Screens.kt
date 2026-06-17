@@ -2682,7 +2682,13 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
-                // Render embed stream player - otakuzone style fullscreen
+                // Kalau URL adalah direct MP4 (hasil resolve Filedon) → ExoPlayer
+                if (activeStreamUrl!!.contains("r2.cloudflarestorage.com") || activeStreamUrl!!.endsWith(".mp4")) {
+                    ExoPlayerScreen(
+                        mp4Url = activeStreamUrl!!,
+                        title = episodeTitle ?: ""
+                    )
+                } else {
                 var customView by remember { mutableStateOf<android.view.View?>(null) }
                 var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
@@ -2849,6 +2855,7 @@ fun WatchScreen(
                     }
                     } // end Box wrapper
                 }
+                } // end else (WebView block)
             }
         }
 

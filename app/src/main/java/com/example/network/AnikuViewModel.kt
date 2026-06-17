@@ -749,7 +749,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val serverId = firstUrl.removePrefix("samehadaku_server:")
                             try {
                                 val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
-                                _activeStreamUrl.value = linkRes.data?.url ?: firstUrl
+                                val resolvedUrl = linkRes.data?.url
+                                if (!resolvedUrl.isNullOrEmpty() && resolvedUrl.contains("filedon.co/embed")) {
+                                    // Resolve Filedon embed → direct MP4
+                                    try {
+                                        val mp4Res = retryIO { NetworkClient.resolverApi.resolve(resolvedUrl) }
+                                        _activeStreamUrl.value = mp4Res.mp4 ?: resolvedUrl
+                                    } catch (e: Exception) {
+                                        _activeStreamUrl.value = resolvedUrl
+                                    }
+                                } else {
+                                    _activeStreamUrl.value = resolvedUrl ?: firstUrl
+                                }
                             } catch (e: Exception) {
                                 _activeStreamUrl.value = firstUrl
                             }
@@ -794,7 +805,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                         val resolvedUrl = linkRes.data?.url
                         if (!resolvedUrl.isNullOrEmpty()) {
-                            _activeStreamUrl.value = resolvedUrl
+                            if (resolvedUrl.contains("filedon.co/embed")) {
+                                try {
+                                    val mp4Res = retryIO { NetworkClient.resolverApi.resolve(resolvedUrl) }
+                                    _activeStreamUrl.value = mp4Res.mp4 ?: resolvedUrl
+                                } catch (e: Exception) {
+                                    _activeStreamUrl.value = resolvedUrl
+                                }
+                            } else {
+                                _activeStreamUrl.value = resolvedUrl
+                            }
                         } else {
                             Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
                             _activeStreamUrl.value = rawUrl

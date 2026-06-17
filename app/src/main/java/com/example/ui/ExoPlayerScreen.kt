@@ -18,46 +18,21 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.example.network.NetworkClient
-import kotlinx.coroutines.launch
 
 @OptIn(UnstableApi::class)
 @Composable
 fun ExoPlayerScreen(
-    filedonEmbedUrl: String,
+    mp4Url: String,
     title: String = "",
-    onBack: () -> Unit = {}
+    onBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    var mp4Url by remember { mutableStateOf<String?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
-    var errorMsg by remember { mutableStateOf<String?>(null) }
 
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
-    }
-
-    // Resolve filedon embed → MP4
-    LaunchedEffect(filedonEmbedUrl) {
-        coroutineScope.launch {
-            try {
-                val response = NetworkClient.resolverApi.resolve(filedonEmbedUrl)
-                if (response.mp4 != null) {
-                    mp4Url = response.mp4
-                    val mediaItem = MediaItem.fromUri(response.mp4)
-                    exoPlayer.setMediaItem(mediaItem)
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = true
-                } else {
-                    errorMsg = response.error ?: "Gagal mendapatkan URL video"
-                }
-            } catch (e: Exception) {
-                errorMsg = e.message ?: "Terjadi kesalahan"
-            } finally {
-                isLoading = false
-            }
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(mp4Url))
+            prepare()
+            playWhenReady = true
         }
     }
 
@@ -70,56 +45,46 @@ fun ExoPlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Top bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White
-                )
-            }
-            if (title.isNotEmpty()) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+        if (onBack != null || title.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                }
+                if (title.isNotEmpty()) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
         }
 
-        Box(
+        AndroidView(
+            factory = {
+                PlayerView(it).apply {
+                    player = exoPlayer
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f),
-            contentAlignment = Alignment.Center
-        ) {
-            when {
-                isLoading -> CircularProgressIndicator(color = Color.White)
-                errorMsg != null -> Text(
-                    text = errorMsg!!,
-                    color = Color.Red,
-                    modifier = Modifier.padding(16.dp)
-                )
-                else -> AndroidView(
-                    factory = {
-                        PlayerView(it).apply {
-                            player = exoPlayer
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
+                .aspectRatio(16f / 9f)
+        )
     }
 }
