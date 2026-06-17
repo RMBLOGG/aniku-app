@@ -462,24 +462,92 @@ fun relativeTimeShort(createdAt: String): String {
 }
 
 @Composable
+fun ShimmerAnimeCard() {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+    val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.12f)
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(shimmerColor)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(11.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(shimmerColor)
+        )
+        Spacer(modifier = Modifier.height(5.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .height(9.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(shimmerColor)
+        )
+    }
+}
+
+@Composable
 fun LoadingScreen(message: String = "Memuat data anime...") {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 2.5.dp,
-                modifier = Modifier.size(36.dp)
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(12) { index ->
+            val infiniteTransition = rememberInfiniteTransition(label = "shimmerDelay$index")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.35f,
+                targetValue = 0.85f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = FastOutSlowInEasing, delayMillis = index * 80),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha$index"
             )
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                letterSpacing = 0.sp
-            )
+            val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.12f)
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(shimmerColor)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(11.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerColor)
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(9.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerColor)
+                )
+            }
         }
     }
 }
