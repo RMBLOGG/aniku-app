@@ -15,6 +15,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -1797,6 +1799,30 @@ fun ScheduleScreen(
     val isLoading by viewModel.isScheduleLoading.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
+    val days = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
+    val activeDayIndex = days.indexOf(activeDay).coerceAtLeast(0)
+
+    val pagerState = rememberPagerState(
+        initialPage = activeDayIndex,
+        pageCount = { days.size }
+    )
+
+    // Sync: swipe → update ViewModel
+    LaunchedEffect(pagerState.currentPage) {
+        val swipedDay = days[pagerState.currentPage]
+        if (swipedDay != activeDay) {
+            viewModel.selectDay(swipedDay)
+        }
+    }
+
+    // Sync: tap tab → scroll pager
+    LaunchedEffect(activeDay) {
+        val idx = days.indexOf(activeDay).coerceAtLeast(0)
+        if (pagerState.currentPage != idx) {
+            pagerState.animateScrollToPage(idx)
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (scheduleMap.isEmpty()) {
             viewModel.fetchScheduleData()
@@ -1808,7 +1834,7 @@ fun ScheduleScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Day selector header (horizontal scroll)
+        // Day selector header — tap untuk pindah, swipe juga bisa
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1818,7 +1844,6 @@ fun ScheduleScreen(
                 .padding(vertical = 12.dp, horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val days = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
             days.forEach { d ->
                 val isSelected = activeDay == d
                 Box(
@@ -1841,78 +1866,84 @@ fun ScheduleScreen(
         if (isLoading) {
             LoadingScreen("Memuat jadwal tayang...")
         } else {
-            val activeDayList = scheduleMap[activeDay] ?: emptyList()
-            if (activeDayList.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(52.dp), tint = Color.Gray)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Hari $activeDay tidak ada jadwal tayang.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
-                }
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(activeDayList, key = { it.slug }) { anim ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable { onNavigateToDetail(anim.slug) }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Small poster
-                            AsyncImage(
-                                model = anim.poster,
-                                contentDescription = anim.title,
-                                contentScale = ContentScale.Crop,
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                val day = days[page]
+                val dayList = scheduleMap[day] ?: emptyList()
+
+                if (dayList.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(52.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Hari $day tidak ada jadwal tayang.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                    }
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(dayList, key = { it.slug }) { anim ->
+                            Row(
                                 modifier = Modifier
-                                    .size(width = 60.dp, height = 90.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = anim.title,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { onNavigateToDetail(anim.slug) }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = anim.poster,
+                                    contentDescription = anim.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(width = 60.dp, height = 90.dp)
+                                        .clip(RoundedCornerShape(12.dp))
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                anim.episode?.let { ep ->
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Tayang: $ep",
-                                        color = accentColor,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
+                                        text = anim.title,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    anim.episode?.let { ep ->
+                                        Text(
+                                            text = "Tayang: $ep",
+                                            color = accentColor,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    anim.type?.let { t ->
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = t,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    }
                                 }
-                                anim.type?.let { t ->
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = t,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 11.sp
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Play",
+                                    tint = accentColor,
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .size(24.dp)
+                                )
                             }
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Play",
-                                tint = accentColor,
-                                modifier = Modifier
-                                    .padding(end = 8.dp)
-                                    .size(24.dp)
-                            )
                         }
                     }
                 }
