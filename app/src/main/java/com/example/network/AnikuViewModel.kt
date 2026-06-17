@@ -88,6 +88,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _updateCheckMessage = MutableStateFlow("")
     val updateCheckMessage: StateFlow<String> = _updateCheckMessage.asStateFlow()
 
+    private val _releaseBody = MutableStateFlow("")
+    val releaseBody: StateFlow<String> = _releaseBody.asStateFlow()
+
     // Bookmarks state (local)
     private val _bookmarks = MutableStateFlow<List<BookmarkedAnime>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkedAnime>> = _bookmarks.asStateFlow()
@@ -299,6 +302,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     } else ""
                     _latestVersion.value = tagName
                     _downloadUrl.value = dlUrl
+                    _releaseBody.value = json.optString("body", "")
                     val latestClean = tagName.trimStart('v')
                     val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.3.4" }
 

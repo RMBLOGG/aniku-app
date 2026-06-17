@@ -597,6 +597,7 @@ fun HomeScreen(
     val updateAvailable by viewModel.updateAvailable.collectAsState()
     val latestVersion by viewModel.latestVersion.collectAsState()
     val downloadUrl by viewModel.downloadUrl.collectAsState()
+    val releaseBody by viewModel.releaseBody.collectAsState()
     var showUpdateDialog by remember { mutableStateOf(false) }
 
     // Tampilkan popup sekali saat update tersedia
@@ -628,6 +629,7 @@ fun HomeScreen(
                 }
             },
             text = {
+                var showChangelog by remember { mutableStateOf(false) }
                 Column {
                     Text(
                         text = "Versi terbaru $latestVersion sudah tersedia dan wajib diinstall. Perbarui sekarang untuk melanjutkan menggunakan Aniku.",
@@ -641,6 +643,116 @@ fun HomeScreen(
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                    if (releaseBody.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        // Tombol toggle changelog
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White.copy(alpha = 0.07f))
+                                .clickable { showChangelog = !showChangelog }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Lihat perubahan",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = if (showChangelog) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        // Expandable changelog
+                        androidx.compose.animation.AnimatedVisibility(visible = showChangelog) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White.copy(alpha = 0.05f))
+                                    .padding(12.dp)
+                            ) {
+                                val markdownLines = releaseBody.lines()
+                                markdownLines.forEach { line ->
+                                    when {
+                                        line.startsWith("### ") -> {
+                                            Text(
+                                                text = line.removePrefix("### "),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+                                            )
+                                        }
+                                        line.startsWith("## ") -> {
+                                            Text(
+                                                text = line.removePrefix("## "),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+                                            )
+                                        }
+                                        line.startsWith("- ") -> {
+                                            val raw = line.removePrefix("- ")
+                                            val annotated = buildAnnotatedString {
+                                                append("• ")
+                                                var i = 0
+                                                while (i < raw.length) {
+                                                    if (raw[i] == '*' && i + 1 < raw.length && raw[i + 1] == '*') {
+                                                        val end = raw.indexOf("**", i + 2)
+                                                        if (end != -1) {
+                                                            withStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
+                                                                append(raw.substring(i + 2, end))
+                                                            }
+                                                            i = end + 2
+                                                        } else { append(raw[i]); i++ }
+                                                    } else { append(raw[i]); i++ }
+                                                }
+                                            }
+                                            Text(
+                                                text = annotated,
+                                                color = Color.LightGray,
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.padding(bottom = 2.dp)
+                                            )
+                                        }
+                                        line.startsWith("---") -> {
+                                            HorizontalDivider(
+                                                color = Color.White.copy(alpha = 0.15f),
+                                                modifier = Modifier.padding(vertical = 6.dp)
+                                            )
+                                        }
+                                        line.startsWith("> ") -> {
+                                            Text(
+                                                text = line.removePrefix("> "),
+                                                color = Color.LightGray.copy(alpha = 0.7f),
+                                                fontSize = 11.sp,
+                                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                                modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
+                                            )
+                                        }
+                                        line.isBlank() -> Spacer(modifier = Modifier.height(2.dp))
+                                        else -> {
+                                            Text(
+                                                text = line,
+                                                color = Color.LightGray,
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.padding(bottom = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -2405,11 +2517,15 @@ fun AnimeDetailScreen(
                             ) {
                                 Button(
                                     onClick = {
-                                        val firstEp = d.episodes?.firstOrNull()?.slug
-                                        if (!firstEp.isNullOrEmpty()) {
-                                            onNavigateToWatch(firstEp, d.title)
+                                        if (!isLoggedIn) {
+                                            showLoginDialog = true
                                         } else {
-                                            Toast.makeText(context, "Tidak ada episode tersedia", Toast.LENGTH_SHORT).show()
+                                            val firstEp = d.episodes?.firstOrNull()?.slug
+                                            if (!firstEp.isNullOrEmpty()) {
+                                                onNavigateToWatch(firstEp, d.title)
+                                            } else {
+                                                Toast.makeText(context, "Tidak ada episode tersedia", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     },
                                     modifier = Modifier.weight(1f).testTag("detail_play_btn"),
@@ -2604,7 +2720,7 @@ fun AnimeDetailScreen(
                                                         .aspectRatio(1.3f)
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                                                        .clickable { onNavigateToWatch(ep.slug, d.title) },
+                                                        .clickable { if (!isLoggedIn) showLoginDialog = true else onNavigateToWatch(ep.slug, d.title) },
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text("E$epNum", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
