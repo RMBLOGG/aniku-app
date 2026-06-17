@@ -2,7 +2,7 @@ name: Notify Telegram on Release
 
 on:
   release:
-    types: [published, edited]
+    types: [published]
 
 jobs:
   notify:
@@ -13,11 +13,13 @@ jobs:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TAG: ${{ github.event.release.tag_name }}
-          BODY: ${{ github.event.release.body }}
-          DOWNLOAD_URL: https://aniku-downloads.vercel.app/
+          NAME: ${{ github.event.release.name }}
         run: |
-          TEXT="$(printf '🎌 <b>Aniku %s - Update Baru!</b>\n\n%s\n\n📲 Download: %s' "$TAG" "$BODY" "$DOWNLOAD_URL")"
+          MESSAGE="🎌 *${NAME}* telah dirilis!
+
+Download: https://aniku-downloads.vercel.app/"
+
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${CHAT_ID}" \
-            -d "parse_mode=HTML" \
-            --data-urlencode "text=${TEXT}"
+            -d chat_id="${CHAT_ID}" \
+            -d text="${MESSAGE}" \
+            -d parse_mode="Markdown"
