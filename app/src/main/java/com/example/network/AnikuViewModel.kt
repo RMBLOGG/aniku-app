@@ -714,6 +714,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun clearStreamState() {
+        _streams.value = emptyList()
+        _activeStreamUrl.value = null
+        _streamEpisodeTitle.value = null
+        _streamError.value = null
+        _isStreamLoading.value = false
+    }
+
     fun loadEpisodeStream(slug: String) {
         _isStreamLoading.value = true
         _streams.value = emptyList()

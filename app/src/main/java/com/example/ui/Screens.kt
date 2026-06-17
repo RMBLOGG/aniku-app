@@ -1238,7 +1238,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(watchHistory, key = { it.animeSlug }) { item ->
+                        items(watchHistory, key = { "${it.animeSlug}_${it.episodeSlug}" }) { item ->
                             Column(
                                 modifier = Modifier
                                     .width(110.dp)
@@ -2676,6 +2676,13 @@ fun WatchScreen(
                 episodeSlug = currentEpisodeSlug,
                 episodeTitle = title
             )
+        }
+    }
+
+    // Clear stream state saat WatchScreen ditinggal
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearStreamState()
         }
     }
 
