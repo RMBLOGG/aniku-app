@@ -2532,7 +2532,6 @@ fun AnimeDetailScreen(
                             if (episodesList.isEmpty()) {
                                 Text(text = "Belum ada episode tersedia.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 13.sp)
                             } else {
-                                // Grouped pagination
                                 val groupSize = 30
                                 val totalEps = episodesList.size
                                 val groups = if (totalEps > groupSize) {
@@ -2541,14 +2540,23 @@ fun AnimeDetailScreen(
                                         Pair(start, end)
                                     }
                                 } else null
-
                                 var selectedGroup by remember(episodesList) { mutableStateOf(0) }
 
-                                // Group tabs
+                                // Header
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Semua Episode", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onBackground)
+                                    Text("$totalEps Ep", fontSize = 12.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f))
+                                }
+
+                                // Group range tabs
                                 if (groups != null && groups.size > 1) {
                                     LazyRow(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.padding(bottom = 10.dp)
+                                        modifier = Modifier.padding(bottom = 12.dp)
                                     ) {
                                         itemsIndexed(groups) { idx, (start, end) ->
                                             val epStart = episodesList.getOrNull(start)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (start + 1)
@@ -2556,11 +2564,8 @@ fun AnimeDetailScreen(
                                             val isSelected = selectedGroup == idx
                                             Box(
                                                 modifier = Modifier
-                                                    .background(
-                                                        if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .border(1.dp, if (isSelected) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
                                                     .clickable { selectedGroup = idx }
                                                     .padding(horizontal = 14.dp, vertical = 7.dp)
                                             ) {
@@ -2575,45 +2580,40 @@ fun AnimeDetailScreen(
                                     }
                                 }
 
-                                // Display episodes for selected group
+                                // Grid pills
                                 val displayEps = if (groups != null) {
                                     val (start, end) = groups[selectedGroup]
                                     episodesList.subList(start, end + 1)
                                 } else episodesList
 
-                                displayEps.forEachIndexed { i, ep ->
-                                    val epVisible = remember(ep.slug) { MutableTransitionState(false).apply { targetState = true } }
-                                    AnimatedVisibility(
-                                        visibleState = epVisible,
-                                        enter = fadeIn(tween(300, delayMillis = (i * 30).coerceAtMost(300))) +
-                                                slideInHorizontally(
-                                                    initialOffsetX = { -it / 4 },
-                                                    animationSpec = tween(300, delayMillis = (i * 30).coerceAtMost(300), easing = EaseOutCubic)
-                                                )
-                                    ) {
+                                val cols = 5
+                                val rowCount = (displayEps.size + cols - 1) / cols
+                                for (row in 0 until rowCount) {
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            .clickable {
-                                                onNavigateToWatch(ep.slug, d.title)
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 14.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(
-                                            text = ep.name,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Icon(Icons.Default.PlayArrow, contentDescription = "Tonton", tint = accentColor)
+                                        for (col in 0 until cols) {
+                                            val epIndex = row * cols + col
+                                            if (epIndex < displayEps.size) {
+                                                val ep = displayEps[epIndex]
+                                                val epNum = ep.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .aspectRatio(1.3f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                        .clickable { onNavigateToWatch(ep.slug, d.title) },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("E$epNum", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                }
+                                            } else {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
                                     }
-                                    } // end AnimatedVisibility
                                 }
                             }
                         }
@@ -3037,7 +3037,7 @@ fun WatchScreen(
         Spacer(modifier = Modifier.height(12.dp))
         if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-        // Episode List selector - Grouped Pagination (Bstation style)
+        // Episode List — Bstation grid pill style
         if (!isFullscreen) {
         val eps = detail?.episodes ?: emptyList()
         val groupSize = 30
@@ -3051,27 +3051,41 @@ fun WatchScreen(
 
         var selectedGroup by remember(eps) { mutableStateOf(0) }
 
+        // Auto-select group containing current episode
+        LaunchedEffect(currentEpisodeSlug, eps) {
+            if (groups != null) {
+                val idx = eps.indexOfFirst { it.slug == currentEpisodeSlug }
+                if (idx >= 0) selectedGroup = idx / groupSize
+            }
+        }
+
+        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Daftar Episode ($totalEps)",
+                text = "Semua Episode",
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
+            Text(
+                text = "$totalEps Episode",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+                fontSize = 12.sp
+            )
         }
 
-        // Group tabs (only show if > 30 episodes)
+        // Group range tabs
         if (groups != null && groups.size > 1) {
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = 10.dp)
             ) {
                 itemsIndexed(groups) { idx, (start, end) ->
                     val epStart = eps.getOrNull(start)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (start + 1)
@@ -3079,11 +3093,8 @@ fun WatchScreen(
                     val isSelected = selectedGroup == idx
                     Box(
                         modifier = Modifier
-                            .background(
-                                if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(8.dp)
-                            )
-                            .border(1.dp, if (isSelected) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
                             .clickable { selectedGroup = idx }
                             .padding(horizontal = 14.dp, vertical = 7.dp)
                     ) {
@@ -3098,38 +3109,53 @@ fun WatchScreen(
             }
         }
 
-        // Episode items for selected group
+        // Grid pills
         val displayEps = if (groups != null) {
             val (start, end) = groups[selectedGroup]
             eps.subList(start, end + 1)
         } else eps
 
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
         ) {
-            itemsIndexed(displayEps) { idx, item ->
+            itemsIndexed(displayEps) { _, item ->
                 val isActive = item.slug == currentEpisodeSlug
-                Row(
+                val epNum = item.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .aspectRatio(1.2f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isActive) accentColor.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, if (isActive) accentColor else Color.Transparent, RoundedCornerShape(8.dp))
-                        .clickable { currentEpisodeSlug = item.slug }
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(
+                            if (isActive) accentColor
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .border(
+                            1.dp,
+                            if (isActive) accentColor else Color.Transparent,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { currentEpisodeSlug = item.slug },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = item.name,
-                        color = if (isActive) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    if (isActive) {
-                        Text("Memutar", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (isActive) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Text(
+                            text = "E$epNum",
+                            color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                        )
                     }
                 }
             }
