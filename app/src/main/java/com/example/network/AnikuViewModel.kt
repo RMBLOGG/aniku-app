@@ -175,7 +175,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val exploreHasNext: StateFlow<Boolean> = _exploreHasNext.asStateFlow()
 
     // Schedule state
-    private val _selectedDay = MutableStateFlow("Minggu") // Minggu | Senin | Selasa | Rabu | Kamis | Jumat | Sabtu
+    private val _selectedDay = MutableStateFlow(run {
+        val dayMap = mapOf(
+            java.util.Calendar.SUNDAY to "Minggu",
+            java.util.Calendar.MONDAY to "Senin",
+            java.util.Calendar.TUESDAY to "Selasa",
+            java.util.Calendar.WEDNESDAY to "Rabu",
+            java.util.Calendar.THURSDAY to "Kamis",
+            java.util.Calendar.FRIDAY to "Jumat",
+            java.util.Calendar.SATURDAY to "Sabtu"
+        )
+        dayMap[java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)] ?: "Minggu"
+    })
     val selectedDay: StateFlow<String> = _selectedDay.asStateFlow()
 
     private val _scheduleMap = MutableStateFlow<Map<String, List<AnimeRaw>>>(emptyMap())

@@ -1525,6 +1525,14 @@ fun ExploreScreen(
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
 
+    val tabs = listOf("Ongoing", "Completed", "Movie", "Latest")
+    val activeTabIndex = tabs.indexOf(activeTab).coerceAtLeast(0)
+
+    val pagerState = rememberPagerState(
+        initialPage = activeTabIndex,
+        pageCount = { tabs.size }
+    )
+
     val gridState = rememberLazyGridState()
     val listState = rememberLazyListState()
 
@@ -1545,10 +1553,25 @@ fun ExploreScreen(
         }
     }
 
-    // Trigger loading if empty
     LaunchedEffect(Unit) {
         if (itemsList.isEmpty()) {
             viewModel.loadExplorePage()
+        }
+    }
+
+    // Sync: swipe → update ViewModel (load data tab baru)
+    LaunchedEffect(pagerState.currentPage) {
+        val swipedTab = tabs[pagerState.currentPage]
+        if (swipedTab != activeTab) {
+            viewModel.setExploreTab(swipedTab)
+        }
+    }
+
+    // Sync: tap tab → scroll pager
+    LaunchedEffect(activeTab) {
+        val idx = tabs.indexOf(activeTab).coerceAtLeast(0)
+        if (pagerState.currentPage != idx) {
+            pagerState.animateScrollToPage(idx)
         }
     }
 
@@ -1557,7 +1580,7 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Tab Filters Ongoing | Completed | Movie | Latest
+        // Tab Filters Ongoing | Completed | Movie | Terbaru
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1566,7 +1589,6 @@ fun ExploreScreen(
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            val tabs = listOf("Ongoing", "Completed", "Movie", "Latest")
             tabs.forEach { tabName ->
                 val isSelected = activeTab == tabName && activeGenre == null
                 Box(
@@ -1577,7 +1599,7 @@ fun ExploreScreen(
                         .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = if (tabName == "Movie") "Movie" else if (tabName == "Latest") "Terbaru" else tabName,
+                        text = if (tabName == "Latest") "Terbaru" else tabName,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -1586,7 +1608,7 @@ fun ExploreScreen(
             }
         }
 
-        // Horizontal Genreschips
+        // Genre chips — berlaku untuk tab aktif
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1609,7 +1631,6 @@ fun ExploreScreen(
                     )
                 }
             }
-
             items(genresList, key = { it.slug }) { gen ->
                 val isSelected = activeGenre == gen.slug
                 Box(
@@ -1629,71 +1650,77 @@ fun ExploreScreen(
             }
         }
 
-        // Dynamic Grid / List
-        Box(modifier = Modifier.weight(1f)) {
-            if (itemsList.isEmpty() && !isLoading) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Daftar anime kosong.", color = Color.Gray)
-                }
-            } else if (gridLayout == "List") {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(itemsList, key = { it.slug }) { anim ->
-                        AnimeListCard(
-                            anime = anim,
-                            accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                            isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
-                        )
+        // HorizontalPager — konten per tab
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f),
+            userScrollEnabled = activeGenre == null // nonaktifkan swipe saat filter genre aktif
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (itemsList.isEmpty() && !isLoading) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Daftar anime kosong.", color = Color.Gray)
                     }
-                    if (isLoading) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                } else if (gridLayout == "List") {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(itemsList, key = { it.slug }) { anim ->
+                            AnimeListCard(
+                                anime = anim,
+                                accentColor = accentColor,
+                                onClick = { onNavigateToDetail(anim.slug) },
+                                isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                                onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                                isLoggedIn = isLoggedIn,
+                                onLoginRequired = { onLoginRequired() }
+                            )
+                        }
+                        if (isLoading) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                val columns = if (gridLayout == "3") 3 else 2
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(columns),
-                    state = gridState,
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(itemsList, key = { it.slug }) { anim ->
-                        AnimeCard(
-                            anime = anim,
-                            accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    if (isLoading) {
-                        item(span = { GridItemSpan(columns) }) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                } else {
+                    val columns = if (gridLayout == "3") 3 else 2
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(columns),
+                        state = gridState,
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(itemsList, key = { it.slug }) { anim ->
+                            AnimeCard(
+                                anime = anim,
+                                accentColor = accentColor,
+                                onClick = { onNavigateToDetail(anim.slug) },
+                                isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                                onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        if (isLoading) {
+                            item(span = { GridItemSpan(columns) }) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
+                                }
                             }
                         }
                     }
