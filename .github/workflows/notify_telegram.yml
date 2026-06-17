@@ -9,21 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Send Telegram Message
-        env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TAG: ${{ github.event.release.tag_name }}
-          NOTES: ${{ github.event.release.body }}
         run: |
-          SAFE_NOTES=$(echo "$NOTES" | sed 's/[_*[\]()~`>#+\-=|{}.!]/\\&/g')
-          SAFE_TAG=$(echo "$TAG" | sed 's/[_*[\]()~`>#+\-=|{}.!]/\\&/g')
-          MESSAGE="🎌 *Aniku ${SAFE_TAG} — Update Baru\!*
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="HTML" \
+            --data-urlencode text="🎌 <b>Aniku ${{ github.event.release.tag_name }} — Update Baru!</b>
 
-${SAFE_NOTES}
+${{ github.event.release.body }}
 
-📲 Download: https://aniku\-downloads\.vercel\.app/"
-
-          curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
-            --data-urlencode text="$MESSAGE" \
-            -d parse_mode="MarkdownV2"
+📲 Download: https://aniku-downloads.vercel.app/"
