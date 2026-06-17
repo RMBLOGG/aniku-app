@@ -4012,6 +4012,86 @@ fun AdminPanelScreen(
 // ================================================================
 // 11. SETTINGS SCREEN
 // ================================================================
+
+@Composable
+private fun AnimatedSettingsItem(
+    index: Int,
+    content: @Composable () -> Unit
+) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(index * 60L)
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(300)) +
+                slideInVertically(
+                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                    initialOffsetY = { it / 3 }
+                )
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun SettingsNavCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconBgColor: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String = ""
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(iconBgColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = iconBgColor, modifier = Modifier.size(22.dp))
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 12.sp)
+            }
+            Icon(
+                Icons.Default.ArrowForward,
+                contentDescription = null,
+                tint = accentColor.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun SettingsScreen(
     viewModel: AnikuViewModel,
@@ -4019,9 +4099,6 @@ fun SettingsScreen(
     onBack: () -> Unit
 ) {
     val isDark by viewModel.isDark.collectAsState()
-    val textScale by viewModel.textSize.collectAsState()
-    val activeAccent by viewModel.accentColorName.collectAsState()
-    val activeGridLayout by viewModel.gridLayout.collectAsState()
     val sess by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
@@ -4030,452 +4107,564 @@ fun SettingsScreen(
     val downloadUrl by viewModel.downloadUrl.collectAsState()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
     val updateCheckMessage by viewModel.updateCheckMessage.collectAsState()
+    val currentSource by viewModel.dataSource.collectAsState()
 
-    Column(
+    // Header title scroll parallax
+    val scrollState = rememberScrollState()
+    val headerAlpha by animateFloatAsState(
+        targetValue = if (scrollState.value > 80) 1f else 0f,
+        animationSpec = tween(200), label = "headerAlpha"
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // TopHeader
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Pengaturan Aplikasi",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .verticalScroll(scrollState)
         ) {
-            // Section A: Current session Auth Status Block
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (sess.token.isNullOrEmpty()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Gunakan Akun Untuk Profil & Admin", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 11.sp)
-                            Text("Anda Masuk Sebagai Tamu", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Button(
-                            onClick = { navController.navigate("auth") },
-                            colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.testTag("settings_login_btn")
-                        ) {
-                            Text("Masuk", fontWeight = FontWeight.Bold)
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = sess.avatarUrl,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surface)
-                             )
-                             Spacer(modifier = Modifier.width(16.dp))
-                             Column {
-                                 Text(text = sess.username ?: sess.email ?: "Pengguna", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                 Text(text = "Pangkat: ${if (sess.isAdmin) "Admin" else "Member"}", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                             }
-                        }
-                        Button(
-                            onClick = { navController.navigate("profile") },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.testTag("settings_profile_btn")
-                        ) {
-                            Text("Ubah Profil")
-                        }
-                        if (!sess.token.isNullOrEmpty()) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    viewModel.logout {}
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Red.copy(alpha = 0.15f),
-                                    contentColor = Color.Red
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Keluar")
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Section B: User Admin Access Toggle Card
-            if (!sess.token.isNullOrEmpty() && sess.isAdmin) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF2E1A1A) else Color(0xFFFFEBEE)),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                        .clickable { navController.navigate("admin") }
-                        .testTag("settings_admin_panel_btn")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(18.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color.Red, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Panel Kontrol Admin Terdeteksi", color = if (isDark) Color.White else Color(0xFFC62828), fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text("Klik untuk kelola Users, Banner Slider, & Blacklist", color = if (isDark) Color.LightGray else Color(0xFFE53935), fontSize = 12.sp)
-                        }
-                        Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color.Red)
-                    }
-                }
-            }
-
-            // Section C: Tampilan & Tema navigation card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
+            // ── Hero Header ──────────────────────────────────────────
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { navController.navigate("tampilan") }
-                    .testTag("settings_tampilan_btn")
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.18f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
+                    .statusBarsPadding()
+                    .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 20.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Palette, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Tampilan & Tema", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Tema, ukuran tulisan, layout kartu, & warna aksen", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
-                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-
-            // Section C2: Sumber Data (navigable)
-            val currentSource by viewModel.dataSource.collectAsState()
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navController.navigate("sumber_data") }
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Apps, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Sumber Data", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column {
                         Text(
-                            "Aktif: $currentSource",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            fontSize = 12.sp
+                            text = "Pengaturan",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                    }
-                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-
-            // Section D: Keamanan
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { navController.navigate("keamanan") }
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Security, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Keamanan", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("Kunci aplikasi, PIN, sidik jari & info sesi", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    }
-                    Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-
-            // Section G: Support donation card (Saweria + Trakteer)
-            Card(
-                colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0xFF162516) else Color(0xFFE8F5E9)),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    // Header
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF4CAF50)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("☕", fontSize = 20.sp)
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Dukung Aniku",
-                                color = if (isDark) Color.White else Color(0xFF2E7D32),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                text = "Bantuan Anda sangat berarti bagi kelangsungan aplikasi",
-                                color = if (isDark) Color.LightGray else Color(0xFF43A047),
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = Color(0xFF4CAF50).copy(alpha = 0.2f))
-                    Spacer(modifier = Modifier.height(14.dp))
-                    // Tombol Saweria
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isDark) Color(0xFF1E3A1E) else Color(0xFFD0F0D0))
-                            .clickable {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime"))
-                                context.startActivity(browserIntent)
-                            }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("☕", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Saweria",
-                                color = if (isDark) Color.White else Color(0xFF2E7D32),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                            Text(
-                                text = "saweria.co/Dayynime",
-                                color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047),
-                                fontSize = 11.sp
-                            )
-                        }
-                        Icon(
-                            Icons.Default.ArrowForward,
-                            contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Tombol Trakteer
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (isDark) Color(0xFF3A1E1E) else Color(0xFFFFE0E0))
-                            .clickable {
-                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://trakteer.id/Dayynimee"))
-                                context.startActivity(browserIntent)
-                            }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("🧡", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Trakteer",
-                                color = if (isDark) Color.White else Color(0xFF7D2E2E),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                            Text(
-                                text = "trakteer.id/Dayynimee",
-                                color = if (isDark) Color(0xFFE57373) else Color(0xFFD32F2F),
-                                fontSize = 11.sp
-                            )
-                        }
-                        Icon(
-                            Icons.Default.ArrowForward,
-                            contentDescription = null,
-                            tint = Color(0xFFE57373),
-                            modifier = Modifier.size(16.dp)
+                        Text(
+                            text = "Kelola akun & preferensi aplikasi",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                         )
                     }
                 }
             }
 
-            // Section H: Versi Aplikasi & Cek Update
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isDark) Color(0xFF1A1A2E) else Color(0xFFF3E5F5)
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+
+                // ── Section A: Profile Card ──────────────────────────
+                AnimatedSettingsItem(index = 0) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        AsyncImage(
-                            model = context.packageManager.getApplicationIcon(context.packageName),
-                            contentDescription = "App Icon",
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Versi Aplikasi",
-                                color = if (isDark) Color.White else Color(0xFF4A148C),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                text = "Aniku v${BuildConfig.VERSION_NAME}",
-                                color = if (isDark) Color.LightGray else Color(0xFF6A1B9A),
-                                fontSize = 12.sp
-                            )
-                        }
-                        if (updateAvailable) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFD32F2F))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                        if (sess.token.isNullOrEmpty()) {
+                            // Guest state
+                            Row(
+                                modifier = Modifier.padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Update Tersedia!",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = accentColor,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Masuk Sebagai Tamu",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "Login untuk akses penuh",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Button(
+                                    onClick = { navController.navigate("auth") },
+                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.testTag("settings_login_btn")
+                                ) {
+                                    Text("Masuk", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        } else {
+                            // Logged in state
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box {
+                                        AsyncImage(
+                                            model = sess.avatarUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                        )
+                                        // Online dot
+                                        Box(
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF4CAF50))
+                                                .border(2.dp, MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                                .align(Alignment.BottomEnd)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = sess.username ?: sess.email ?: "Pengguna",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(
+                                                        if (sess.isAdmin) Color(0xFFD32F2F).copy(alpha = 0.15f)
+                                                        else accentColor.copy(alpha = 0.12f)
+                                                    )
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (sess.isAdmin) "Admin" else "Member",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (sess.isAdmin) Color(0xFFD32F2F) else accentColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(14.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = { navController.navigate("profile") },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("settings_profile_btn"),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.4f))
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Ubah Profil", fontSize = 13.sp)
+                                    }
+                                    Button(
+                                        onClick = { viewModel.logout {} },
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.weight(1f),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFFD32F2F).copy(alpha = 0.12f),
+                                            contentColor = Color(0xFFEF5350)
+                                        ),
+                                        elevation = ButtonDefaults.buttonElevation(0.dp)
+                                    ) {
+                                        Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Keluar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                    // Feedback message
-                    if (updateCheckMessage.isNotEmpty()) {
-                        Text(
-                            text = updateCheckMessage,
-                            color = if (updateAvailable) Color(0xFFD32F2F) else Color(0xFF43A047),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                // ── Section B: Admin Panel ───────────────────────────
+                if (!sess.token.isNullOrEmpty() && sess.isAdmin) {
+                    AnimatedSettingsItem(index = 1) {
+                        val pulseAnim = rememberInfiniteTransition(label = "pulse")
+                        val pulseAlpha by pulseAnim.animateFloat(
+                            initialValue = 0.4f, targetValue = 0.9f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(900, easing = FastOutSlowInEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ), label = "pulseAlpha"
                         )
-                    }
-
-                    // Download button kalau ada update
-                    if (updateAvailable && downloadUrl.isNotEmpty()) {
-                        Button(
-                            onClick = {
-                                viewModel.downloadUpdate(downloadUrl, latestVersion)
-                                Toast.makeText(context, "Download dimulai, cek notifikasi", Toast.LENGTH_SHORT).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) Color(0xFF2A1515) else Color(0xFFFFF0F0)
+                            ),
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFFD32F2F).copy(alpha = pulseAlpha), RoundedCornerShape(18.dp))
+                                .clickable { navController.navigate("admin") }
+                                .testTag("settings_admin_panel_btn")
                         ) {
-                            Text(
-                                text = "Download ${latestVersion}",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-
-                    // Tombol Cek Update
-                    OutlinedButton(
-                        onClick = { viewModel.checkForUpdate() },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor),
-                        enabled = !isCheckingUpdate
-                    ) {
-                        if (isCheckingUpdate) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = accentColor,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Memeriksa...", fontSize = 14.sp)
-                        } else {
-                            Text("Cek Update", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFFD32F2F).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(22.dp))
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Panel Kontrol Admin",
+                                        color = if (isDark) Color.White else Color(0xFFC62828),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        "Kelola Users, Banner Slider, & Blacklist",
+                                        color = if (isDark) Color(0xFFEF9A9A) else Color(0xFFE53935),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
                 }
-            }
 
-            // Developer Metadata credits block
-            Column(
+                // ── Section Label: Preferensi ────────────────────────
+                AnimatedSettingsItem(index = 2) {
+                    Text(
+                        text = "PREFERENSI",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                AnimatedSettingsItem(index = 3) {
+                    SettingsNavCard(
+                        icon = Icons.Default.Palette,
+                        iconBgColor = accentColor,
+                        title = "Tampilan & Tema",
+                        subtitle = "Tema, ukuran tulisan, layout & warna aksen",
+                        onClick = { navController.navigate("tampilan") },
+                        testTag = "settings_tampilan_btn"
+                    )
+                }
+
+                AnimatedSettingsItem(index = 4) {
+                    SettingsNavCard(
+                        icon = Icons.Default.Apps,
+                        iconBgColor = Color(0xFF29B6F6),
+                        title = "Sumber Data",
+                        subtitle = "Aktif: $currentSource",
+                        onClick = { navController.navigate("sumber_data") }
+                    )
+                }
+
+                AnimatedSettingsItem(index = 5) {
+                    SettingsNavCard(
+                        icon = Icons.Default.Security,
+                        iconBgColor = Color(0xFF66BB6A),
+                        title = "Keamanan",
+                        subtitle = "Kunci aplikasi, PIN, sidik jari & info sesi",
+                        onClick = { navController.navigate("keamanan") }
+                    )
+                }
+
+                // ── Section Label: Dukung ────────────────────────────
+                AnimatedSettingsItem(index = 6) {
+                    Text(
+                        text = "DUKUNG KAMI",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                // ── Donation Card ────────────────────────────────────
+                AnimatedSettingsItem(index = 7) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF0F1F10) else Color(0xFFF1F8E9)
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("☕", fontSize = 22.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Dukung Aniku",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = if (isDark) Color.White else Color(0xFF2E7D32)
+                                    )
+                                    Text(
+                                        "Bantu kelangsungan aplikasi",
+                                        fontSize = 12.sp,
+                                        color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047)
+                                    )
+                                }
+                            }
+                            HorizontalDivider(color = Color(0xFF4CAF50).copy(alpha = 0.15f))
+                            // Saweria row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isDark) Color(0xFF1B3A1B) else Color(0xFFDCEDC8))
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime")))
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("☕", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Saweria", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (isDark) Color.White else Color(0xFF2E7D32))
+                                    Text("saweria.co/Dayynime", fontSize = 11.sp, color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
+                                }
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                            }
+                            // Trakteer row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isDark) Color(0xFF3A1A1A) else Color(0xFFFFE0E0))
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://trakteer.id/Dayynimee")))
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🧡", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Trakteer", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (isDark) Color.White else Color(0xFF7D2E2E))
+                                    Text("trakteer.id/Dayynimee", fontSize = 11.sp, color = if (isDark) Color(0xFFEF9A9A) else Color(0xFFD32F2F))
+                                }
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+
+                // ── Section Label: Aplikasi ──────────────────────────
+                AnimatedSettingsItem(index = 8) {
+                    Text(
+                        text = "APLIKASI",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                // ── Version Card ─────────────────────────────────────
+                AnimatedSettingsItem(index = 9) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDark) Color(0xFF16162A) else Color(0xFFF3E5F5)
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(
+                                    model = context.packageManager.getApplicationIcon(context.packageName),
+                                    contentDescription = "App Icon",
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Versi Aplikasi",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = if (isDark) Color.White else Color(0xFF4A148C)
+                                    )
+                                    Text(
+                                        "Aniku v${BuildConfig.VERSION_NAME}",
+                                        fontSize = 12.sp,
+                                        color = if (isDark) Color(0xFFCE93D8) else Color(0xFF6A1B9A)
+                                    )
+                                }
+                                if (updateAvailable) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFD32F2F))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Update!", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFF4CAF50).copy(alpha = 0.15f))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Terbaru ✓", color = Color(0xFF4CAF50), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            if (updateCheckMessage.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = updateCheckMessage,
+                                    color = if (updateAvailable) Color(0xFFEF5350) else Color(0xFF4CAF50),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            if (updateAvailable && downloadUrl.isNotEmpty()) {
+                                Button(
+                                    onClick = {
+                                        viewModel.downloadUpdate(downloadUrl, latestVersion)
+                                        Toast.makeText(context, "Download dimulai, cek notifikasi", Toast.LENGTH_SHORT).show()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Download $latestVersion", fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.checkForUpdate() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = accentColor),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.3f)),
+                                enabled = !isCheckingUpdate
+                            ) {
+                                if (isCheckingUpdate) {
+                                    CircularProgressIndicator(modifier = Modifier.size(15.dp), color = accentColor, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Memeriksa...", fontSize = 13.sp)
+                                } else {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Cek Update", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Footer ───────────────────────────────────────────
+                AnimatedSettingsItem(index = 10) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Aniku v${BuildConfig.VERSION_NAME}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                        )
+                        Text(
+                            "Developer: Dayynime",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        TextButton(
+                            onClick = {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/profile.php?id=61588359607423")))
+                            }
+                        ) {
+                            Text("Kunjungi Facebook Developer", color = accentColor.copy(alpha = 0.7f), fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+
+        // ── Sticky TopBar saat scroll ────────────────────────────────
+        AnimatedVisibility(
+            visible = headerAlpha > 0.5f,
+            enter = fadeIn(tween(150)) + slideInVertically(tween(150), initialOffsetY = { -it }),
+            exit = fadeOut(tween(150)) + slideOutVertically(tween(150), targetOffsetY = { -it })
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f))
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
-                Text(
-                    text = "Aniku v${BuildConfig.VERSION_NAME}",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "Developer: Dayynime",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
-                    onClick = {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/profile.php?id=61588359607423"))
-                        context.startActivity(browserIntent)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
                     }
-                ) {
-                    Text("Kunjungi Facebook Developer", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Pengaturan",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
                 }
             }
         }
