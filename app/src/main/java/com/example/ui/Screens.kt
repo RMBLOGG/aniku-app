@@ -3120,7 +3120,7 @@ fun WatchScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(displayEps) { _, item ->
+            itemsIndexed(displayEps, key = { idx, item -> "${item.slug}_${idx}" }) { _, item ->
                 val isActive = item.slug == currentEpisodeSlug
                 val epNum = item.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
                 Box(
