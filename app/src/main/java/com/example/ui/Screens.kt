@@ -3115,19 +3115,17 @@ fun WatchScreen(
             eps.subList(start, end + 1)
         } else eps
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
+        LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(displayEps) { _, item ->
                 val isActive = item.slug == currentEpisodeSlug
                 val epNum = item.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
                 Box(
                     modifier = Modifier
-                        .aspectRatio(1.2f)
+                        .size(52.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (isActive) accentColor
@@ -3147,13 +3145,13 @@ fun WatchScreen(
                                 Icons.Default.PlayArrow,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                         Text(
                             text = "E$epNum",
                             color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                         )
                     }
