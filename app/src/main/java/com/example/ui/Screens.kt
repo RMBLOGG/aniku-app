@@ -462,93 +462,93 @@ fun relativeTimeShort(createdAt: String): String {
 }
 
 @Composable
-fun ShimmerAnimeCard() {
-    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
+private fun shimmerAlpha(index: Int = 0): Float {
+    val t = rememberInfiniteTransition(label = "sh$index")
+    val a by t.animateFloat(
+        initialValue = 0.3f, targetValue = 0.75f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
+            animation = tween(900, easing = FastOutSlowInEasing, delayMillis = index * 80),
             repeatMode = RepeatMode.Reverse
-        ),
-        label = "shimmerAlpha"
+        ), label = "a$index"
     )
-    val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.12f)
+    return a
+}
+
+@Composable
+fun ShimmerAnimeCard(index: Int = 0) {
+    val a = shimmerAlpha(index)
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = a * 0.15f)
     Column {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(shimmerColor)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .height(11.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(shimmerColor)
-        )
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(color))
+        Spacer(modifier = Modifier.height(7.dp))
+        Box(modifier = Modifier.fillMaxWidth(0.85f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(color))
         Spacer(modifier = Modifier.height(5.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.55f)
-                .height(9.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(shimmerColor)
-        )
+        Box(modifier = Modifier.fillMaxWidth(0.55f).height(9.dp).clip(RoundedCornerShape(4.dp)).background(color))
+    }
+}
+
+@Composable
+fun ShimmerGrid(columns: Int = 3, count: Int = 12) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(columns),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(count) { i -> ShimmerAnimeCard(index = i) }
     }
 }
 
 @Composable
 fun LoadingScreen(message: String = "Memuat data anime...") {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(12) { index ->
-            val infiniteTransition = rememberInfiniteTransition(label = "shimmerDelay$index")
-            val alpha by infiniteTransition.animateFloat(
-                initialValue = 0.35f,
-                targetValue = 0.85f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(900, easing = FastOutSlowInEasing, delayMillis = index * 80),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "alpha$index"
-            )
-            val shimmerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.12f)
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f / 3f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(shimmerColor)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .height(11.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(shimmerColor)
-                )
-                Spacer(modifier = Modifier.height(5.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(9.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(shimmerColor)
-                )
+    val bg = MaterialTheme.colorScheme.onSurface
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // Hero placeholder
+        val a0 = shimmerAlpha(0)
+        Box(modifier = Modifier.fillMaxWidth().height(260.dp).background(bg.copy(alpha = a0 * 0.13f)))
+        Spacer(modifier = Modifier.height(16.dp))
+        // Section label
+        val aL = shimmerAlpha(1)
+        Row(modifier = Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.width(120.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(bg.copy(alpha = aL * 0.13f)))
+            Box(modifier = Modifier.width(60.dp).height(11.dp).clip(RoundedCornerShape(4.dp)).background(bg.copy(alpha = aL * 0.1f)))
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        // Row 1
+        Row(modifier = Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(5) { i ->
+                val c = bg.copy(alpha = shimmerAlpha(i + 2) * 0.14f)
+                Column(modifier = Modifier.width(110.dp)) {
+                    Box(modifier = Modifier.width(110.dp).height(155.dp).clip(RoundedCornerShape(10.dp)).background(c))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.85f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(c))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.55f).height(9.dp).clip(RoundedCornerShape(4.dp)).background(c))
+                }
             }
         }
+        Spacer(modifier = Modifier.height(24.dp))
+        // Section label 2
+        val aL2 = shimmerAlpha(7)
+        Row(modifier = Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(bg.copy(alpha = aL2 * 0.13f)))
+            Box(modifier = Modifier.width(60.dp).height(11.dp).clip(RoundedCornerShape(4.dp)).background(bg.copy(alpha = aL2 * 0.1f)))
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        // Row 2
+        Row(modifier = Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            repeat(5) { i ->
+                val c = bg.copy(alpha = shimmerAlpha(i + 8) * 0.14f)
+                Column(modifier = Modifier.width(110.dp)) {
+                    Box(modifier = Modifier.width(110.dp).height(155.dp).clip(RoundedCornerShape(10.dp)).background(c))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.85f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(c))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(modifier = Modifier.fillMaxWidth(0.55f).height(9.dp).clip(RoundedCornerShape(4.dp)).background(c))
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -1725,7 +1725,10 @@ fun ExploreScreen(
             userScrollEnabled = activeGenre == null // nonaktifkan swipe saat filter genre aktif
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (itemsList.isEmpty() && !isLoading) {
+                if (itemsList.isEmpty() && isLoading) {
+                    val columns = if (gridLayout == "3") 3 else 2
+                    ShimmerGrid(columns = columns, count = if (columns == 3) 12 else 8)
+                } else if (itemsList.isEmpty() && !isLoading) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
