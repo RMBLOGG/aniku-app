@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -723,18 +722,14 @@ fun HomeScreen(
         }
     } else {
         Box(modifier = Modifier.fillMaxSize()) {
-
-        // CustomScrollView dengan Sliver — satu scroll engine, no conflict
-        androidx.compose.foundation.lazy.LazyColumn(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            userScrollEnabled = true,
-            flingBehavior = ScrollableDefaults.flingBehavior()
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Hero Banner
+            // Edeg-to-Edge Hero Billboard Slider
             if (sliderItems.isNotEmpty()) {
-                item(key = "hero") {
+                item {
                     val activeSlide = sliderItems.getOrNull(slideIndex)
                     if (activeSlide != null) {
                         Box(
@@ -742,52 +737,70 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .height(460.dp)
                         ) {
+                            // Crossfade antar slide
                             androidx.compose.animation.Crossfade(
                                 targetState = activeSlide,
                                 animationSpec = tween(600, easing = EaseInOutCubic),
                                 label = "hero_crossfade"
                             ) { slide ->
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(slide.poster)
-                                        .crossfade(400)
-                                        .build(),
-                                    contentDescription = slide.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                            // Bleeding Poster Graphic
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(slide.poster)
+                                    .crossfade(400)
+                                    .build(),
+                                contentDescription = slide.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                             }
+
+                            // Immersive Linear Gradients
                             Box(
-                                modifier = Modifier.fillMaxSize().background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.6f),
-                                            Color.Transparent,
-                                            Color.Black.copy(alpha = 0.3f),
-                                            MaterialTheme.colorScheme.background
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.6f),
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.3f),
+                                                MaterialTheme.colorScheme.background
+                                            )
                                         )
                                     )
-                                )
                             )
+
+                            // Atmospheric Radial Bleeding overlay
                             Box(
-                                modifier = Modifier.fillMaxSize().drawBehind {
-                                    drawRect(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(accentColor.copy(alpha = 0.15f), Color.Transparent),
-                                            center = center,
-                                            radius = size.width * 0.7f
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .drawBehind {
+                                        drawRect(
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(
+                                                    accentColor.copy(alpha = 0.15f),
+                                                    Color.Transparent
+                                                ),
+                                                center = center,
+                                                radius = size.width * 0.7f
+                                            )
                                         )
-                                    )
-                                }
+                                    }
                             )
+
+                            // Slider metadata info (Bottom aligned)
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
                                     .padding(horizontal = 20.dp, vertical = 24.dp)
                             ) {
+                                // Dynamic Glassmorphism Categories Row (above title)
                                 val genresToShow = activeSlide.genres?.filter { it.isNotBlank() } ?: listOf("Action", "Fantasy", "Adventure")
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     genresToShow.take(3).forEach { genre ->
@@ -798,18 +811,36 @@ fun HomeScreen(
                                                 .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
                                                 .padding(horizontal = 12.dp, vertical = 4.dp)
                                         ) {
-                                            Text(text = genre, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp)
+                                            Text(
+                                                text = genre,
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                letterSpacing = 0.5.sp
+                                            )
                                         }
                                     }
                                 }
+
                                 androidx.compose.animation.AnimatedContent(
                                     targetState = activeSlide.title,
-                                    transitionSpec = { fadeIn(tween(500)) togetherWith fadeOut(tween(200)) },
+                                    transitionSpec = {
+                                        fadeIn(tween(500)) togetherWith fadeOut(tween(200))
+                                    },
                                     label = "hero_title"
                                 ) { title ->
-                                    Text(text = title, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    text = title,
+                                    color = Color.White,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 }
+
                                 Spacer(modifier = Modifier.height(14.dp))
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -819,12 +850,16 @@ fun HomeScreen(
                                         onClick = { onNavigateToDetail(activeSlide.slug) },
                                         shape = RoundedCornerShape(12.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                                        modifier = Modifier.weight(1f).height(44.dp).testTag("hero_play_btn")
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp)
+                                            .testTag("hero_play_btn")
                                     ) {
                                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
                                     }
+
                                     val isHeroBookmarked = bookmarkedAnimes.any { it.slug == activeSlide.slug }
                                     IconButton(
                                         onClick = { viewModel.toggleBookmark(activeSlide.slug, activeSlide.title, activeSlide.poster) },
@@ -843,7 +878,10 @@ fun HomeScreen(
                                         )
                                     }
                                 }
+
                                 Spacer(modifier = Modifier.height(16.dp))
+
+                                // Dot selectors
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.Center,
@@ -873,6 +911,8 @@ fun HomeScreen(
                                     }
                                 }
                             }
+
+                            // Header Bar (logo only - settings button is now a floating overlay)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -899,9 +939,10 @@ fun HomeScreen(
                 }
             }
 
-            // Donasi
+
+            // Donasi terbaru dari Saweria
             if (donations.isNotEmpty()) {
-                item(key = "donation") {
+                item {
                     var donationDismissed by remember { mutableStateOf(false) }
                     if (!donationDismissed) {
                         DonationCard(
@@ -914,22 +955,38 @@ fun HomeScreen(
                 }
             }
 
-            // Announcement
+
             activeAnnouncement?.let { ann ->
-                item(key = "announcement") {
+                item {
                     var dismissed by remember { mutableStateOf(false) }
                     val visible = remember { MutableTransitionState(false).apply { targetState = true } }
                     if (!dismissed) {
                         AnimatedVisibility(
                             visibleState = visible,
-                            enter = slideInVertically(initialOffsetY = { -it }, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(animationSpec = tween(300)),
+                            enter = slideInVertically(
+                                initialOffsetY = { -it },
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                            ) + fadeIn(animationSpec = tween(300)),
                             exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
                         ) {
-                            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                // Bottom glow
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(0.8f).height(12.dp).align(Alignment.BottomCenter).offset(y = 6.dp)
-                                        .background(brush = Brush.horizontalGradient(colors = listOf(Color.Transparent, Color(0x33E53935), Color.Transparent)), shape = RoundedCornerShape(50))
+                                        .fillMaxWidth(0.8f)
+                                        .height(12.dp)
+                                        .align(Alignment.BottomCenter)
+                                        .offset(y = 6.dp)
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(Color.Transparent, Color(0x33E53935), Color.Transparent)
+                                            ),
+                                            shape = RoundedCornerShape(50)
+                                        )
                                 )
                                 Card(
                                     modifier = Modifier.fillMaxWidth(),
@@ -940,46 +997,140 @@ fun HomeScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(brush = Brush.linearGradient(colors = listOf(Color(0xFF1C0A0A), Color(0xFF141414), Color(0xFF1A0D0D))), shape = RoundedCornerShape(18.dp))
-                                            .border(width = 1.dp, brush = Brush.linearGradient(colors = listOf(Color(0x44E53935), Color(0x22E53935), Color(0x44E53935))), shape = RoundedCornerShape(18.dp))
+                                            .background(
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0xFF1C0A0A), Color(0xFF141414), Color(0xFF1A0D0D))
+                                                ),
+                                                shape = RoundedCornerShape(18.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                brush = Brush.linearGradient(
+                                                    colors = listOf(Color(0x44E53935), Color(0x22E53935), Color(0x44E53935))
+                                                ),
+                                                shape = RoundedCornerShape(18.dp)
+                                            )
                                     ) {
-                                        Box(modifier = Modifier.fillMaxWidth(0.7f).height(1.dp).align(Alignment.TopCenter).background(brush = Brush.horizontalGradient(colors = listOf(Color.Transparent, Color(0x88FF6464), Color.Transparent))))
-                                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        // Shimmer top line
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.7f)
+                                                .height(1.dp)
+                                                .align(Alignment.TopCenter)
+                                                .background(
+                                                    brush = Brush.horizontalGradient(
+                                                        colors = listOf(Color.Transparent, Color(0x88FF6464), Color.Transparent)
+                                                    )
+                                                )
+                                        )
+                                        Row(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                        ) {
+                                            // Icon box
                                             Box(
-                                                modifier = Modifier.size(44.dp)
-                                                    .background(brush = Brush.linearGradient(colors = listOf(Color(0x44E53935), Color(0x22B71C1C))), shape = RoundedCornerShape(14.dp))
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .background(
+                                                        brush = Brush.linearGradient(
+                                                            colors = listOf(Color(0x44E53935), Color(0x22B71C1C))
+                                                        ),
+                                                        shape = RoundedCornerShape(14.dp)
+                                                    )
                                                     .border(1.dp, Color(0x44E53935), RoundedCornerShape(14.dp)),
                                                 contentAlignment = Alignment.Center
-                                            ) { Text("📢", fontSize = 22.sp) }
+                                            ) {
+                                                Text("📢", fontSize = 22.sp)
+                                            }
+                                            // Content
                                             Column(modifier = Modifier.weight(1f)) {
+                                                // Badge with pulse dot
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.background(Color(0x22E53935), RoundedCornerShape(6.dp)).border(1.dp, Color(0x33E53935), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp)
+                                                    modifier = Modifier
+                                                        .background(Color(0x22E53935), RoundedCornerShape(6.dp))
+                                                        .border(1.dp, Color(0x33E53935), RoundedCornerShape(6.dp))
+                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
                                                 ) {
                                                     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                                                    val pulseAlpha by infiniteTransition.animateFloat(initialValue = 1f, targetValue = 0.3f, animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "pulseAlpha")
-                                                    Box(modifier = Modifier.size(5.dp).background(Color(0xFFFF5252).copy(alpha = pulseAlpha), CircleShape))
+                                                    val pulseAlpha by infiniteTransition.animateFloat(
+                                                        initialValue = 1f, targetValue = 0.3f,
+                                                        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+                                                        label = "pulseAlpha"
+                                                    )
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(5.dp)
+                                                            .background(Color(0xFFFF5252).copy(alpha = pulseAlpha), CircleShape)
+                                                    )
                                                     Spacer(modifier = Modifier.width(5.dp))
-                                                    Text("PENGUMUMAN", color = Color(0xFFFF6B6B), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                                                    Text(
+                                                        "PENGUMUMAN",
+                                                        color = Color(0xFFFF6B6B),
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        letterSpacing = 1.5.sp
+                                                    )
                                                 }
                                                 Spacer(modifier = Modifier.height(5.dp))
-                                                Text(text = ann.title, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    text = ann.title,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    fontSize = 14.sp,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                                 Spacer(modifier = Modifier.height(2.dp))
-                                                Text(text = ann.message, color = Color.White.copy(alpha = 0.5f), fontSize = 11.5.sp, maxLines = Int.MAX_VALUE, overflow = TextOverflow.Visible)
+                                                Text(
+                                                    text = ann.message,
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.5.sp,
+                                                    maxLines = Int.MAX_VALUE,
+                                                    overflow = TextOverflow.Visible
+                                                )
                                             }
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Close button
                                                 Box(
-                                                    modifier = Modifier.size(28.dp).background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)).border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp)).clickable { dismissed = true },
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                                        .clickable { dismissed = true },
                                                     contentAlignment = Alignment.Center
-                                                ) { Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp) }
+                                                ) {
+                                                    Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
+                                                }
+                                                // Download button (only if download_url exists)
                                                 if (!ann.download_url.isNullOrBlank()) {
                                                     val ctx = LocalContext.current
                                                     Box(
-                                                        modifier = Modifier.background(brush = Brush.linearGradient(colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))), shape = RoundedCornerShape(8.dp))
-                                                            .clickable { val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url)); ctx.startActivity(intent) }
+                                                        modifier = Modifier
+                                                            .background(
+                                                                brush = Brush.linearGradient(
+                                                                    colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
+                                                                ),
+                                                                shape = RoundedCornerShape(8.dp)
+                                                            )
+                                                            .clickable {
+                                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url))
+                                                                ctx.startActivity(intent)
+                                                            }
                                                             .padding(horizontal = 8.dp, vertical = 5.dp),
                                                         contentAlignment = Alignment.Center
-                                                    ) { Text("Download", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                                                    ) {
+                                                        Text(
+                                                            "Download",
+                                                            color = Color.White,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -991,46 +1142,75 @@ fun HomeScreen(
                 }
             }
 
-            // Riwayat Ditonton
+            // Section Riwayat: Terakhir Ditonton
             if (watchHistory.isNotEmpty()) {
-                item(key = "history_header") {
+                item {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Terakhir Ditonton", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(
+                            text = "Terakhir Ditonton",
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
                         TextButton(onClick = { viewModel.clearWatchHistory() }) {
                             Text("Hapus", color = accentColor, fontSize = 12.sp)
                         }
                     }
                 }
-                item(key = "history_row") {
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        watchHistory.forEach { item ->
+                        items(watchHistory, key = { it.animeSlug }) { item ->
                             Column(
-                                modifier = Modifier.width(110.dp).clickable { onNavigateToDetail(item.animeSlug) }
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .clickable { onNavigateToDetail(item.animeSlug) }
                             ) {
                                 Box {
                                     AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current).data(item.animePoster).crossfade(300).build(),
+                                        model = item.animePoster,
                                         contentDescription = item.animeTitle,
                                         contentScale = ContentScale.Crop,
-                                        modifier = Modifier.width(110.dp).height(155.dp).clip(RoundedCornerShape(10.dp))
+                                        modifier = Modifier
+                                            .width(110.dp)
+                                            .height(155.dp)
+                                            .clip(RoundedCornerShape(10.dp))
                                     )
+                                    // Badge episode
                                     Box(
-                                        modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.75f)).padding(horizontal = 4.dp, vertical = 2.dp)
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(4.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(Color.Black.copy(alpha = 0.75f))
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
                                     ) {
-                                        Text(text = item.episodeTitle, color = Color.White, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            text = item.episodeTitle,
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(text = item.animeTitle, color = MaterialTheme.colorScheme.onBackground, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 14.sp)
+                                Text(
+                                    text = item.animeTitle,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontSize = 11.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 14.sp
+                                )
                             }
                         }
                     }
@@ -1038,60 +1218,92 @@ fun HomeScreen(
             }
 
             // Section 1: Sedang Tayang
-            item(key = "header_ongoing") { SectionHeader(title = "Sedang Tayang", onSeeAllClick = { onSeeAllClicked("Ongoing") }) }
-            item(key = "row_ongoing") {
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            item { SectionHeader(title = "Sedang Tayang", onSeeAllClick = { onSeeAllClicked("Ongoing") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ongoingList.forEach { anim ->
-                        AnimeCard(anime = anim, accentColor = accentColor, onClick = { onNavigateToDetail(anim.slug) }, isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug }, onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }, isLoggedIn = isLoggedIn, onLoginRequired = { showLoginDialog = true })
+                    items(ongoingList, key = { it.slug }) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
+                        )
                     }
                 }
             }
 
             // Section 2: Terbaru
-            item(key = "header_recent") { SectionHeader(title = "Terbaru", onSeeAllClick = { onSeeAllClicked("Latest") }) }
-            item(key = "row_recent") {
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            item { SectionHeader(title = "Terbaru", onSeeAllClick = { onSeeAllClicked("Latest") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    recentList.forEach { anim ->
-                        AnimeCard(anime = anim, accentColor = accentColor, onClick = { onNavigateToDetail(anim.slug) }, isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug }, onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }, isLoggedIn = isLoggedIn, onLoginRequired = { showLoginDialog = true })
+                    items(recentList, key = { it.slug }) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
+                        )
                     }
                 }
             }
 
             // Section 3: Terpopuler
-            item(key = "header_popular") { SectionHeader(title = "Terpopuler", onSeeAllClick = { onSeeAllClicked("Popular") }) }
-            item(key = "row_popular") {
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            item { SectionHeader(title = "Terpopuler", onSeeAllClick = { onSeeAllClicked("Popular") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    popularList.forEach { anim ->
-                        AnimeCard(anime = anim, accentColor = accentColor, onClick = { onNavigateToDetail(anim.slug) }, isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug }, onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }, isLoggedIn = isLoggedIn, onLoginRequired = { showLoginDialog = true })
+                    items(popularList, key = { it.slug }) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
+                        )
                     }
                 }
             }
 
             // Section 4: Anime Movie
-            item(key = "header_movie") { SectionHeader(title = "Anime Movie", onSeeAllClick = { onSeeAllClicked("Movie") }) }
-            item(key = "row_movie") {
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            item { SectionHeader(title = "Anime Movie", onSeeAllClick = { onSeeAllClicked("Movie") }) }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    moviesList.forEach { anim ->
-                        AnimeCard(anime = anim, accentColor = accentColor, onClick = { onNavigateToDetail(anim.slug) }, isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug }, onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) }, isLoggedIn = isLoggedIn, onLoginRequired = { showLoginDialog = true })
+                    items(moviesList, key = { it.slug }) { anim ->
+                        AnimeCard(
+                            anime = anim,
+                            accentColor = accentColor,
+                            onClick = { onNavigateToDetail(anim.slug) },
+                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
+                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            isLoggedIn = isLoggedIn,
+                            onLoginRequired = { showLoginDialog = true }
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
 
-        // Floating Settings/Profile Button
+        // Floating Settings Button (sticky, tidak ikut scroll)
         Box(
             modifier = Modifier
                 .statusBarsPadding()
@@ -1106,11 +1318,18 @@ fun HomeScreen(
                 AsyncImage(
                     model = session.avatarUrl,
                     contentDescription = "Profile",
-                    modifier = Modifier.size(38.dp).clip(CircleShape),
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         } // end Box
