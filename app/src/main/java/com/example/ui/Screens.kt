@@ -1825,6 +1825,7 @@ fun ScheduleScreen(
     val scheduleMap by viewModel.scheduleMap.collectAsState()
     val isLoading by viewModel.isScheduleLoading.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val currentSource by viewModel.dataSource.collectAsState()
 
     val days = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
     val activeDayIndex = days.indexOf(activeDay).coerceAtLeast(0)
@@ -1850,10 +1851,10 @@ fun ScheduleScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (scheduleMap.isEmpty()) {
-            viewModel.fetchScheduleData()
-        }
+    LaunchedEffect(currentSource) {
+        viewModel.clearScheduleCache()
+        viewModel.fetchScheduleData()
+
     }
 
     Column(

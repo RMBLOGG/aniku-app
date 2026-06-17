@@ -638,6 +638,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
     
+    fun clearScheduleCache() {
+        _scheduleMap.value = emptyMap()
+    }
+
     fun fetchScheduleData() {
         _isScheduleLoading.value = true
         viewModelScope.launch {
