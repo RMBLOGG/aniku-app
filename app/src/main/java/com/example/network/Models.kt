@@ -586,12 +586,3 @@ data class Donation(
     val created_at: String,
     val is_announced: Boolean? = false
 )
-
-// ─── Filedon Resolver ────────────────────────────────────────────────────────
-@JsonClass(generateAdapter = true)
-data class ResolverResponse(
-    val status: String,
-    val mp4: String?,
-    val filename: String?,
-    val error: String? = null
-)
