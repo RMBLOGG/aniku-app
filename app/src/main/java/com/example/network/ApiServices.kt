@@ -368,6 +368,13 @@ interface SupabaseDbApi {
     ): List<Donation>
 }
 
+interface ResolverApi {
+    @GET("resolve")
+    suspend fun resolve(
+        @Query("url") url: String
+    ): ResolverResponse
+}
+
 interface CloudinaryApi {
     @Multipart
     @POST("v1_1/dzfkklsza/image/upload")
@@ -500,6 +507,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(CloudinaryApi::class.java)
+    }
+
+    val resolverApi: ResolverApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://filedon-resolver.vercel.app/")
+            .client(defaultOkHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(ResolverApi::class.java)
     }
 }
 
