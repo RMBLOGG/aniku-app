@@ -4714,7 +4714,200 @@ fun SettingsScreen(
                 }
 
                 // ── Section Label: Aplikasi ──────────────────────────
+                // ── Section Label: Komunitas ─────────────────────────
                 AnimatedSettingsItem(index = 8) {
+                    Text(
+                        text = "KOMUNITAS",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                    )
+                }
+
+                // ── Komunitas Card ───────────────────────────────────
+                AnimatedSettingsItem(index = 9) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            // Telegram Channel
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Dayynime")))
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF229ED9)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Telegram icon (paper plane)
+                                    androidx.compose.foundation.Canvas(modifier = Modifier.size(22.dp)) {
+                                        val w = size.width; val h = size.height
+                                        val path = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(w * 0.1f, h * 0.5f)
+                                            lineTo(w * 0.9f, h * 0.18f)
+                                            lineTo(w * 0.62f, h * 0.82f)
+                                            lineTo(w * 0.42f, h * 0.62f)
+                                            close()
+                                        }
+                                        drawPath(path, androidx.compose.ui.graphics.Color.White)
+                                        val path2 = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(w * 0.42f, h * 0.62f)
+                                            lineTo(w * 0.4f, h * 0.82f)
+                                            lineTo(w * 0.54f, h * 0.7f)
+                                            close()
+                                        }
+                                        drawPath(path2, androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Telegram Channel", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("t.me/Dayynime", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                }
+                                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), modifier = Modifier.padding(start = 70.dp))
+
+                            // Telegram Bot
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Dayynime_bot")))
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF229ED9).copy(alpha = 0.75f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Bot icon (simple robot head)
+                                    Icon(
+                                        imageVector = Icons.Default.SmartToy,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Telegram Bot", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("t.me/Dayynime_bot", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                }
+                                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), modifier = Modifier.padding(start = 70.dp))
+
+                            // WhatsApp Komunitas
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/EHKEVbk26x37GSjpLvd42B")))
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF25D366)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // WhatsApp icon
+                                    androidx.compose.foundation.Canvas(modifier = Modifier.size(22.dp)) {
+                                        val w = size.width; val h = size.height
+                                        // Bubble shape
+                                        drawCircle(androidx.compose.ui.graphics.Color.White, radius = w * 0.42f, center = center)
+                                        // Phone handset simplified
+                                        val phonePath = androidx.compose.ui.graphics.Path().apply {
+                                            moveTo(w * 0.35f, h * 0.25f)
+                                            cubicTo(w * 0.28f, h * 0.25f, w * 0.22f, h * 0.35f, w * 0.25f, h * 0.45f)
+                                            cubicTo(w * 0.30f, h * 0.62f, w * 0.40f, h * 0.72f, w * 0.57f, h * 0.76f)
+                                            cubicTo(w * 0.67f, h * 0.79f, w * 0.76f, h * 0.73f, w * 0.76f, h * 0.66f)
+                                            lineTo(w * 0.76f, h * 0.58f)
+                                            cubicTo(w * 0.76f, h * 0.55f, w * 0.74f, h * 0.53f, w * 0.71f, h * 0.52f)
+                                            lineTo(w * 0.63f, h * 0.50f)
+                                            cubicTo(w * 0.60f, h * 0.49f, w * 0.57f, h * 0.50f, w * 0.55f, h * 0.52f)
+                                            lineTo(w * 0.53f, h * 0.55f)
+                                            cubicTo(w * 0.47f, h * 0.52f, w * 0.48f, h * 0.53f, w * 0.45f, h * 0.47f)
+                                            lineTo(w * 0.47f, h * 0.45f)
+                                            cubicTo(w * 0.50f, h * 0.43f, w * 0.51f, h * 0.40f, w * 0.50f, h * 0.37f)
+                                            lineTo(w * 0.48f, h * 0.29f)
+                                            cubicTo(w * 0.47f, h * 0.26f, w * 0.45f, h * 0.24f, w * 0.42f, h * 0.24f)
+                                            close()
+                                        }
+                                        drawPath(phonePath, Color(0xFF25D366))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("WhatsApp Komunitas", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Grup komunitas Aniku", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                }
+                                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), modifier = Modifier.padding(start = 70.dp))
+
+                            // Facebook
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/vppxbn3e8h")))
+                                    }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(Color(0xFF1877F2)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Facebook,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Facebook", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Dayynime", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                }
+                                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
+
+                // ── Section Label: Aplikasi ──────────────────────────
+                AnimatedSettingsItem(index = 10) {
                     Text(
                         text = "APLIKASI",
                         fontSize = 11.sp,
@@ -4726,7 +4919,7 @@ fun SettingsScreen(
                 }
 
                 // ── Version Card ─────────────────────────────────────
-                AnimatedSettingsItem(index = 9) {
+                AnimatedSettingsItem(index = 11) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = if (isDark) Color(0xFF16162A) else Color(0xFFF3E5F5)
@@ -4830,7 +5023,7 @@ fun SettingsScreen(
                 }
 
                 // ── Footer ───────────────────────────────────────────
-                AnimatedSettingsItem(index = 10) {
+                AnimatedSettingsItem(index = 12) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
