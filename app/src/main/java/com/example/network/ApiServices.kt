@@ -383,6 +383,46 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<Donation>
+
+    @GET("rest/v1/active_viewers")
+    suspend fun getViewerCount(
+        @Query("anime_slug") animeSlug: String,
+        @Query("select") select: String = "user_id",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "count=exact"
+    ): List<Map<String, String>>
+
+    @GET("rest/v1/active_viewers")
+    suspend fun getAllViewerCounts(
+        @Query("select") select: String = "anime_slug",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "count=exact"
+    ): List<Map<String, String>>
+
+    @POST("rest/v1/active_viewers")
+    suspend fun upsertViewer(
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
+    @DELETE("rest/v1/active_viewers")
+    suspend fun removeViewer(
+        @Query("anime_slug") animeSlug: String,
+        @Query("user_id") userId: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @DELETE("rest/v1/active_viewers")
+    suspend fun removeStaleViewers(
+        @Query("last_seen") lastSeen: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
 }
 
 interface CloudinaryApi {

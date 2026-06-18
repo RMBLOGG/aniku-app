@@ -101,7 +101,8 @@ fun AnimeCard(
     onBookmarkToggle: () -> Unit,
     modifier: Modifier = Modifier,
     isLoggedIn: Boolean = true,
-    onLoginRequired: () -> Unit = {}
+    onLoginRequired: () -> Unit = {},
+    viewerCount: Int = 0
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -244,6 +245,35 @@ fun AnimeCard(
                             text = statusString,
                             color = Color.White,
                             fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Viewer count badge (top-center) - only show if > 0
+            if (viewerCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .background(Color(0xFF4CAF50), CircleShape)
+                        )
+                        Text(
+                            text = if (viewerCount >= 1000) "${viewerCount / 1000}k" else "$viewerCount",
+                            color = Color.White,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -577,6 +607,12 @@ fun HomeScreen(
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     var showLoginDialog by remember { mutableStateOf(false) }
+    val viewerCounts by viewModel.viewerCounts.collectAsState()
+
+    LaunchedEffect(ongoingList, recentList, popularList) {
+        val slugs = (ongoingList + recentList + popularList).map { it.slug }
+        if (slugs.isNotEmpty()) viewModel.startViewerCountPolling(slugs)
+    }
 
     if (showLoginDialog) {
         AlertDialog(
@@ -1402,7 +1438,8 @@ fun HomeScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true }
+                            onLoginRequired = { showLoginDialog = true },
+                            viewerCount = viewerCounts[anim.slug] ?: 0
                         )
                     }
                 }
@@ -1423,7 +1460,8 @@ fun HomeScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true }
+                            onLoginRequired = { showLoginDialog = true },
+                            viewerCount = viewerCounts[anim.slug] ?: 0
                         )
                     }
                 }
@@ -1444,7 +1482,8 @@ fun HomeScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true }
+                            onLoginRequired = { showLoginDialog = true },
+                            viewerCount = viewerCounts[anim.slug] ?: 0
                         )
                     }
                 }
@@ -1465,7 +1504,8 @@ fun HomeScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true }
+                            onLoginRequired = { showLoginDialog = true },
+                            viewerCount = viewerCounts[anim.slug] ?: 0
                         )
                     }
                 }
@@ -2767,6 +2807,7 @@ fun WatchScreen(
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
         com.example.AnikuAnalytics.trackEpisodeWatched(animeTitle, currentEpisodeSlug)
+        viewModel.joinAsViewer(viewModel.currentAnimeSlug.value)
     }
 
     // Catat riwayat saat episodeTitle sudah tersedia
@@ -2787,6 +2828,7 @@ fun WatchScreen(
     DisposableEffect(Unit) {
         onDispose {
             viewModel.clearStreamState()
+            viewModel.leaveAsViewer()
         }
     }
 

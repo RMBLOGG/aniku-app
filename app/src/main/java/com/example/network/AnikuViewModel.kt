@@ -1302,6 +1302,91 @@ class AnikuViewModel(context: Context) : ViewModel() {
         watchChatPollingJob = null
     }
 
+    // ── Active Viewers ───────────────────────────────────────────
+    private val _viewerCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val viewerCounts: StateFlow<Map<String, Int>> = _viewerCounts.asStateFlow()
+
+    private var viewerPollingJob: kotlinx.coroutines.Job? = null
+    private var currentViewingSlug: String? = null
+
+    fun joinAsViewer(animeSlug: String) {
+        val userId = session.value.userId ?: return
+        val token = session.value.token ?: return
+        currentViewingSlug = animeSlug
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.upsertViewer(
+                    data = mapOf(
+                        "anime_slug" to animeSlug,
+                        "user_id" to userId,
+                        "last_seen" to java.time.Instant.now().toString()
+                    ),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (_: Exception) {}
+        }
+        // Keep alive setiap 30 detik
+        viewerPollingJob?.cancel()
+        viewerPollingJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(30_000L)
+                try {
+                    NetworkClient.supabaseDbApi.upsertViewer(
+                        data = mapOf(
+                            "anime_slug" to animeSlug,
+                            "user_id" to userId,
+                            "last_seen" to java.time.Instant.now().toString()
+                        ),
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun leaveAsViewer() {
+        val userId = session.value.userId ?: return
+        val token = session.value.token ?: return
+        val slug = currentViewingSlug ?: return
+        viewerPollingJob?.cancel()
+        viewerPollingJob = null
+        currentViewingSlug = null
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.removeViewer(
+                    animeSlug = "eq.$slug",
+                    userId = "eq.$userId",
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun startViewerCountPolling(animeSlugs: List<String>) {
+        if (animeSlugs.isEmpty()) return
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    // Ambil semua viewers aktif (last_seen < 2 menit)
+                    val cutoff = java.time.Instant.now().minusSeconds(120).toString()
+                    val rows = NetworkClient.supabaseDbApi.getAllViewerCounts(
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    // Count per anime_slug
+                    val counts = rows.groupBy { it["anime_slug"] ?: "" }
+                        .mapValues { it.value.size }
+                        .filterKeys { it.isNotEmpty() }
+                    _viewerCounts.value = counts
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(30_000L)
+            }
+        }
+    }
+
     fun sendWatchChatMessage(episodeSlug: String, message: String) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) return
