@@ -576,6 +576,13 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable("watch_history") {
+                            com.example.ui.WatchHistoryScreen(
+                                viewModel = viewModel,
+                                onNavigateToDetail = { slug -> navController.navigate("detail/$slug") },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                     }
                 }
             }

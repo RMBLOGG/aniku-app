@@ -1364,8 +1364,8 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
-                        TextButton(onClick = { viewModel.clearWatchHistory() }) {
-                            Text("Hapus", color = accentColor, fontSize = 12.sp)
+                        TextButton(onClick = { navController.navigate("watch_history") }) {
+                            Text("LIHAT SEMUA", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         }
                     }
                 }
