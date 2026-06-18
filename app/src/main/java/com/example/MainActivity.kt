@@ -50,7 +50,21 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
-
+        // Immersive sticky: nav bar hilang, muncul lagi kalau swipe dari bawah, lalu auto-hilang
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.navigationBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+        }
         val viewModel = AnikuViewModel(this)
 
         // Minta izin notifikasi (Android 13+)
@@ -110,12 +124,6 @@ class MainActivity : ComponentActivity() {
                 accentName = accentColorName,
                 textScale = textSizeScale
             ) {
-                val backgroundColor = androidx.compose.material3.MaterialTheme.colorScheme.background
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(backgroundColor)
-                ) {
                 val appLockEnabled by viewModel.appLockEnabled.collectAsState()
                 val appLockType by viewModel.appLockType.collectAsState()
                 val appPin by viewModel.appPin.collectAsState()
@@ -362,7 +370,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
-                        /*if (showBottomBar) {
+                        if (showBottomBar) {
                             CurvedBottomNav(
                                 mainNavItems = mainNavItems,
                                 currentRoute = currentRoute,
@@ -377,7 +385,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onMoreClick = { showMoreSheet = true }
                             )
-                        }*/
+                        }
                     }
                 ) { innerPadding ->
                     NavHost(
@@ -572,7 +580,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
             } // end else (unlocked)
-                } // end Box
         }
     }
 }
