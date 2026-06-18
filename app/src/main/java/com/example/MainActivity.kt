@@ -362,7 +362,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = Color.Transparent,
                     bottomBar = {
-                        if (showBottomBar) {
+                        /*if (showBottomBar) {
                             CurvedBottomNav(
                                 mainNavItems = mainNavItems,
                                 currentRoute = currentRoute,
@@ -377,7 +377,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onMoreClick = { showMoreSheet = true }
                             )
-                        }
+                        }*/
                     }
                 ) { innerPadding ->
                     NavHost(
