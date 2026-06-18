@@ -3446,6 +3446,8 @@ fun WatchScreen(
                 }
             }
         }
+    }
+}
 
 // ================================================================
 // 8. AUTH SCREENS (LOGIN / REGISTER)
@@ -4394,7 +4396,7 @@ fun AdminPanelScreen(
 // ================================================================
 
 @Composable
-private fun AnimatedSettingsItem(
+fun AnimatedSettingsItem(
     index: Int,
     content: @Composable () -> Unit
 ) {
@@ -4416,7 +4418,7 @@ private fun AnimatedSettingsItem(
 }
 
 @Composable
-private fun SettingsNavCard(
+fun SettingsNavCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     iconBgColor: Color,
     title: String,
@@ -5216,6 +5218,7 @@ fun SettingsScreen(
         }
 
         // ── Sticky TopBar saat scroll ────────────────────────────────
+        Column {
         AnimatedVisibility(
             visible = headerAlpha > 0.5f,
             enter = fadeIn(tween(150)) + slideInVertically(tween(150), initialOffsetY = { -it }),
@@ -5241,6 +5244,7 @@ fun SettingsScreen(
                 }
             }
         }
+        } // end Column wrapper for AnimatedVisibility
     }
 }
 
