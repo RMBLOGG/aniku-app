@@ -221,7 +221,8 @@ fun ChatScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .navigationBarsPadding(),
+                            .navigationBarsPadding()
+                            .imePadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Tombol pilih foto

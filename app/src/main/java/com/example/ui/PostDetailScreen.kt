@@ -136,7 +136,8 @@ fun PostDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .navigationBarsPadding(),
+                            .navigationBarsPadding()
+                            .imePadding(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AvatarCircle(
