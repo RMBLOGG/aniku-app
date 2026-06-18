@@ -1270,6 +1270,67 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun clearChatError() { _chatError.value = null }
 
+    // ── Watch Live Chat ──────────────────────────────────────────
+    private val _watchChatMessages = MutableStateFlow<List<WatchChatMessage>>(emptyList())
+    val watchChatMessages: StateFlow<List<WatchChatMessage>> = _watchChatMessages.asStateFlow()
+
+    private val _isWatchChatLoading = MutableStateFlow(false)
+    val isWatchChatLoading: StateFlow<Boolean> = _isWatchChatLoading.asStateFlow()
+
+    private var watchChatPollingJob: kotlinx.coroutines.Job? = null
+
+    fun startWatchChatPolling(episodeSlug: String) {
+        watchChatPollingJob?.cancel()
+        _watchChatMessages.value = emptyList()
+        watchChatPollingJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val messages = NetworkClient.supabaseDbApi.getWatchChatMessages(
+                        episodeSlug = "eq.$episodeSlug",
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    _watchChatMessages.value = messages
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(5000L)
+            }
+        }
+    }
+
+    fun stopWatchChatPolling() {
+        watchChatPollingJob?.cancel()
+        watchChatPollingJob = null
+    }
+
+    fun sendWatchChatMessage(episodeSlug: String, message: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+        val trimmed = message.trim()
+        if (trimmed.isEmpty() || trimmed.length > 200) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.insertWatchChatMessage(
+                    data = WatchChatRequest(
+                        episode_slug = episodeSlug,
+                        user_id = currentSession.userId ?: "",
+                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "User",
+                        avatar_url = currentSession.avatarUrl,
+                        message = trimmed
+                    ),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                // Immediately reload
+                val messages = NetworkClient.supabaseDbApi.getWatchChatMessages(
+                    episodeSlug = "eq.$episodeSlug",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _watchChatMessages.value = messages
+            } catch (_: Exception) {}
+        }
+    }
+
     fun loadChatMessages() {
         viewModelScope.launch {
             _isChatLoading.value = true

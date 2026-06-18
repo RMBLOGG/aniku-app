@@ -3270,8 +3270,182 @@ fun WatchScreen(
             }
         }
         } // end if (!isFullscreen)
-    }
-}
+
+        // ── Live Chat ────────────────────────────────────────────
+        if (!isFullscreen) {
+            val watchChatMessages by viewModel.watchChatMessages.collectAsState()
+            val session by viewModel.session.collectAsState()
+            var chatInput by remember { mutableStateOf("") }
+            var chatExpanded by remember { mutableStateOf(false) }
+            val listState = rememberLazyListState()
+
+            LaunchedEffect(currentEpisodeSlug) {
+                viewModel.startWatchChatPolling(currentEpisodeSlug)
+            }
+            DisposableEffect(Unit) {
+                onDispose { viewModel.stopWatchChatPolling() }
+            }
+            LaunchedEffect(watchChatMessages.size) {
+                if (watchChatMessages.isNotEmpty() && chatExpanded) {
+                    listState.animateScrollToItem(watchChatMessages.size - 1)
+                }
+            }
+
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                // Header toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { chatExpanded = !chatExpanded }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Forum, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
+                        Text("Live Chat", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                        if (watchChatMessages.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .background(accentColor, RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("${watchChatMessages.size}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Icon(
+                        if (chatExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(visible = chatExpanded) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        // Message list
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            if (watchChatMessages.isEmpty()) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("Belum ada pesan. Mulai chat!", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 13.sp)
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    items(watchChatMessages, key = { it.id }) { msg ->
+                                        val isMe = msg.user_id == session.userId
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            if (!isMe) {
+                                                // Avatar
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(accentColor),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (!msg.avatar_url.isNullOrEmpty()) {
+                                                        AsyncImage(model = msg.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                                    } else {
+                                                        Text(msg.username.take(1).uppercase(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                Spacer(Modifier.width(6.dp))
+                                            }
+                                            Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
+                                                if (!isMe) {
+                                                    Text(msg.username, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 2.dp))
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(
+                                                            if (isMe) accentColor else MaterialTheme.colorScheme.surfaceVariant,
+                                                            RoundedCornerShape(
+                                                                topStart = if (isMe) 12.dp else 2.dp,
+                                                                topEnd = if (isMe) 2.dp else 12.dp,
+                                                                bottomStart = 12.dp,
+                                                                bottomEnd = 12.dp
+                                                            )
+                                                        )
+                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                                ) {
+                                                    Text(msg.message, color = if (isMe) Color.White else MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Input
+                        if (session.token.isNullOrEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Login untuk ikut chat", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 13.sp)
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = chatInput,
+                                    onValueChange = { if (it.length <= 200) chatInput = it },
+                                    placeholder = { Text("Tulis pesan...", fontSize = 13.sp) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    maxLines = 2,
+                                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = accentColor,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                                    )
+                                )
+                                IconButton(
+                                    onClick = {
+                                        if (chatInput.isNotBlank()) {
+                                            viewModel.sendWatchChatMessage(currentEpisodeSlug, chatInput)
+                                            chatInput = ""
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .background(accentColor, RoundedCornerShape(10.dp))
+                                ) {
+                                    Icon(Icons.Default.Send, contentDescription = "Kirim", tint = Color.White, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
 // ================================================================
 // 8. AUTH SCREENS (LOGIN / REGISTER)

@@ -267,6 +267,23 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    @GET("rest/v1/watch_chat")
+    suspend fun getWatchChatMessages(
+        @Query("episode_slug") episodeSlug: String,
+        @Query("order") order: String = "created_at.asc",
+        @Query("limit") limit: Int = 100,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<WatchChatMessage>
+
+    @POST("rest/v1/watch_chat")
+    suspend fun insertWatchChatMessage(
+        @Body data: WatchChatRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<WatchChatMessage>
+
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
         @Query("order") order: String = "created_at.asc",

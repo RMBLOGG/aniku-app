@@ -586,3 +586,24 @@ data class Donation(
     val created_at: String,
     val is_announced: Boolean? = false
 )
+
+// Watch live chat models
+@JsonClass(generateAdapter = true)
+data class WatchChatMessage(
+    val id: String,
+    val episode_slug: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String,
+    val created_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class WatchChatRequest(
+    val episode_slug: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val message: String
+)
