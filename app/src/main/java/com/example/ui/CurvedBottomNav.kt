@@ -46,10 +46,9 @@ fun CurvedBottomNav(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(32.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clip(RoundedCornerShape(32.dp))
-                .background(surfaceColor)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                 .padding(horizontal = 6.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
