@@ -2332,6 +2332,12 @@ fun AnimeDetailScreen(
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
     var showLoginDialog by remember { mutableStateOf(false) }
+    val watchHistory by viewModel.watchHistory.collectAsState()
+    val watchedEpisodeSlugs = remember(watchHistory, slug) {
+        watchHistory.filter { it.animeSlug == slug }.map { it.episodeSlug }.toSet()
+    }
+
+    LaunchedEffect(Unit) { viewModel.refreshWatchHistory() }
 
     if (showLoginDialog) {
         AlertDialog(
@@ -2742,6 +2748,7 @@ fun AnimeDetailScreen(
                                             if (epIndex < displayEps.size) {
                                                 val ep = displayEps[epIndex]
                                                 val epNum = ep.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
+                                                val isWatched = watchedEpisodeSlugs.contains(ep.slug)
                                                 Box(
                                                     modifier = Modifier
                                                         .weight(1f)
@@ -2752,6 +2759,25 @@ fun AnimeDetailScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Text("E$epNum", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    // Checkmark watched indicator
+                                                    if (isWatched) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .align(Alignment.BottomEnd)
+                                                                .padding(3.dp)
+                                                                .size(14.dp)
+                                                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                                                .background(Color(0xFF4CAF50)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = "Watched",
+                                                                tint = Color.White,
+                                                                modifier = Modifier.size(9.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             } else {
                                                 Spacer(modifier = Modifier.weight(1f))
@@ -2803,6 +2829,10 @@ fun WatchScreen(
     val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
     val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val watchHistory by viewModel.watchHistory.collectAsState()
+    val watchedEpisodeSlugs = remember(watchHistory, currentAnimeSlug) {
+        watchHistory.filter { it.animeSlug == currentAnimeSlug }.map { it.episodeSlug }.toSet()
+    }
 
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
@@ -3275,6 +3305,7 @@ fun WatchScreen(
         ) {
             itemsIndexed(displayEps, key = { idx, item -> "${item.slug}_${idx}" }) { _, item ->
                 val isActive = item.slug == currentEpisodeSlug
+                val isWatched = !isActive && watchedEpisodeSlugs.contains(item.slug)
                 val epNum = item.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
                 Box(
                     modifier = Modifier
@@ -3307,6 +3338,24 @@ fun WatchScreen(
                             fontSize = 11.sp,
                             fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
                         )
+                    }
+                    if (isWatched) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(3.dp)
+                                .size(14.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Color(0xFF4CAF50)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Watched",
+                                tint = Color.White,
+                                modifier = Modifier.size(9.dp)
+                            )
+                        }
                     }
                 }
             }
