@@ -570,8 +570,6 @@ fun HomeScreen(
     val moviesList by viewModel.homeMovies.collectAsState()
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
-    val donations by viewModel.donations.collectAsState()
-    val hasNewDonation by viewModel.hasNewDonation.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
@@ -1125,20 +1123,7 @@ fun HomeScreen(
             }
 
 
-            // Donasi terbaru dari Saweria
-            if (donations.isNotEmpty()) {
-                item {
-                    var donationDismissed by remember { mutableStateOf(false) }
-                    if (!donationDismissed) {
-                        DonationCard(
-                            donations = donations.take(3),
-                            onRefresh = { viewModel.loadDonations() },
-                            onDismiss = { donationDismissed = true },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
+
 
 
             activeAnnouncement?.let { ann ->
