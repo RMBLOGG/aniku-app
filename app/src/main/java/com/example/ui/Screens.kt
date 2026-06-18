@@ -1430,7 +1430,7 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(ongoingList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(ongoingList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1452,7 +1452,7 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(recentList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(recentList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1474,7 +1474,7 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(popularList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(popularList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1496,7 +1496,7 @@ fun HomeScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(moviesList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(moviesList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1619,7 +1619,7 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(popularList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(popularList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeListCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1640,7 +1640,7 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(popularList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(popularList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1672,7 +1672,7 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(results, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(results, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeListCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1693,7 +1693,7 @@ fun SearchScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(results, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                    itemsIndexed(results, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
@@ -1839,7 +1839,7 @@ fun ExploreScreen(
                     )
                 }
             }
-            items(genresList, key = { "${it.slug}_${it.hashCode()}" }) { gen ->
+            itemsIndexed(genresList, key = { idx, it -> "${it.slug}_${idx}" }) { _, gen ->
                 val isSelected = activeGenre == gen.slug
                 Box(
                     modifier = Modifier
@@ -1885,7 +1885,7 @@ fun ExploreScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(itemsList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                        itemsIndexed(itemsList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                             AnimeListCard(
                                 anime = anim,
                                 accentColor = accentColor,
@@ -1914,7 +1914,7 @@ fun ExploreScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(itemsList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                        itemsIndexed(itemsList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                             AnimeCard(
                                 anime = anim,
                                 accentColor = accentColor,
@@ -2128,7 +2128,7 @@ fun ScheduleScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(dayList, key = { "${it.slug}_${it.hashCode()}" }) { anim ->
+                        itemsIndexed(dayList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -2259,7 +2259,7 @@ fun BookmarkScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(bookmarksList, key = { "${it.slug}_${it.hashCode()}" }) { bookmarked ->
+                itemsIndexed(bookmarksList, key = { idx, it -> "${it.slug}_${idx}" }) { _, bookmarked ->
                     val backingRaw = AnimeRaw(
                         title = bookmarked.title,
                         slug = bookmarked.slug,
@@ -2287,7 +2287,7 @@ fun BookmarkScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(bookmarksList, key = { "${it.slug}_${it.hashCode()}" }) { bookmarked ->
+                itemsIndexed(bookmarksList, key = { idx, it -> "${it.slug}_${idx}" }) { _, bookmarked ->
                     val backingRaw = AnimeRaw(
                         title = bookmarked.title,
                         slug = bookmarked.slug,
