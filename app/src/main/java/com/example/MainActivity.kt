@@ -350,13 +350,30 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
+                    bottomBar = {
+                        if (showBottomBar) {
+                            CurvedBottomNav(
+                                mainNavItems = mainNavItems,
+                                currentRoute = currentRoute,
+                                isSheetRouteActive = isSheetRouteActive,
+                                hasUnreadChat = hasUnreadChat,
+                                onNavigate = { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                onMoreClick = { showMoreSheet = true }
+                            )
+                        }
+                    }
                 ) { innerPadding ->
-                    Box(modifier = Modifier.fillMaxSize()) {
                     NavHost(
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(
-                            bottom = if (showBottomBar) 88.dp else 0.dp
+                            bottom = if (showBottomBar) 76.dp else 0.dp
                         ),
                         enterTransition = {
                             fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
@@ -541,31 +558,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-
-                    // Floating nav overlay
-                    if (showBottomBar) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                        ) {
-                            CurvedBottomNav(
-                                mainNavItems = mainNavItems,
-                                currentRoute = currentRoute,
-                                isSheetRouteActive = isSheetRouteActive,
-                                hasUnreadChat = hasUnreadChat,
-                                onNavigate = { route ->
-                                    navController.navigate(route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                onMoreClick = { showMoreSheet = true }
-                            )
-                        }
-                    }
-                    } // end Box overlay
                 }
             }
             } // end else (unlocked)
