@@ -37,10 +37,8 @@ fun CurvedBottomNav(
         Triple("home", "Home", Icons.Default.Home)
     ) + mainNavItems
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
+    Column(
+        modifier = Modifier.fillMaxWidth()
     ) {
         // Pill container
         Row(
@@ -114,6 +112,7 @@ fun CurvedBottomNav(
                 }
             }
         }
+        Spacer(modifier = Modifier.navigationBarsPadding())
     }
 }
 

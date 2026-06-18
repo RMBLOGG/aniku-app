@@ -360,7 +360,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
                         /*if (showBottomBar) {
                             CurvedBottomNav(
