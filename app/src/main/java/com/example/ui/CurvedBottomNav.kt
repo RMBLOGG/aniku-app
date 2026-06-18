@@ -30,121 +30,77 @@ fun CurvedBottomNav(
     onMoreClick: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = MaterialTheme.colorScheme.surface
 
-    // Semua item termasuk Home di depan
     val allItems = listOf(
         Triple("home", "Home", Icons.Default.Home)
     ) + mainNavItems
 
+    // Floating pill — tidak ada background di bawahnya
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(surfaceColor)
             .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
     ) {
-        // Pill container
+        // Pill container utama
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                .padding(horizontal = 6.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .clip(RoundedCornerShape(50.dp))
+                .background(Color(0xFF1C1C1E))
+                .shadow(
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(50.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.5f),
+                    spotColor = Color.Black.copy(alpha = 0.5f)
+                )
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             allItems.forEach { (route, label, icon) ->
                 val isSelected = currentRoute == route
-                FlatNavItem(
+                FloatingNavItem(
                     icon = icon,
                     label = label,
                     isSelected = isSelected,
                     primaryColor = primaryColor,
-                    modifier = Modifier.weight(1f),
                     onClick = { onNavigate(route) }
                 )
             }
 
             // Lainnya
             val moreSelected = isSheetRouteActive
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        if (moreSelected) primaryColor.copy(alpha = 0.12f)
-                        else Color.Transparent
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onMoreClick() }
-                    .padding(vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Box {
-                        Icon(
-                            Icons.Default.MoreHoriz,
-                            contentDescription = "Lainnya",
-                            tint = if (moreSelected) primaryColor
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                            modifier = Modifier.size(22.dp)
-                        )
-                        if (hasUnreadChat) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.error)
-                                    .align(Alignment.TopEnd)
-                            )
-                        }
-                    }
-                    Text(
-                        "Lainnya",
-                        fontSize = 10.sp,
-                        fontWeight = if (moreSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (moreSelected) primaryColor
-                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                    )
-                }
-            }
+            FloatingNavItemMore(
+                isSelected = moreSelected,
+                primaryColor = primaryColor,
+                hasUnreadChat = hasUnreadChat,
+                onClick = onMoreClick
+            )
         }
     }
 }
 
 @Composable
-private fun FlatNavItem(
+private fun FloatingNavItem(
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
     primaryColor: Color,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) primaryColor.copy(alpha = 0.12f) else Color.Transparent,
-        animationSpec = tween(250, easing = EaseOutCubic),
+        targetValue = if (isSelected) Color(0xFF2C2C2E) else Color.Transparent,
+        animationSpec = tween(300, easing = EaseOutCubic),
         label = "nav_bg"
     )
     val iconTint by animateColorAsState(
-        targetValue = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+        targetValue = if (isSelected) Color.White else Color(0xFF8E8E93),
         animationSpec = tween(250),
         label = "nav_tint"
     )
-    val textColor by animateColorAsState(
-        targetValue = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-        animationSpec = tween(250),
-        label = "nav_text_color"
-    )
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.15f else 1f,
+        targetValue = if (isSelected) 1.1f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -153,21 +109,39 @@ private fun FlatNavItem(
     )
 
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
+        modifier = Modifier
+            .clip(RoundedCornerShape(40.dp))
             .background(bgColor)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = 6.dp),
+            .padding(horizontal = if (isSelected) 16.dp else 12.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
+        if (isSelected) {
+            // Active: icon + label inline horizontal
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = iconTint,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                )
+                Text(
+                    text = label,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+        } else {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
@@ -176,12 +150,87 @@ private fun FlatNavItem(
                     .size(22.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
             )
-            Text(
-                text = label,
-                fontSize = 10.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = textColor
+        }
+    }
+}
+
+@Composable
+private fun FloatingNavItemMore(
+    isSelected: Boolean,
+    primaryColor: Color,
+    hasUnreadChat: Boolean,
+    onClick: () -> Unit
+) {
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF2C2C2E) else Color.Transparent,
+        animationSpec = tween(300, easing = EaseOutCubic),
+        label = "more_bg"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (isSelected) Color.White else Color(0xFF8E8E93),
+        animationSpec = tween(250),
+        label = "more_tint"
+    )
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(40.dp))
+            .background(bgColor)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
             )
+            .padding(horizontal = if (isSelected) 16.dp else 12.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isSelected) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    Icon(
+                        Icons.Default.MoreHoriz,
+                        contentDescription = "Lainnya",
+                        tint = iconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    if (hasUnreadChat) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error)
+                                .align(Alignment.TopEnd)
+                        )
+                    }
+                }
+                Text(
+                    "Lainnya",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+        } else {
+            Box {
+                Icon(
+                    Icons.Default.MoreHoriz,
+                    contentDescription = "Lainnya",
+                    tint = iconTint,
+                    modifier = Modifier.size(22.dp)
+                )
+                if (hasUnreadChat) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error)
+                            .align(Alignment.TopEnd)
+                    )
+                }
+            }
         }
     }
 }

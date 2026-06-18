@@ -373,7 +373,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(
-                            bottom = if (showBottomBar) 76.dp else 0.dp
+                            bottom = if (showBottomBar) 88.dp else 0.dp
                         ),
                         enterTransition = {
                             fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
