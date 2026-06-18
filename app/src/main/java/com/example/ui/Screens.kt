@@ -3452,9 +3452,7 @@ fun WatchScreen(
                             }
                         } else {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .imePadding(),
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
