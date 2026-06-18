@@ -357,9 +357,7 @@ private fun HistoryGridCard(
                             colors = listOf(
                                 Color.Transparent,
                                 Color.Black.copy(alpha = 0.7f)
-                            ),
-                            startFraction = 0.5f,
-                            endFraction = 1f
+                            )
                         )
                     )
             )
