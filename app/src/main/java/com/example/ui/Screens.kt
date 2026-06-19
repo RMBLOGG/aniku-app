@@ -8,6 +8,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -2884,6 +2888,7 @@ fun WatchScreen(
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
+    val isDirectStream by viewModel.isDirectStream.collectAsState()
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
@@ -2999,172 +3004,187 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
-                // Render embed stream player - otakuzone style fullscreen
-                var customView by remember { mutableStateOf<android.view.View?>(null) }
-                var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
-
-                val handleHideCustomView = {
-                    customViewCallback?.onCustomViewHidden()
-                    customView = null
-                    customViewCallback = null
-                }
-
-                if (customView != null) {
-                    BackHandler { handleHideCustomView() }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black)
-                    ) {
-                        AndroidView(
-                            factory = {
-                                customView?.apply {
-                                    layoutParams = ViewGroup.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                } ?: android.view.View(it)
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                if (isDirectStream) {
+                    // ── ExoPlayer: untuk URL direct (.mp4 / .m3u8) ──
+                    val ctx = LocalContext.current
+                    val exoPlayer = remember(activeStreamUrl) {
+                        ExoPlayer.Builder(ctx).build().apply {
+                            val mediaItem = MediaItem.fromUri(activeStreamUrl!!)
+                            setMediaItem(mediaItem)
+                            prepare()
+                            playWhenReady = true
+                        }
                     }
-                } else {
-                    var isWebViewLoading by remember { mutableStateOf(true) }
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    DisposableEffect(exoPlayer) {
+                        onDispose { exoPlayer.release() }
+                    }
                     AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
+                        factory = { c ->
+                            PlayerView(c).apply {
+                                player = exoPlayer
                                 layoutParams = ViewGroup.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
-                                settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    mediaPlaybackRequiresUserGesture = false
-                                    useWideViewPort = true
-                                    loadWithOverviewMode = true
-                                    mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                    cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                                    userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                }
-                                android.webkit.CookieManager.getInstance().setAcceptCookie(true)
-                                setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                                android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                                webViewClient = object : WebViewClient() {
-                                    // Domain video player yang diizinkan
-                                    private val allowedDomains = listOf(
-                                        // Vidhide semua subdomain
-                                        "vidhide.com", "vidhidepro.com", "vidhideplus.com",
-                                        // Filemoon
-                                        "filemoon.sx", "filemoon.in", "filemoon.to",
-                                        // Filedon
-                                        "filedon.co", "filedon.com",
-                                        // Dood
-                                        "dood.watch", "doodstream.com", "dood.to",
-                                        "dood.so", "dood.cx", "dood.la",
-                                        // Streamtape
-                                        "streamtape.com", "streamtape.co",
-                                        // Upload services
-                                        "mp4upload.com", "yourupload.com",
-                                        // Mega embed
-                                        "mega.nz", "mega.co.nz",
-                                        // Blogger/Google video embed resmi
-                                        "blogger.com", "blogspot.com",
-                                        "googlevideo.com", "googleapis.com",
-                                        // CDN & player assets
-                                        "gstatic.com", "jwplatform.com", "jwpcdn.com",
-                                        "akamaized.net", "cloudfront.net", "fastly.net",
-                                        "cdnjs.cloudflare.com", "cloudflare.com",
-                                        // Animasu & API source
-                                        "animasu.cc", "sanka.my.id",
-                                        // Abysscdn
-                                        "abysscdn.com",
-                                        // Samehadaku servers
-                                        "samehadaku.how", "v2.samehadaku.how",
-                                        "wibufile.com", "wibu.io",
-                                        "pixeldrain.com",
-                                        "letsupload.io", "letsupload.cc",
-                                        "krakenfiles.com",
-                                        "gofile.io",
-                                        "acefile.co",
-                                        "mediafire.com",
-                                        "mir.cr",
-                                        "nakamaxyz.com", "nakama.to",
-                                        "premium.to",
-                                        "pucuk.eu.org",
-                                        // General CDN
-                                        "cdn.jsdelivr.net", "unpkg.com"
-                                    )
-                                    override fun shouldOverrideUrlLoading(
-                                        view: WebView?,
-                                        request: WebResourceRequest?
-                                    ): Boolean {
-                                        val url = request?.url?.toString() ?: return false
-                                        val host = request.url?.host?.lowercase() ?: return false
-                                        val isAllowed = allowedDomains.any { host.endsWith(it) }
-                                        if (!isAllowed) {
-                                            android.util.Log.w("AnikuWebView", "Blocked redirect: $url")
-                                            return true
-                                        }
-                                        return false
-                                    }
-                                    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                        super.onPageStarted(view, url, favicon)
-                                        isWebViewLoading = true
-                                    }
-                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        isWebViewLoading = false
-                                    }
-                                }
-                                webChromeClient = object : WebChromeClient() {
-                                    override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
-                                        super.onShowCustomView(view, callback)
-                                        customView = view
-                                        customViewCallback = callback
-                                    }
-                                    override fun onHideCustomView() {
-                                        super.onHideCustomView()
-                                        handleHideCustomView()
-                                    }
-                                }
+                                useController = true
                             }
-                        },
-                        update = { view ->
-                            val url = activeStreamUrl ?: return@AndroidView
-                            val headers = mapOf(
-                                "Referer" to "https://v2.samehadaku.how/",
-                                "Origin" to "https://v2.samehadaku.how",
-                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                            )
-                            view.loadUrl(url, headers)
                         },
                         modifier = Modifier.fillMaxSize()
                     )
-                    // Loading overlay di atas WebView
-                    if (isWebViewLoading) {
+                } else {
+                    // ── WebView: untuk URL embed (iframe, dll) ──
+                    var customView by remember { mutableStateOf<android.view.View?>(null) }
+                    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+
+                    val handleHideCustomView = {
+                        customViewCallback?.onCustomViewHidden()
+                        customView = null
+                        customViewCallback = null
+                    }
+
+                    if (customView != null) {
+                        BackHandler { handleHideCustomView() }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.85f)),
-                            contentAlignment = Alignment.Center
+                                .background(Color.Black)
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
-                                Text(
-                                    "Sedang memuat video...",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                            AndroidView(
+                                factory = {
+                                    customView?.apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                    } ?: android.view.View(it)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
+                    } else {
+                        var isWebViewLoading by remember { mutableStateOf(true) }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    WebView(ctx).apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                        settings.apply {
+                                            javaScriptEnabled = true
+                                            domStorageEnabled = true
+                                            mediaPlaybackRequiresUserGesture = false
+                                            useWideViewPort = true
+                                            loadWithOverviewMode = true
+                                            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                        }
+                                        android.webkit.CookieManager.getInstance().setAcceptCookie(true)
+                                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                                        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                        webViewClient = object : WebViewClient() {
+                                            private val allowedDomains = listOf(
+                                                "vidhide.com", "vidhidepro.com", "vidhideplus.com",
+                                                "filemoon.sx", "filemoon.in", "filemoon.to",
+                                                "filedon.co", "filedon.com",
+                                                "dood.watch", "doodstream.com", "dood.to",
+                                                "dood.so", "dood.cx", "dood.la",
+                                                "streamtape.com", "streamtape.co",
+                                                "mp4upload.com", "yourupload.com",
+                                                "mega.nz", "mega.co.nz",
+                                                "blogger.com", "blogspot.com",
+                                                "googlevideo.com", "googleapis.com",
+                                                "gstatic.com", "jwplatform.com", "jwpcdn.com",
+                                                "akamaized.net", "cloudfront.net", "fastly.net",
+                                                "cdnjs.cloudflare.com", "cloudflare.com",
+                                                "animasu.cc", "sanka.my.id",
+                                                "abysscdn.com",
+                                                "samehadaku.how", "v2.samehadaku.how",
+                                                "wibufile.com", "wibu.io",
+                                                "pixeldrain.com",
+                                                "letsupload.io", "letsupload.cc",
+                                                "krakenfiles.com",
+                                                "gofile.io",
+                                                "acefile.co",
+                                                "mediafire.com",
+                                                "mir.cr",
+                                                "nakamaxyz.com", "nakama.to",
+                                                "premium.to",
+                                                "pucuk.eu.org",
+                                                "cdn.jsdelivr.net", "unpkg.com"
+                                            )
+                                            override fun shouldOverrideUrlLoading(
+                                                view: WebView?,
+                                                request: WebResourceRequest?
+                                            ): Boolean {
+                                                val url = request?.url?.toString() ?: return false
+                                                val host = request.url?.host?.lowercase() ?: return false
+                                                val isAllowed = allowedDomains.any { host.endsWith(it) }
+                                                if (!isAllowed) {
+                                                    android.util.Log.w("AnikuWebView", "Blocked redirect: $url")
+                                                    return true
+                                                }
+                                                return false
+                                            }
+                                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                                super.onPageStarted(view, url, favicon)
+                                                isWebViewLoading = true
+                                            }
+                                            override fun onPageFinished(view: WebView?, url: String?) {
+                                                super.onPageFinished(view, url)
+                                                isWebViewLoading = false
+                                            }
+                                        }
+                                        webChromeClient = object : WebChromeClient() {
+                                            override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
+                                                super.onShowCustomView(view, callback)
+                                                customView = view
+                                                customViewCallback = callback
+                                            }
+                                            override fun onHideCustomView() {
+                                                super.onHideCustomView()
+                                                handleHideCustomView()
+                                            }
+                                        }
+                                    }
+                                },
+                                update = { view ->
+                                    val url = activeStreamUrl ?: return@AndroidView
+                                    val headers = mapOf(
+                                        "Referer" to "https://v2.samehadaku.how/",
+                                        "Origin" to "https://v2.samehadaku.how",
+                                        "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    )
+                                    view.loadUrl(url, headers)
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            // Loading overlay di atas WebView
+                            if (isWebViewLoading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.85f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
+                                        Text(
+                                            "Sedang memuat video...",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        } // end Box wrapper
                     }
-                    } // end Box wrapper
                 }
             }
         }

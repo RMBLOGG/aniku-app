@@ -230,6 +230,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _streamError = MutableStateFlow<String?>(null)
     val streamError: StateFlow<String?> = _streamError.asStateFlow()
 
+    private val _isDirectStream = MutableStateFlow(false)
+    val isDirectStream: StateFlow<Boolean> = _isDirectStream.asStateFlow()
+
     // Auth flows
     private val _authLoading = MutableStateFlow(false)
     val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
@@ -724,6 +727,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _streamEpisodeTitle.value = null
         _streamError.value = null
         _isStreamLoading.value = false
+        _isDirectStream.value = false
     }
 
     fun loadEpisodeStream(slug: String) {
@@ -765,12 +769,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val serverId = firstUrl.removePrefix("samehadaku_server:")
                             try {
                                 val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
-                                _activeStreamUrl.value = linkRes.data?.url ?: firstUrl
+                                val resolvedUrl = linkRes.data?.url ?: firstUrl
+                                _activeStreamUrl.value = resolvedUrl
+                                _isDirectStream.value = isDirectUrl(resolvedUrl)
                             } catch (e: Exception) {
                                 _activeStreamUrl.value = firstUrl
+                                _isDirectStream.value = false
                             }
                         } else {
                             _activeStreamUrl.value = firstUrl
+                            _isDirectStream.value = isDirectUrl(firstUrl)
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -783,6 +791,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     if (streamList.isNotEmpty()) {
                         _selectedStreamIndex.value = 0
                         _activeStreamUrl.value = streamList[0].url
+                        _isDirectStream.value = isDirectUrl(streamList[0].url)
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
                     }
@@ -805,27 +814,37 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val serverId = rawUrl.removePrefix("samehadaku_server:")
                 _isStreamLoading.value = true
                 _activeStreamUrl.value = null
+                _isDirectStream.value = false
                 viewModelScope.launch {
                     try {
                         val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                         val resolvedUrl = linkRes.data?.url
                         if (!resolvedUrl.isNullOrEmpty()) {
                             _activeStreamUrl.value = resolvedUrl
+                            _isDirectStream.value = isDirectUrl(resolvedUrl)
                         } else {
                             Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
                             _activeStreamUrl.value = rawUrl
+                            _isDirectStream.value = false
                         }
                     } catch (e: Exception) {
                         Log.e("AnikuVM", "Failed resolve server $serverId: ${e.message}", e)
                         _activeStreamUrl.value = rawUrl
+                        _isDirectStream.value = false
                     } finally {
                         _isStreamLoading.value = false
                     }
                 }
             } else {
                 _activeStreamUrl.value = rawUrl
+                _isDirectStream.value = isDirectUrl(rawUrl)
             }
         }
+    }
+
+    private fun isDirectUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains(".mp4") || lower.contains(".m3u8") || lower.contains(".mkv")
     }
 
     // Toggle Bookmarks locally
