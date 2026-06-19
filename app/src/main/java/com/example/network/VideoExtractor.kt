@@ -60,10 +60,10 @@ object VideoExtractor {
                 host.contains("streamtape") -> extractStreamTape(embedUrl)
                 host.contains("pixeldrain") -> extractPixeldrain(embedUrl)
                 host.contains("mediafire") -> extractMediafire(embedUrl)
+                host.contains("filedon") -> extractFiledon(embedUrl, referer)
                 host.contains("filemoon") ||
                 host.contains("vidhide") ||
                 host.contains("wibufile") ||
-                host.contains("filedon") ||
                 host.contains("streamhide") ||
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
@@ -136,6 +136,34 @@ object VideoExtractor {
         return ResolvedStream(
             url = "https://pixeldrain.com/api/file/$id",
             isHls = false,
+            headers = mapOf("User-Agent" to DESKTOP_UA)
+        )
+    }
+
+    // ---------------------------------------------------------------------
+    // Filedon — halaman embed-nya pakai Inertia.js (Laravel). Data video-nya
+    // (link presigned S3 langsung) ada statis di atribut data-page="{...}"
+    // dalam bentuk JSON yang di-HTML-encode. Gak perlu unpack JS sama sekali.
+    // ---------------------------------------------------------------------
+    private fun extractFiledon(embedUrl: String, referer: String?): ResolvedStream? {
+        val html = fetchHtml(embedUrl, referer ?: embedUrl)
+        val raw = Regex("""data-page="([^"]*)"""").find(html)?.groupValues?.get(1) ?: return null
+        val decoded = raw
+            .replace("&quot;", "\"")
+            .replace("&#039;", "'")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+
+        val props = org.json.JSONObject(decoded).getJSONObject("props")
+        val hlsUrl = props.optJSONObject("media")?.optString("hls_url")
+            ?.takeIf { it.isNotBlank() && it != "null" }
+        val directUrl = props.optString("url").takeIf { it.isNotBlank() && it != "null" }
+        val url = hlsUrl ?: directUrl ?: return null
+
+        return ResolvedStream(
+            url = url,
+            isHls = url.contains(".m3u8"),
             headers = mapOf("User-Agent" to DESKTOP_UA)
         )
     }
