@@ -6,6 +6,13 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.PlayerView
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -2809,6 +2816,57 @@ fun AnimeDetailScreen(
 }
 
 // ================================================================
+// 6b. EXOPLAYER - rendering direct link hasil VideoExtractor
+// ================================================================
+@Composable
+fun ExoVideoPlayer(
+    streamUrl: String,
+    headers: Map<String, String>,
+    modifier: Modifier = Modifier,
+    onPlaybackError: () -> Unit
+) {
+    val context = LocalContext.current
+
+    val exoPlayer = remember(streamUrl) {
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+            .setAllowCrossProtocolRedirects(true)
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory))
+            .build()
+            .apply {
+                setMediaItem(MediaItem.fromUri(streamUrl))
+                playWhenReady = true
+                prepare()
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        android.util.Log.e("ExoVideoPlayer", "Playback error: ${error.message}", error)
+                        onPlaybackError()
+                    }
+                })
+            }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose { exoPlayer.release() }
+    }
+
+    AndroidView(
+        factory = {
+            PlayerView(it).apply {
+                player = exoPlayer
+                useController = true
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        modifier = modifier
+    )
+}
+
+// ================================================================
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
 
@@ -2822,6 +2880,8 @@ fun WatchScreen(
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
+    val resolvedStream by viewModel.resolvedStream.collectAsState()
+    val isResolving by viewModel.isResolving.collectAsState()
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
@@ -2833,6 +2893,10 @@ fun WatchScreen(
     val watchedEpisodeSlugs = remember(watchHistory, currentAnimeSlug) {
         watchHistory.filter { it.animeSlug == currentAnimeSlug }.map { it.episodeSlug }.toSet()
     }
+    // Kalau ExoPlayer gagal play link hasil extractor (regex host meleset/berubah),
+    // kita jatuhkan balik ke WebView lama buat URL embed yang sama ini saja.
+    var forceWebViewFallback by remember { mutableStateOf(false) }
+    LaunchedEffect(activeStreamUrl) { forceWebViewFallback = false }
 
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
@@ -2937,6 +3001,24 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
+                if (isResolving) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
+                            Text("Mengekstrak video...", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                } else if (resolvedStream != null && !forceWebViewFallback) {
+                    ExoVideoPlayer(
+                        streamUrl = resolvedStream!!.url,
+                        headers = resolvedStream!!.headers,
+                        modifier = Modifier.fillMaxSize(),
+                        onPlaybackError = { forceWebViewFallback = true }
+                    )
+                } else {
                 // Render embed stream player - otakuzone style fullscreen
                 var customView by remember { mutableStateOf<android.view.View?>(null) }
                 var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -3071,9 +3153,11 @@ fun WatchScreen(
                         },
                         update = { view ->
                             val url = activeStreamUrl ?: return@AndroidView
+                            val isSamehadaku = viewModel.dataSource.value == "Dayynime-v2"
+                            val refUrl = if (isSamehadaku) "https://v2.samehadaku.how/" else "https://animasu.cc/"
                             val headers = mapOf(
-                                "Referer" to "https://v2.samehadaku.how/",
-                                "Origin" to "https://v2.samehadaku.how",
+                                "Referer" to refUrl,
+                                "Origin" to refUrl.trimEnd('/'),
                                 "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             )
                             view.loadUrl(url, headers)
@@ -3103,6 +3187,7 @@ fun WatchScreen(
                         }
                     }
                     } // end Box wrapper
+                }
                 }
             }
         }

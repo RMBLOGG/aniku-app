@@ -16,6 +16,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 
 class AnikuViewModel(context: Context) : ViewModel() {
+    companion object {
+        private const val SAMEHADAKU_REFERER = "https://v2.samehadaku.how/"
+        private const val ANIMASU_REFERER = "https://animasu.cc/"
+    }
+
     private val appContext = context.applicationContext
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
@@ -229,6 +234,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     private val _streamError = MutableStateFlow<String?>(null)
     val streamError: StateFlow<String?> = _streamError.asStateFlow()
+
+    // Hasil ekstraksi embed -> direct link buat ExoPlayer. Null artinya host belum
+    // didukung extractor (atau gagal di-parse) -> UI fallback ke WebView lama.
+    private val _resolvedStream = MutableStateFlow<ResolvedStream?>(null)
+    val resolvedStream: StateFlow<ResolvedStream?> = _resolvedStream.asStateFlow()
+
+    private val _isResolving = MutableStateFlow(false)
+    val isResolving: StateFlow<Boolean> = _isResolving.asStateFlow()
 
     // Auth flows
     private val _authLoading = MutableStateFlow(false)
@@ -724,6 +737,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _streamEpisodeTitle.value = null
         _streamError.value = null
         _isStreamLoading.value = false
+        _resolvedStream.value = null
+        _isResolving.value = false
+    }
+
+    // Set embed URL aktif lalu coba ekstrak jadi direct link di background.
+    private fun setActiveStream(url: String, referer: String? = null) {
+        _activeStreamUrl.value = url
+        _resolvedStream.value = null
+        viewModelScope.launch {
+            _isResolving.value = true
+            _resolvedStream.value = try {
+                VideoExtractor.resolve(url, referer)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Extractor error: ${e.message}", e)
+                null
+            }
+            _isResolving.value = false
+        }
     }
 
     fun loadEpisodeStream(slug: String) {
@@ -765,12 +796,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             val serverId = firstUrl.removePrefix("samehadaku_server:")
                             try {
                                 val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
-                                _activeStreamUrl.value = linkRes.data?.url ?: firstUrl
+                                setActiveStream(linkRes.data?.url ?: firstUrl, SAMEHADAKU_REFERER)
                             } catch (e: Exception) {
-                                _activeStreamUrl.value = firstUrl
+                                setActiveStream(firstUrl, SAMEHADAKU_REFERER)
                             }
                         } else {
-                            _activeStreamUrl.value = firstUrl
+                            setActiveStream(firstUrl, SAMEHADAKU_REFERER)
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -782,7 +813,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _streams.value = streamList
                     if (streamList.isNotEmpty()) {
                         _selectedStreamIndex.value = 0
-                        _activeStreamUrl.value = streamList[0].url
+                        setActiveStream(streamList[0].url, ANIMASU_REFERER)
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
                     }
@@ -801,29 +832,31 @@ class AnikuViewModel(context: Context) : ViewModel() {
         if (index in streamList.indices) {
             _selectedStreamIndex.value = index
             val rawUrl = streamList[index].url
+            val referer = if (dataSource.value == "Dayynime-v2") SAMEHADAKU_REFERER else ANIMASU_REFERER
             if (rawUrl.startsWith("samehadaku_server:")) {
                 val serverId = rawUrl.removePrefix("samehadaku_server:")
                 _isStreamLoading.value = true
                 _activeStreamUrl.value = null
+                _resolvedStream.value = null
                 viewModelScope.launch {
                     try {
                         val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                         val resolvedUrl = linkRes.data?.url
                         if (!resolvedUrl.isNullOrEmpty()) {
-                            _activeStreamUrl.value = resolvedUrl
+                            setActiveStream(resolvedUrl, referer)
                         } else {
                             Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
-                            _activeStreamUrl.value = rawUrl
+                            setActiveStream(rawUrl, referer)
                         }
                     } catch (e: Exception) {
                         Log.e("AnikuVM", "Failed resolve server $serverId: ${e.message}", e)
-                        _activeStreamUrl.value = rawUrl
+                        setActiveStream(rawUrl, referer)
                     } finally {
                         _isStreamLoading.value = false
                     }
                 }
             } else {
-                _activeStreamUrl.value = rawUrl
+                setActiveStream(rawUrl, referer)
             }
         }
     }
