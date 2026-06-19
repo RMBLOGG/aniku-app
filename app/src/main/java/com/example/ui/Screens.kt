@@ -6,13 +6,6 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.PlayerView
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -1382,48 +1375,110 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(watchHistory, key = { "${it.animeSlug}_${it.episodeSlug}" }) { item ->
-                            Column(
+                            // Variant B — Horizontal compact card
+                            Box(
                                 modifier = Modifier
-                                    .width(110.dp)
+                                    .width(260.dp)
+                                    .height(80.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                                     .clickable { onNavigateToDetail(item.animeSlug) }
                             ) {
-                                Box {
-                                    AsyncImage(
-                                        model = item.animePoster,
-                                        contentDescription = item.animeTitle,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .width(110.dp)
-                                            .height(155.dp)
-                                            .clip(RoundedCornerShape(10.dp))
-                                    )
-                                    // Badge episode
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    // Poster kiri
                                     Box(
                                         modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(4.dp)
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(Color.Black.copy(alpha = 0.75f))
-                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                            .width(56.dp)
+                                            .fillMaxHeight()
+                                    ) {
+                                        AsyncImage(
+                                            model = item.animePoster,
+                                            contentDescription = item.animeTitle,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        // Fade ke kanan
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                        colors = listOf(
+                                                            Color.Transparent,
+                                                            MaterialTheme.colorScheme.surface
+                                                        ),
+                                                        startX = 0f,
+                                                        endX = 140f
+                                                    )
+                                                )
+                                        )
+                                    }
+
+                                    // Info tengah
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .padding(start = 4.dp, top = 10.dp, bottom = 10.dp, end = 8.dp),
+                                        verticalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = item.episodeTitle,
-                                            color = Color.White,
-                                            fontSize = 9.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            text = item.animeTitle,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            lineHeight = 15.sp
+                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(accentColor.copy(alpha = 0.15f))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = item.episodeTitle,
+                                                    color = accentColor,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            val relTime = run {
+                                                val diff = System.currentTimeMillis() - item.watchedAt
+                                                val m = diff / 60_000; val h = diff / 3_600_000; val d = diff / 86_400_000
+                                                when { m < 1 -> "Baru saja"; m < 60 -> "${m}m lalu"; h < 24 -> "${h}j lalu"; d < 7 -> "${d}h lalu"; else -> "${d}h lalu" }
+                                            }
+                                            Text(
+                                                text = relTime,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                            )
+                                        }
+                                    }
+
+                                    // Play icon kanan
+                                    Box(
+                                        modifier = Modifier
+                                            .width(36.dp)
+                                            .fillMaxHeight(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PlayCircleOutline,
+                                            contentDescription = "Play",
+                                            tint = accentColor.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = item.animeTitle,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 11.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 14.sp
-                                )
                             }
                         }
                     }
@@ -2816,57 +2871,6 @@ fun AnimeDetailScreen(
 }
 
 // ================================================================
-// 6b. EXOPLAYER - rendering direct link hasil VideoExtractor
-// ================================================================
-@Composable
-fun ExoVideoPlayer(
-    streamUrl: String,
-    headers: Map<String, String>,
-    modifier: Modifier = Modifier,
-    onPlaybackError: () -> Unit
-) {
-    val context = LocalContext.current
-
-    val exoPlayer = remember(streamUrl) {
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(headers)
-            .setAllowCrossProtocolRedirects(true)
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory))
-            .build()
-            .apply {
-                setMediaItem(MediaItem.fromUri(streamUrl))
-                playWhenReady = true
-                prepare()
-                addListener(object : Player.Listener {
-                    override fun onPlayerError(error: PlaybackException) {
-                        android.util.Log.e("ExoVideoPlayer", "Playback error: ${error.message}", error)
-                        onPlaybackError()
-                    }
-                })
-            }
-    }
-
-    DisposableEffect(exoPlayer) {
-        onDispose { exoPlayer.release() }
-    }
-
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                player = exoPlayer
-                useController = true
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-        },
-        modifier = modifier
-    )
-}
-
-// ================================================================
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
 
@@ -2880,8 +2884,6 @@ fun WatchScreen(
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
-    val resolvedStream by viewModel.resolvedStream.collectAsState()
-    val isResolving by viewModel.isResolving.collectAsState()
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
@@ -2893,10 +2895,6 @@ fun WatchScreen(
     val watchedEpisodeSlugs = remember(watchHistory, currentAnimeSlug) {
         watchHistory.filter { it.animeSlug == currentAnimeSlug }.map { it.episodeSlug }.toSet()
     }
-    // Kalau ExoPlayer gagal play link hasil extractor (regex host meleset/berubah),
-    // kita jatuhkan balik ke WebView lama buat URL embed yang sama ini saja.
-    var forceWebViewFallback by remember { mutableStateOf(false) }
-    LaunchedEffect(activeStreamUrl) { forceWebViewFallback = false }
 
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
@@ -2927,24 +2925,6 @@ fun WatchScreen(
     }
 
     val activity = LocalContext.current as? android.app.Activity
-    val context = LocalContext.current
-
-    // --- DEBUG SEMENTARA: copy embed URL ke clipboard begitu fallback ke WebView,
-    // biar bisa langsung paste ke Termux tanpa perlu adb logcat. Hapus blok ini
-    // (sampai komentar END DEBUG) kalau extractor-nya udah fix semua.
-    var lastCopiedUrl by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(activeStreamUrl, resolvedStream, isResolving, forceWebViewFallback) {
-        val url = activeStreamUrl
-        val needsWebView = !isResolving && !url.isNullOrEmpty() &&
-            (resolvedStream == null || forceWebViewFallback)
-        if (needsWebView && url != lastCopiedUrl) {
-            lastCopiedUrl = url
-            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("embed_url", url))
-            Toast.makeText(context, "Embed URL disalin ke clipboard (fallback WebView)", Toast.LENGTH_LONG).show()
-        }
-    }
-    // --- END DEBUG
     var isFullscreen by remember { mutableStateOf(false) }
 
     // Handle back press to exit fullscreen
@@ -3019,24 +2999,6 @@ fun WatchScreen(
                     Text(text = streamError ?: "Gagal memutar video", color = Color.White, modifier = Modifier.padding(16.dp))
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
-                if (isResolving) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
-                            Text("Mengekstrak video...", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-                    }
-                } else if (resolvedStream != null && !forceWebViewFallback) {
-                    ExoVideoPlayer(
-                        streamUrl = resolvedStream!!.url,
-                        headers = resolvedStream!!.headers,
-                        modifier = Modifier.fillMaxSize(),
-                        onPlaybackError = { forceWebViewFallback = true }
-                    )
-                } else {
                 // Render embed stream player - otakuzone style fullscreen
                 var customView by remember { mutableStateOf<android.view.View?>(null) }
                 var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -3171,11 +3133,9 @@ fun WatchScreen(
                         },
                         update = { view ->
                             val url = activeStreamUrl ?: return@AndroidView
-                            val isSamehadaku = viewModel.dataSource.value == "Dayynime-v2"
-                            val refUrl = if (isSamehadaku) "https://v2.samehadaku.how/" else "https://animasu.cc/"
                             val headers = mapOf(
-                                "Referer" to refUrl,
-                                "Origin" to refUrl.trimEnd('/'),
+                                "Referer" to "https://v2.samehadaku.how/",
+                                "Origin" to "https://v2.samehadaku.how",
                                 "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             )
                             view.loadUrl(url, headers)
@@ -3205,7 +3165,6 @@ fun WatchScreen(
                         }
                     }
                     } // end Box wrapper
-                }
                 }
             }
         }
