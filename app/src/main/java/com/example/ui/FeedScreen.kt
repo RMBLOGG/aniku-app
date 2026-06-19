@@ -262,7 +262,7 @@ private fun TweetCard(
             if (!post.image_url.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 AsyncImage(
-                    model = post.image_url,
+                    model = crossfadeModel(post.image_url),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -359,7 +359,7 @@ private fun TweetAction(
 fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
     if (!avatarUrl.isNullOrEmpty()) {
         AsyncImage(
-            model = avatarUrl,
+            model = crossfadeModel(avatarUrl),
             contentDescription = username,
             modifier = Modifier.size(size).clip(CircleShape),
             contentScale = ContentScale.Crop
@@ -431,7 +431,7 @@ fun FullScreenImage(url: String, onDismiss: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = url,
+                model = crossfadeModel(url),
                 contentDescription = null,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 contentScale = ContentScale.FillWidth

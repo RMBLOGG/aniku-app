@@ -440,7 +440,7 @@ private fun ChatBubble(
         if (!isOwnMessage) {
             if (!message.avatar_url.isNullOrEmpty()) {
                 AsyncImage(
-                    model = message.avatar_url,
+                    model = crossfadeModel(message.avatar_url),
                     contentDescription = message.username,
                     modifier = Modifier
                         .size(32.dp)
@@ -575,7 +575,7 @@ private fun ChatBubble(
                     var showFullImage by remember { mutableStateOf(false) }
                     if (!message.image_url.isNullOrEmpty()) {
                         AsyncImage(
-                            model = message.image_url,
+                            model = crossfadeModel(message.image_url),
                             contentDescription = "Foto",
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -596,7 +596,7 @@ private fun ChatBubble(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     AsyncImage(
-                                        model = message.image_url,
+                                        model = crossfadeModel(message.image_url),
                                         contentDescription = "Foto penuh",
                                         modifier = Modifier
                                             .fillMaxWidth()

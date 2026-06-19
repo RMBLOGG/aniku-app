@@ -342,7 +342,7 @@ private fun HistoryGridCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             AsyncImage(
-                model = item.animePoster,
+                model = crossfadeModel(item.animePoster),
                 contentDescription = item.animeTitle,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -434,7 +434,7 @@ private fun HistoryListCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             AsyncImage(
-                model = item.animePoster,
+                model = crossfadeModel(item.animePoster),
                 contentDescription = item.animeTitle,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
