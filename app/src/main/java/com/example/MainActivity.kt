@@ -41,6 +41,16 @@ import com.example.network.AnikuViewModel
 import com.example.ui.*
 import com.example.ui.theme.MyApplicationTheme
 
+private val TAB_ROUTES = setOf(
+    "home", "search", "explore", "feed", "bookmark",
+    "schedule", "top_supporter", "chat", "profile", "settings"
+)
+
+private fun isTabRoute(route: String?): Boolean {
+    if (route == null) return false
+    return TAB_ROUTES.contains(route)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -395,32 +405,52 @@ class MainActivity : ComponentActivity() {
                             bottom = if (showBottomBar) 76.dp else 0.dp
                         ),
                         enterTransition = {
-                            fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
-                            scaleIn(
-                                initialScale = 0.94f,
-                                animationSpec = tween(280, easing = EaseOutCubic)
-                            )
+                            val toTab = isTabRoute(targetState.destination.route)
+                            val fromTab = isTabRoute(initialState.destination.route)
+                            if (toTab && fromTab) {
+                                fadeIn(animationSpec = tween(220, easing = EaseOutCubic))
+                            } else {
+                                slideInHorizontally(
+                                    initialOffsetX = { it / 3 },
+                                    animationSpec = tween(300, easing = EaseOutCubic)
+                                ) + fadeIn(animationSpec = tween(300, easing = EaseOutCubic))
+                            }
                         },
                         exitTransition = {
-                            fadeOut(animationSpec = tween(200, easing = EaseInCubic)) +
-                            scaleOut(
-                                targetScale = 0.97f,
-                                animationSpec = tween(200, easing = EaseInCubic)
-                            )
+                            val toTab = isTabRoute(targetState.destination.route)
+                            val fromTab = isTabRoute(initialState.destination.route)
+                            if (toTab && fromTab) {
+                                fadeOut(animationSpec = tween(180, easing = EaseInCubic))
+                            } else {
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it / 4 },
+                                    animationSpec = tween(300, easing = EaseInCubic)
+                                ) + fadeOut(animationSpec = tween(220, easing = EaseInCubic))
+                            }
                         },
                         popEnterTransition = {
-                            fadeIn(animationSpec = tween(280, easing = EaseOutCubic)) +
-                            scaleIn(
-                                initialScale = 0.97f,
-                                animationSpec = tween(280, easing = EaseOutCubic)
-                            )
+                            val toTab = isTabRoute(targetState.destination.route)
+                            val fromTab = isTabRoute(initialState.destination.route)
+                            if (toTab && fromTab) {
+                                fadeIn(animationSpec = tween(220, easing = EaseOutCubic))
+                            } else {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 4 },
+                                    animationSpec = tween(300, easing = EaseOutCubic)
+                                ) + fadeIn(animationSpec = tween(300, easing = EaseOutCubic))
+                            }
                         },
                         popExitTransition = {
-                            fadeOut(animationSpec = tween(200, easing = EaseInCubic)) +
-                            scaleOut(
-                                targetScale = 0.94f,
-                                animationSpec = tween(200, easing = EaseInCubic)
-                            )
+                            val toTab = isTabRoute(targetState.destination.route)
+                            val fromTab = isTabRoute(initialState.destination.route)
+                            if (toTab && fromTab) {
+                                fadeOut(animationSpec = tween(180, easing = EaseInCubic))
+                            } else {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it / 3 },
+                                    animationSpec = tween(300, easing = EaseInCubic)
+                                ) + fadeOut(animationSpec = tween(220, easing = EaseInCubic))
+                            }
                         }
                     ) {
                         composable("home") {

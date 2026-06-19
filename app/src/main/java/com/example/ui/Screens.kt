@@ -9,7 +9,6 @@ import android.webkit.WebViewClient
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.activity.compose.BackHandler
@@ -3008,12 +3007,38 @@ fun WatchScreen(
                     // ── ExoPlayer: untuk URL direct (.mp4 / .m3u8) ──
                     val ctx = LocalContext.current
                     val exoPlayer = remember(activeStreamUrl) {
-                        ExoPlayer.Builder(ctx).build().apply {
-                            val mediaItem = MediaItem.fromUri(activeStreamUrl!!)
-                            setMediaItem(mediaItem)
-                            prepare()
-                            playWhenReady = true
-                        }
+                        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                            .setDefaultRequestProperties(mapOf(
+                                "Referer" to "https://v2.samehadaku.how/",
+                                "Origin" to "https://v2.samehadaku.how",
+                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                            ))
+                            .setConnectTimeoutMs(15000)
+                            .setReadTimeoutMs(15000)
+                            .setAllowCrossProtocolRedirects(true)
+
+                        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(ctx, httpDataSourceFactory)
+                        val mediaSourceFactory = androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(dataSourceFactory)
+                        val hlsMediaSourceFactory = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
+
+                        val url = activeStreamUrl!!
+                        val mediaItem = MediaItem.fromUri(url)
+
+                        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                            .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000)
+                            .build()
+
+                        ExoPlayer.Builder(ctx)
+                            .setLoadControl(loadControl)
+                            .setMediaSourceFactory(
+                                if (url.contains(".m3u8")) hlsMediaSourceFactory
+                                else mediaSourceFactory
+                            )
+                            .build().apply {
+                                setMediaItem(mediaItem)
+                                prepare()
+                                playWhenReady = true
+                            }
                     }
                     DisposableEffect(exoPlayer) {
                         onDispose { exoPlayer.release() }
@@ -3161,7 +3186,6 @@ fun WatchScreen(
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
-                            // Loading overlay di atas WebView
                             if (isWebViewLoading) {
                                 Box(
                                     modifier = Modifier
