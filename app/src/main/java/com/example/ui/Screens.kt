@@ -1393,7 +1393,7 @@ fun HomeScreen(
                                             .fillMaxHeight()
                                     ) {
                                         AsyncImage(
-                                            model = crossfadeModel(item.animePoster),
+                                            model = item.animePoster,
                                             contentDescription = item.animeTitle,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
@@ -1588,7 +1588,7 @@ fun HomeScreen(
         ) {
             if (!session.avatarUrl.isNullOrEmpty()) {
                 AsyncImage(
-                    model = crossfadeModel(session.avatarUrl),
+                    model = session.avatarUrl,
                     contentDescription = "Profile",
                     modifier = Modifier
                         .size(38.dp)
@@ -2035,7 +2035,7 @@ fun AnimeListCard(
                 .background(MaterialTheme.colorScheme.surface)
         ) {
             AsyncImage(
-                model = crossfadeModel(anime.poster),
+                model = anime.poster,
                 contentDescription = anime.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -2201,7 +2201,7 @@ fun ScheduleScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 AsyncImage(
-                                    model = crossfadeModel(anim.poster),
+                                    model = anim.poster,
                                     contentDescription = anim.title,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
@@ -2473,7 +2473,7 @@ fun AnimeDetailScreen(
             ) {
                 // Background Poster with Dark Gradient overlays
                 AsyncImage(
-                    model = crossfadeModel(d.poster),
+                    model = d.poster,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -3514,7 +3514,7 @@ fun WatchScreen(
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     if (!msg.avatar_url.isNullOrEmpty()) {
-                                                        AsyncImage(model = crossfadeModel(msg.avatar_url), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                                        AsyncImage(model = msg.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                                                     } else {
                                                         Text(msg.username.take(1).uppercase(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }
@@ -3867,7 +3867,7 @@ fun ProfileScreen(
                     Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
                 } else {
                     AsyncImage(
-                        model = crossfadeModel(sess.avatarUrl),
+                        model = sess.avatarUrl,
                         contentDescription = "Avatar",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
@@ -4428,7 +4428,7 @@ fun AdminPanelScreen(
                                 ) {
                                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                         AsyncImage(
-                                            model = crossfadeModel(ft.anime_poster),
+                                            model = ft.anime_poster,
                                             contentDescription = null,
                                             modifier = Modifier.size(45.dp, 65.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)
                                         )
@@ -4763,7 +4763,7 @@ fun SettingsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box {
                                         AsyncImage(
-                                            model = crossfadeModel(sess.avatarUrl),
+                                            model = sess.avatarUrl,
                                             contentDescription = null,
                                             modifier = Modifier
                                                 .size(56.dp)

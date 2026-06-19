@@ -51,7 +51,7 @@ fun SharedAnimeCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box {
                 AsyncImage(
-                    model = crossfadeModel(poster),
+                    model = poster,
                     contentDescription = title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

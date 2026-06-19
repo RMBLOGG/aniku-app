@@ -447,7 +447,7 @@ private fun PostHeader(
 
         if (!post.image_url.isNullOrEmpty()) {
             AsyncImage(
-                model = crossfadeModel(post.image_url),
+                model = post.image_url,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
