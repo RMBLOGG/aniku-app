@@ -61,6 +61,7 @@ object VideoExtractor {
                 host.contains("pixeldrain") -> extractPixeldrain(embedUrl)
                 host.contains("mediafire") -> extractMediafire(embedUrl)
                 host.contains("filedon") -> extractFiledon(embedUrl, referer)
+                host.contains("blogger") || host.contains("blogspot") -> extractBlogger(embedUrl, referer)
                 host.contains("filemoon") ||
                 host.contains("vidhide") ||
                 host.contains("wibufile") ||
@@ -221,9 +222,62 @@ object VideoExtractor {
             ?: Regex("""file\s*:\s*["'](https?://[^"']+\.(?:m3u8|mp4)[^"']*)["']""").find(js)?.groupValues?.get(1)
     }
 
+    // ---------------------------------------------------------------------
+    // Blogger video embed — URL format: blogger.com/video.g?token=XXX
+    // Response HTML-nya mengandung <video src="..."> atau JSON config
+    // di dalam tag <script> dengan key "play_url" / "streams".
+    // ---------------------------------------------------------------------
+    private fun extractBlogger(embedUrl: String, referer: String?): ResolvedStream? {
+        val html = fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
+
+        // Coba ambil dari <source src="..."> atau <video src="...">
+        val videoSrc = Regex("""<(?:video|source)[^>]+src=["']([^"']+\.(?:mp4|m3u8)[^"']*)["']""", RegexOption.IGNORE_CASE)
+            .find(html)?.groupValues?.get(1)
+        if (!videoSrc.isNullOrBlank()) {
+            return ResolvedStream(
+                url = videoSrc,
+                isHls = videoSrc.contains(".m3u8"),
+                headers = mapOf(
+                    "Referer" to "https://www.blogger.com/",
+                    "User-Agent" to DESKTOP_UA
+                )
+            )
+        }
+
+        // Fallback: cari "play_url":"..." di JSON script
+        val playUrl = Regex(""""play_url"\s*:\s*"([^"]+)"""")
+            .find(html)?.groupValues?.get(1)?.replace("\\/", "/")
+        if (!playUrl.isNullOrBlank()) {
+            return ResolvedStream(
+                url = playUrl,
+                isHls = playUrl.contains(".m3u8"),
+                headers = mapOf(
+                    "Referer" to "https://www.blogger.com/",
+                    "User-Agent" to DESKTOP_UA
+                )
+            )
+        }
+
+        // Fallback: cari stream URL di array streams JSON
+        val streamUrl = Regex(""""url"\s*:\s*"([^"]+\.(?:mp4|m3u8)[^"]*)"""")
+            .find(html)?.groupValues?.get(1)?.replace("\\/", "/")
+        if (!streamUrl.isNullOrBlank()) {
+            return ResolvedStream(
+                url = streamUrl,
+                isHls = streamUrl.contains(".m3u8"),
+                headers = mapOf(
+                    "Referer" to "https://www.blogger.com/",
+                    "User-Agent" to DESKTOP_UA
+                )
+            )
+        }
+
+        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL di $embedUrl")
+        return null
+    }
+
     /**
      * Implementasi unpacker generik untuk "Dean Edwards packer"
-     * (eval(function(p,a,c,k,e,d){...}('payload', radix, count, 'kw1|kw2|...'.split('|'),0,{})))
      * — format obfuscation umum yang dipakai banyak situs mirror video.
      */
     private fun unpackJs(packed: String): String? {

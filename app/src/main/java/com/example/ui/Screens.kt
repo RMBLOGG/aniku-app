@@ -2888,6 +2888,7 @@ fun WatchScreen(
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
     val isDirectStream by viewModel.isDirectStream.collectAsState()
+    val resolvedHeaders by viewModel.resolvedHeaders.collectAsState()
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
@@ -3007,12 +3008,14 @@ fun WatchScreen(
                     // ── ExoPlayer: untuk URL direct (.mp4 / .m3u8) ──
                     val ctx = LocalContext.current
                     val exoPlayer = remember(activeStreamUrl) {
+                        val defaultHeaders = mapOf(
+                            "Referer" to "https://v2.samehadaku.how/",
+                            "Origin" to "https://v2.samehadaku.how",
+                            "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                        )
+                        val headers = if (resolvedHeaders.isNotEmpty()) resolvedHeaders else defaultHeaders
                         val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                            .setDefaultRequestProperties(mapOf(
-                                "Referer" to "https://v2.samehadaku.how/",
-                                "Origin" to "https://v2.samehadaku.how",
-                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                            ))
+                            .setDefaultRequestProperties(headers)
                             .setConnectTimeoutMs(15000)
                             .setReadTimeoutMs(15000)
                             .setAllowCrossProtocolRedirects(true)
