@@ -37,6 +37,22 @@ object VideoExtractor {
         .build()
 
     suspend fun resolve(embedUrl: String, referer: String? = null): ResolvedStream? {
+        Log.d("VideoExtractor", "Resolving embed: $embedUrl (referer=$referer)")
+
+        // Fast-path: beberapa server (terutama varian Wibufile seperti s0.wibufile.com)
+        // sebenarnya udah ngasih link file langsung, bukan embed page. Kalau gitu,
+        // langsung dipakai aja tanpa di-scrape - hemat 1 request & gak ada yang gagal parse.
+        if (Regex("""\.(mp4|m3u8|ts)(\?|$)""").containsMatchIn(embedUrl)) {
+            return ResolvedStream(
+                url = embedUrl,
+                isHls = embedUrl.contains(".m3u8"),
+                headers = mapOf(
+                    "Referer" to (referer ?: embedUrl),
+                    "User-Agent" to DESKTOP_UA
+                )
+            )
+        }
+
         val host = runCatching { URI(embedUrl).host?.lowercase() }.getOrNull() ?: return null
         return try {
             when {
@@ -52,7 +68,10 @@ object VideoExtractor {
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") -> extractPackedJwPlayer(embedUrl, referer)
-                else -> null // host belum didukung -> caller fallback ke WebView
+                else -> {
+                    Log.d("VideoExtractor", "Host '$host' belum ada extractor-nya")
+                    null
+                }
             }
         } catch (e: Exception) {
             Log.e("VideoExtractor", "Gagal resolve $embedUrl: ${e.message}")
@@ -154,7 +173,10 @@ object VideoExtractor {
             attempts++
         }
 
-        val url = fileUrl ?: return null
+        val url = fileUrl ?: run {
+            Log.d("VideoExtractor", "Gak nemu sources/file di $embedUrl - mungkin JS-nya render dinamis (SPA/XHR), bukan static config")
+            return null
+        }
         return ResolvedStream(
             url = url,
             isHls = url.contains(".m3u8"),

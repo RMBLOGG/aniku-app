@@ -2927,6 +2927,24 @@ fun WatchScreen(
     }
 
     val activity = LocalContext.current as? android.app.Activity
+    val context = LocalContext.current
+
+    // --- DEBUG SEMENTARA: copy embed URL ke clipboard begitu fallback ke WebView,
+    // biar bisa langsung paste ke Termux tanpa perlu adb logcat. Hapus blok ini
+    // (sampai komentar END DEBUG) kalau extractor-nya udah fix semua.
+    var lastCopiedUrl by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(activeStreamUrl, resolvedStream, isResolving, forceWebViewFallback) {
+        val url = activeStreamUrl
+        val needsWebView = !isResolving && !url.isNullOrEmpty() &&
+            (resolvedStream == null || forceWebViewFallback)
+        if (needsWebView && url != lastCopiedUrl) {
+            lastCopiedUrl = url
+            val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("embed_url", url))
+            Toast.makeText(context, "Embed URL disalin ke clipboard (fallback WebView)", Toast.LENGTH_LONG).show()
+        }
+    }
+    // --- END DEBUG
     var isFullscreen by remember { mutableStateOf(false) }
 
     // Handle back press to exit fullscreen
