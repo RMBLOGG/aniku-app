@@ -9,8 +9,11 @@ import android.webkit.WebViewClient
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -3005,8 +3008,10 @@ fun WatchScreen(
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
                 if (isDirectStream) {
-                    // ── ExoPlayer: untuk URL direct (.mp4 / .m3u8) ──
+                    // ── Custom Netflix-style ExoPlayer ──
                     val ctx = LocalContext.current
+                    val activity = ctx as? android.app.Activity
+
                     val exoPlayer = remember(activeStreamUrl) {
                         val defaultHeaders = mapOf(
                             "Referer" to "https://v2.samehadaku.how/",
@@ -3019,46 +3024,317 @@ fun WatchScreen(
                             .setConnectTimeoutMs(15000)
                             .setReadTimeoutMs(15000)
                             .setAllowCrossProtocolRedirects(true)
-
                         val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(ctx, httpDataSourceFactory)
-                        val mediaSourceFactory = androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(dataSourceFactory)
-                        val hlsMediaSourceFactory = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
-
                         val url = activeStreamUrl!!
-                        val mediaItem = MediaItem.fromUri(url)
-
                         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-                            .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000)
-                            .build()
-
+                            .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000).build()
                         ExoPlayer.Builder(ctx)
                             .setLoadControl(loadControl)
                             .setMediaSourceFactory(
-                                if (url.contains(".m3u8")) hlsMediaSourceFactory
-                                else mediaSourceFactory
+                                if (url.contains(".m3u8"))
+                                    androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
+                                else
+                                    androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(dataSourceFactory)
                             )
                             .build().apply {
-                                setMediaItem(mediaItem)
+                                setMediaItem(MediaItem.fromUri(url))
                                 prepare()
                                 playWhenReady = true
                             }
                     }
+                    DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
+
+                    // state
+                    var isPlaying by remember { mutableStateOf(true) }
+                    var showControls by remember { mutableStateOf(true) }
+                    var isBuffering by remember { mutableStateOf(true) }
+                    var currentPosition by remember { mutableStateOf(0L) }
+                    var duration by remember { mutableStateOf(0L) }
+                    var playbackSpeed by remember { mutableStateOf(1f) }
+                    var showSpeedMenu by remember { mutableStateOf(false) }
+                    var isLocked by remember { mutableStateOf(false) }
+                    var doubleTapSide by remember { mutableStateOf<String?>(null) } // "left"/"right"/null
+
+                    // listener
                     DisposableEffect(exoPlayer) {
-                        onDispose { exoPlayer.release() }
-                    }
-                    AndroidView(
-                        factory = { c ->
-                            PlayerView(c).apply {
-                                player = exoPlayer
-                                layoutParams = ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                useController = true
+                        val listener = object : Player.Listener {
+                            override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+                            override fun onPlaybackStateChanged(state: Int) {
+                                isBuffering = state == Player.STATE_BUFFERING
                             }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                        }
+                        exoPlayer.addListener(listener)
+                        onDispose { exoPlayer.removeListener(listener) }
+                    }
+
+                    // tick update progress
+                    LaunchedEffect(exoPlayer) {
+                        while (true) {
+                            currentPosition = exoPlayer.currentPosition
+                            duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+                            kotlinx.coroutines.delay(500)
+                        }
+                    }
+
+                    // auto-hide controls after 3s
+                    LaunchedEffect(showControls, isPlaying) {
+                        if (showControls && isPlaying) {
+                            kotlinx.coroutines.delay(3000)
+                            showControls = false
+                        }
+                    }
+
+                    // double tap animation dismiss
+                    LaunchedEffect(doubleTapSide) {
+                        if (doubleTapSide != null) {
+                            kotlinx.coroutines.delay(600)
+                            doubleTapSide = null
+                        }
+                    }
+
+                    fun formatMs(ms: Long): String {
+                        val totalSec = ms / 1000
+                        val h = totalSec / 3600
+                        val m = (totalSec % 3600) / 60
+                        val s = totalSec % 60
+                        return if (h > 0) "%d:%02d:%02d".format(h, m, s)
+                        else "%02d:%02d".format(m, s)
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                        // Video surface
+                        AndroidView(
+                            factory = { c ->
+                                PlayerView(c).apply {
+                                    player = exoPlayer
+                                    useController = false
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Buffering spinner
+                        if (isBuffering) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+
+                        // Double tap ripple feedback
+                        if (doubleTapSide != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(0.4f)
+                                    .align(if (doubleTapSide == "left") Alignment.CenterStart else Alignment.CenterEnd)
+                                    .background(Color.White.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = if (doubleTapSide == "left")
+                                            androidx.compose.material.icons.Icons.Default.Refresh
+                                        else androidx.compose.material.icons.Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                    Text(
+                                        if (doubleTapSide == "left") "-10s" else "+10s",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        // Tap to toggle controls / double tap to skip
+                        var lastTapTime by remember { mutableStateOf(0L) }
+                        var lastTapSide by remember { mutableStateOf("") }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(isLocked) {
+                                    detectTapGestures(
+                                        onTap = { offset ->
+                                            if (isLocked) return@detectTapGestures
+                                            val now = System.currentTimeMillis()
+                                            val side = if (offset.x < size.width / 2f) "left" else "right"
+                                            if (now - lastTapTime < 300 && lastTapSide == side) {
+                                                // double tap
+                                                if (side == "left") exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
+                                                else exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
+                                                doubleTapSide = side
+                                                showControls = false
+                                            } else {
+                                                showControls = !showControls
+                                            }
+                                            lastTapTime = now
+                                            lastTapSide = side
+                                        }
+                                    )
+                                }
+                        )
+
+                        // Controls overlay
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showControls,
+                            enter = androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.fadeOut(),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.45f))
+                            ) {
+                                if (!isLocked) {
+                                    // Center play/pause
+                                    Box(
+                                        modifier = Modifier.align(Alignment.Center)
+                                    ) {
+                                        IconButton(
+                                            onClick = {
+                                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                                showControls = true
+                                            },
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .background(Color.White.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.CircleShape)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isPlaying)
+                                                    androidx.compose.material.icons.Icons.Default.Pause
+                                                else
+                                                    androidx.compose.material.icons.Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(36.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // Bottom bar
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .align(Alignment.BottomCenter)
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        // Seekbar
+                                        Slider(
+                                            value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                                            onValueChange = { exoPlayer.seekTo((it * duration).toLong()) },
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = accentColor,
+                                                activeTrackColor = accentColor,
+                                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                                            ),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                "${formatMs(currentPosition)} / ${formatMs(duration)}",
+                                                color = Color.White,
+                                                fontSize = 12.sp
+                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                // Speed button
+                                                Box {
+                                                    TextButton(onClick = { showSpeedMenu = true }) {
+                                                        Text(
+                                                            "${playbackSpeed}x",
+                                                            color = Color.White,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    DropdownMenu(
+                                                        expanded = showSpeedMenu,
+                                                        onDismissRequest = { showSpeedMenu = false },
+                                                        modifier = Modifier.background(Color(0xFF1A1A1A))
+                                                    ) {
+                                                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                                                            DropdownMenuItem(
+                                                                text = {
+                                                                    Text(
+                                                                        "${speed}x",
+                                                                        color = if (speed == playbackSpeed) accentColor else Color.White,
+                                                                        fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal
+                                                                    )
+                                                                },
+                                                                onClick = {
+                                                                    playbackSpeed = speed
+                                                                    exoPlayer.setPlaybackSpeed(speed)
+                                                                    showSpeedMenu = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Lock/Unlock button — always visible when controls shown
+                                IconButton(
+                                    onClick = { isLocked = !isLocked },
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 12.dp)
+                                        .background(Color.Black.copy(alpha = 0.4f), shape = androidx.compose.foundation.shape.CircleShape)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isLocked)
+                                            androidx.compose.material.icons.Icons.Default.Lock
+                                        else
+                                            androidx.compose.material.icons.Icons.Default.LockOpen,
+                                        contentDescription = "Lock",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Locked indicator — hanya tampil saat locked + controls visible
+                        if (isLocked && showControls) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.3f))
+                            ) {
+                                IconButton(
+                                    onClick = { isLocked = false; showControls = true },
+                                    modifier = Modifier
+                                        .align(Alignment.CenterEnd)
+                                        .padding(end = 12.dp)
+                                        .background(Color.Black.copy(alpha = 0.5f), shape = androidx.compose.foundation.shape.CircleShape)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Default.Lock,
+                                        contentDescription = "Unlock",
+                                        tint = accentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 } else {
                     // ── WebView: untuk URL embed (iframe, dll) ──
                     var customView by remember { mutableStateOf<android.view.View?>(null) }
