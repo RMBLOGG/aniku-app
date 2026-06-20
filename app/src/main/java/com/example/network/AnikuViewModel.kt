@@ -312,7 +312,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _downloadUrl.value = dlUrl
                     _releaseBody.value = json.optString("body", "")
                     val latestClean = tagName.trimStart('v')
-                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.3.4" }
+                    val appVersion = try { com.example.BuildConfig.VERSION_NAME.trimStart('v') } catch (e: Exception) { "1.3.5" }
 
                     fun parseVersion(v: String): List<Int> =
                         v.split(".").map { it.toIntOrNull() ?: 0 }
