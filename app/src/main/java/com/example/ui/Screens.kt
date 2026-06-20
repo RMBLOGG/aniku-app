@@ -675,7 +675,7 @@ fun HomeScreen(
             },
             text = {
                 var showChangelog by remember { mutableStateOf(false) }
-                Column {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
                         text = "Versi terbaru $latestVersion sudah tersedia dan wajib diinstall. Perbarui sekarang untuk melanjutkan menggunakan Aniku.",
                         color = Color.LightGray,
@@ -719,9 +719,11 @@ fun HomeScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .heightIn(max = 260.dp)
                                     .padding(top = 8.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color.White.copy(alpha = 0.05f))
+                                    .verticalScroll(rememberScrollState())
                                     .padding(12.dp)
                             ) {
                                 val markdownLines = releaseBody.lines()
