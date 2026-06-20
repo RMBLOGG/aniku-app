@@ -776,12 +776,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             try {
                                 val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                                 val resolvedUrl = linkRes.data?.url ?: firstUrl
-                                _activeStreamUrl.value = resolvedUrl
-                                _resolvedHeaders.value = mapOf(
-                                    "Referer" to "https://v2.samehadaku.how/",
-                                    "Origin" to "https://v2.samehadaku.how"
-                                )
-                                _isDirectStream.value = isDirectUrl(resolvedUrl)
+                                if (isDirectUrl(resolvedUrl)) {
+                                    _activeStreamUrl.value = resolvedUrl
+                                    _resolvedHeaders.value = mapOf(
+                                        "Referer" to "https://v2.samehadaku.how/",
+                                        "Origin" to "https://v2.samehadaku.how"
+                                    )
+                                    _isDirectStream.value = true
+                                } else {
+                                    val extracted = withContext(Dispatchers.IO) {
+                                        VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/")
+                                    }
+                                    if (extracted != null) {
+                                        _activeStreamUrl.value = extracted.url
+                                        _resolvedHeaders.value = extracted.headers
+                                        _isDirectStream.value = true
+                                    } else {
+                                        _activeStreamUrl.value = resolvedUrl
+                                        _resolvedHeaders.value = emptyMap()
+                                        _isDirectStream.value = false
+                                    }
+                                }
                             } catch (e: Exception) {
                                 _activeStreamUrl.value = firstUrl
                                 _resolvedHeaders.value = emptyMap()
@@ -842,12 +857,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
                         val resolvedUrl = linkRes.data?.url
                         if (!resolvedUrl.isNullOrEmpty()) {
-                            _activeStreamUrl.value = resolvedUrl
-                            _resolvedHeaders.value = mapOf(
-                                "Referer" to "https://v2.samehadaku.how/",
-                                "Origin" to "https://v2.samehadaku.how"
-                            )
-                            _isDirectStream.value = isDirectUrl(resolvedUrl)
+                            if (isDirectUrl(resolvedUrl)) {
+                                _activeStreamUrl.value = resolvedUrl
+                                _resolvedHeaders.value = mapOf(
+                                    "Referer" to "https://v2.samehadaku.how/",
+                                    "Origin" to "https://v2.samehadaku.how"
+                                )
+                                _isDirectStream.value = true
+                            } else {
+                                val extracted = withContext(Dispatchers.IO) {
+                                    VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/")
+                                }
+                                if (extracted != null) {
+                                    _activeStreamUrl.value = extracted.url
+                                    _resolvedHeaders.value = extracted.headers
+                                    _isDirectStream.value = true
+                                } else {
+                                    _activeStreamUrl.value = resolvedUrl
+                                    _resolvedHeaders.value = emptyMap()
+                                    _isDirectStream.value = false
+                                }
+                            }
                         } else {
                             Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
                             _activeStreamUrl.value = rawUrl
