@@ -2,8 +2,10 @@ package com.example
 
 import android.os.Bundle
 import android.Manifest
+import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Rational
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -53,6 +55,22 @@ private fun isTabRoute(route: String?): Boolean {
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        var isWatchingDirectStream = false
+        var pipExoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isWatchingDirectStream && pipExoPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .build()
+            enterPictureInPictureMode(params)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

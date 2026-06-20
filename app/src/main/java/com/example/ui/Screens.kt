@@ -7,7 +7,9 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.view.ViewGroup
+import android.os.Build
 import android.widget.Toast
+import androidx.compose.foundation.border
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -3008,7 +3010,7 @@ fun WatchScreen(
                 }
             } else if (!activeStreamUrl.isNullOrEmpty()) {
                 if (isDirectStream) {
-                    // ── Custom Netflix-style ExoPlayer ──
+                    // ── Design A: Glass · Merah · Modern + PiP ──
                     val ctx = LocalContext.current
                     val activity = ctx as? android.app.Activity
 
@@ -3042,9 +3044,19 @@ fun WatchScreen(
                                 playWhenReady = true
                             }
                     }
-                    DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
 
-                    // state
+                    // Register ke MainActivity untuk PiP
+                    DisposableEffect(exoPlayer) {
+                        com.example.MainActivity.pipExoPlayer = exoPlayer
+                        com.example.MainActivity.isWatchingDirectStream = true
+                        onDispose {
+                            exoPlayer.release()
+                            com.example.MainActivity.pipExoPlayer = null
+                            com.example.MainActivity.isWatchingDirectStream = false
+                        }
+                    }
+
+                    // State
                     var isPlaying by remember { mutableStateOf(true) }
                     var showControls by remember { mutableStateOf(true) }
                     var isBuffering by remember { mutableStateOf(true) }
@@ -3053,9 +3065,32 @@ fun WatchScreen(
                     var playbackSpeed by remember { mutableStateOf(1f) }
                     var showSpeedMenu by remember { mutableStateOf(false) }
                     var isLocked by remember { mutableStateOf(false) }
-                    var doubleTapSide by remember { mutableStateOf<String?>(null) } // "left"/"right"/null
+                    var doubleTapSide by remember { mutableStateOf<String?>(null) }
 
-                    // listener
+                    // PiP state
+                    val isPiP = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val pipMode = remember { mutableStateOf(false) }
+                        DisposableEffect(activity) {
+                            val listener = androidx.core.app.PictureInPictureModeChangedInfo::class
+                            onDispose {}
+                        }
+                        // track via lifecycle
+                        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner) {
+                            val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                                    pipMode.value = activity?.isInPictureInPictureMode == true
+                                } else if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                                    pipMode.value = false
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(obs)
+                            onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+                        }
+                        pipMode.value
+                    } else false
+
+                    // Listener
                     DisposableEffect(exoPlayer) {
                         val listener = object : Player.Listener {
                             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
@@ -3067,7 +3102,7 @@ fun WatchScreen(
                         onDispose { exoPlayer.removeListener(listener) }
                     }
 
-                    // tick update progress
+                    // Progress tick
                     LaunchedEffect(exoPlayer) {
                         while (true) {
                             currentPosition = exoPlayer.currentPosition
@@ -3076,15 +3111,15 @@ fun WatchScreen(
                         }
                     }
 
-                    // auto-hide controls after 3s
+                    // Auto-hide controls
                     LaunchedEffect(showControls, isPlaying) {
-                        if (showControls && isPlaying) {
+                        if (showControls && isPlaying && !isPiP) {
                             kotlinx.coroutines.delay(3000)
                             showControls = false
                         }
                     }
 
-                    // double tap animation dismiss
+                    // Double tap dismiss
                     LaunchedEffect(doubleTapSide) {
                         if (doubleTapSide != null) {
                             kotlinx.coroutines.delay(600)
@@ -3093,15 +3128,22 @@ fun WatchScreen(
                     }
 
                     fun formatMs(ms: Long): String {
-                        val totalSec = ms / 1000
-                        val h = totalSec / 3600
-                        val m = (totalSec % 3600) / 60
-                        val s = totalSec % 60
-                        return if (h > 0) "%d:%02d:%02d".format(h, m, s)
-                        else "%02d:%02d".format(m, s)
+                        val s = ms / 1000
+                        val h = s / 3600; val m = (s % 3600) / 60; val sec = s % 60
+                        return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%02d:%02d".format(m, sec)
+                    }
+
+                    fun enterPiP() {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val params = android.app.PictureInPictureParams.Builder()
+                                .setAspectRatio(android.util.Rational(16, 9))
+                                .build()
+                            activity?.enterPictureInPictureMode(params)
+                        }
                     }
 
                     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+
                         // Video surface
                         AndroidView(
                             factory = { c ->
@@ -3117,220 +3159,234 @@ fun WatchScreen(
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // Buffering spinner
-                        if (isBuffering) {
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
+                        // Buffering
+                        if (isBuffering && !isPiP) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = Color.White, strokeWidth = 2.5.dp)
+                            }
                         }
 
-                        // Double tap ripple feedback
+                        // Double tap ripple
                         if (doubleTapSide != null) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
-                                    .fillMaxWidth(0.4f)
+                                    .fillMaxWidth(0.38f)
                                     .align(if (doubleTapSide == "left") Alignment.CenterStart else Alignment.CenterEnd)
-                                    .background(Color.White.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.CircleShape),
+                                    .background(Color.White.copy(alpha = 0.1f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = if (doubleTapSide == "left")
-                                            androidx.compose.material.icons.Icons.Default.Refresh
-                                        else androidx.compose.material.icons.Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(36.dp)
-                                    )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        if (doubleTapSide == "left") "-10s" else "+10s",
+                                        if (doubleTapSide == "left") "« 10s" else "10s »",
                                         color = Color.White,
-                                        fontSize = 13.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
 
-                        // Tap to toggle controls / double tap to skip
-                        var lastTapTime by remember { mutableStateOf(0L) }
-                        var lastTapSide by remember { mutableStateOf("") }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(isLocked) {
-                                    detectTapGestures(
-                                        onTap = { offset ->
-                                            if (isLocked) return@detectTapGestures
-                                            val now = System.currentTimeMillis()
-                                            val side = if (offset.x < size.width / 2f) "left" else "right"
-                                            if (now - lastTapTime < 300 && lastTapSide == side) {
-                                                // double tap
-                                                if (side == "left") exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
-                                                else exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
-                                                doubleTapSide = side
-                                                showControls = false
-                                            } else {
-                                                showControls = !showControls
-                                            }
-                                            lastTapTime = now
-                                            lastTapSide = side
-                                        }
-                                    )
-                                }
-                        )
-
-                        // Controls overlay
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = showControls,
-                            enter = androidx.compose.animation.fadeIn(),
-                            exit = androidx.compose.animation.fadeOut(),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.45f))
-                            ) {
-                                if (!isLocked) {
-                                    // Center play/pause
-                                    Box(
-                                        modifier = Modifier.align(Alignment.Center)
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                                showControls = true
-                                            },
-                                            modifier = Modifier
-                                                .size(64.dp)
-                                                .background(Color.White.copy(alpha = 0.15f), shape = androidx.compose.foundation.shape.CircleShape)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isPlaying)
-                                                    androidx.compose.material.icons.Icons.Default.Pause
-                                                else
-                                                    androidx.compose.material.icons.Icons.Default.PlayArrow,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(36.dp)
-                                            )
-                                        }
+                        // Tap / double-tap gesture area
+                        if (!isPiP) {
+                            var lastTapTime by remember { mutableStateOf(0L) }
+                            var lastTapSide by remember { mutableStateOf("") }
+                            Box(modifier = Modifier.fillMaxSize().pointerInput(isLocked) {
+                                detectTapGestures(onTap = { offset ->
+                                    if (isLocked) return@detectTapGestures
+                                    val now = System.currentTimeMillis()
+                                    val side = if (offset.x < size.width / 2f) "left" else "right"
+                                    if (now - lastTapTime < 300 && lastTapSide == side) {
+                                        if (side == "left") exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
+                                        else exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
+                                        doubleTapSide = side
+                                        showControls = false
+                                    } else {
+                                        showControls = !showControls
                                     }
+                                    lastTapTime = now; lastTapSide = side
+                                })
+                            })
+                        }
 
-                                    // Bottom bar
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .align(Alignment.BottomCenter)
-                                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                                    ) {
-                                        // Seekbar
-                                        Slider(
-                                            value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                                            onValueChange = { exoPlayer.seekTo((it * duration).toLong()) },
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = accentColor,
-                                                activeTrackColor = accentColor,
-                                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
+                        // Controls overlay — hidden in PiP
+                        if (!isPiP) {
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = showControls,
+                                enter = androidx.compose.animation.fadeIn(tween(200)),
+                                exit = androidx.compose.animation.fadeOut(tween(200)),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                0f to Color.Black.copy(alpha = 0.2f),
+                                                0.4f to Color.Transparent,
+                                                1f to Color.Black.copy(alpha = 0.7f)
+                                            )
                                         )
+                                ) {
+                                    if (!isLocked) {
+                                        // Top bar — chip kualitas + PiP button
                                         Row(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .align(Alignment.TopStart)
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                "${formatMs(currentPosition)} / ${formatMs(duration)}",
-                                                color = Color.White,
-                                                fontSize = 12.sp
+                                            // Quality chip
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                            ) {
+                                                Text("720p", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(0.8f))
+                                            }
+                                            // PiP button
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                IconButton(
+                                                    onClick = { enterPiP() },
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                                                        .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                                                ) {
+                                                    Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", tint = Color.White, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+
+                                        // Center controls
+                                        Row(
+                                            modifier = Modifier.align(Alignment.Center),
+                                            horizontalArrangement = Arrangement.spacedBy(32.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // -10s
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White.copy(0.8f), modifier = Modifier.size(28.dp))
+                                                Text("-10s", fontSize = 9.sp, color = Color.White.copy(0.6f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp)
+                                            }
+                                            // Play/Pause
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(60.dp)
+                                                    .background(accentColor.copy(alpha = 0.9f), CircleShape)
+                                                    .border(1.5.dp, Color.White.copy(0.15f), CircleShape)
+                                                    .clickable {
+                                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                                        showControls = true
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(32.dp)
+                                                )
+                                            }
+                                            // +15s
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White.copy(0.8f), modifier = Modifier.size(28.dp))
+                                                Text("+10s", fontSize = 9.sp, color = Color.White.copy(0.6f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp)
+                                            }
+                                        }
+
+                                        // Bottom bar
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .align(Alignment.BottomCenter)
+                                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            // Progress bar
+                                            Slider(
+                                                value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                                                onValueChange = { exoPlayer.seekTo((it * duration).toLong()) },
+                                                colors = SliderDefaults.colors(
+                                                    thumbColor = accentColor,
+                                                    activeTrackColor = accentColor,
+                                                    inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                                                ),
+                                                modifier = Modifier.fillMaxWidth().height(24.dp)
                                             )
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                // Speed button
-                                                Box {
-                                                    TextButton(onClick = { showSpeedMenu = true }) {
-                                                        Text(
-                                                            "${playbackSpeed}x",
-                                                            color = Color.White,
-                                                            fontSize = 12.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                    DropdownMenu(
-                                                        expanded = showSpeedMenu,
-                                                        onDismissRequest = { showSpeedMenu = false },
-                                                        modifier = Modifier.background(Color(0xFF1A1A1A))
-                                                    ) {
-                                                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
-                                                            DropdownMenuItem(
-                                                                text = {
-                                                                    Text(
-                                                                        "${speed}x",
-                                                                        color = if (speed == playbackSpeed) accentColor else Color.White,
-                                                                        fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal
-                                                                    )
-                                                                },
-                                                                onClick = {
-                                                                    playbackSpeed = speed
-                                                                    exoPlayer.setPlaybackSpeed(speed)
-                                                                    showSpeedMenu = false
-                                                                }
-                                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Timestamp
+                                                Text(
+                                                    "${formatMs(currentPosition)} / ${formatMs(duration)}",
+                                                    color = Color.White.copy(0.75f),
+                                                    fontSize = 11.sp,
+                                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    // Speed pill
+                                                    Box {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .background(Color.Black.copy(0.4f), RoundedCornerShape(20.dp))
+                                                                .border(1.dp, Color.White.copy(0.15f), RoundedCornerShape(20.dp))
+                                                                .clickable { showSpeedMenu = true }
+                                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text("${playbackSpeed}×", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accentColor)
+                                                        }
+                                                        DropdownMenu(
+                                                            expanded = showSpeedMenu,
+                                                            onDismissRequest = { showSpeedMenu = false },
+                                                            modifier = Modifier.background(Color(0xFF1A1A1A))
+                                                        ) {
+                                                            listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                                                                DropdownMenuItem(
+                                                                    text = {
+                                                                        Text(
+                                                                            "${speed}×",
+                                                                            color = if (speed == playbackSpeed) accentColor else Color.White,
+                                                                            fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal,
+                                                                            fontSize = 13.sp
+                                                                        )
+                                                                    },
+                                                                    onClick = {
+                                                                        playbackSpeed = speed
+                                                                        exoPlayer.setPlaybackSpeed(speed)
+                                                                        showSpeedMenu = false
+                                                                    }
+                                                                )
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                }
 
-                                // Lock/Unlock button — always visible when controls shown
-                                IconButton(
-                                    onClick = { isLocked = !isLocked },
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .padding(end = 12.dp)
-                                        .background(Color.Black.copy(alpha = 0.4f), shape = androidx.compose.foundation.shape.CircleShape)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (isLocked)
-                                            androidx.compose.material.icons.Icons.Default.Lock
-                                        else
-                                            androidx.compose.material.icons.Icons.Default.LockOpen,
-                                        contentDescription = "Lock",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Locked indicator — hanya tampil saat locked + controls visible
-                        if (isLocked && showControls) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.3f))
-                            ) {
-                                IconButton(
-                                    onClick = { isLocked = false; showControls = true },
-                                    modifier = Modifier
-                                        .align(Alignment.CenterEnd)
-                                        .padding(end = 12.dp)
-                                        .background(Color.Black.copy(alpha = 0.5f), shape = androidx.compose.foundation.shape.CircleShape)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = androidx.compose.material.icons.Icons.Default.Lock,
-                                        contentDescription = "Unlock",
-                                        tint = accentColor,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    // Lock button — always visible
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .padding(end = 10.dp)
+                                            .size(36.dp)
+                                            .background(Color.Black.copy(0.45f), CircleShape)
+                                            .border(1.dp, Color.White.copy(0.12f), CircleShape)
+                                            .clickable { isLocked = !isLocked },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                            contentDescription = "Lock",
+                                            tint = if (isLocked) accentColor else Color.White.copy(0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
