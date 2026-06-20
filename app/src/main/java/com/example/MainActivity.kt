@@ -61,6 +61,35 @@ class MainActivity : ComponentActivity() {
         var pipExoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
     }
 
+    private fun hideSystemBars() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.navigationBars() or WindowInsets.Type.statusBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        hideSystemBars()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (isWatchingDirectStream && pipExoPlayer != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -78,21 +107,8 @@ class MainActivity : ComponentActivity() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // Immersive sticky: nav bar hilang, muncul lagi kalau swipe dari bawah, lalu auto-hilang
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.navigationBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
-        }
+        // Immersive sticky — juga diperkuat di onResume & onWindowFocusChanged
+        hideSystemBars()
         val viewModel = AnikuViewModel(this)
 
         // Minta izin notifikasi (Android 13+)
