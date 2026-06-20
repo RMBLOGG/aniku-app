@@ -162,11 +162,13 @@ class MainActivity : ComponentActivity() {
             val isDark by viewModel.isDark.collectAsState()
             val accentColorName by viewModel.accentColorName.collectAsState()
             val textSizeScale by viewModel.textSize.collectAsState()
+            val themePreset by viewModel.themePreset.collectAsState()
 
             MyApplicationTheme(
                 darkTheme = isDark,
                 accentName = accentColorName,
-                textScale = textSizeScale
+                textScale = textSizeScale,
+                themePreset = themePreset
             ) {
                 val appLockEnabled by viewModel.appLockEnabled.collectAsState()
                 val appLockType by viewModel.appLockType.collectAsState()

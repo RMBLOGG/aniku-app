@@ -5792,6 +5792,7 @@ fun TampilanScreen(
     val textScale by viewModel.textSize.collectAsState()
     val activeAccent by viewModel.accentColorName.collectAsState()
     val activeGridLayout by viewModel.gridLayout.collectAsState()
+    val activePreset by viewModel.themePreset.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     Column(
@@ -5825,14 +5826,114 @@ fun TampilanScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Section C: Theme preferences toggle
+            // ── Section: Theme Preset ──
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Pilihan Tema", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                    Text(
+                        "Tema Preset",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.05.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val presets = listOf(
+                        Triple("Default", Color(0xFF0A0A0A), Color(0xFFE53935)),
+                        Triple("Netflix", Color(0xFF141414), Color(0xFFE50914)),
+                        Triple("Midnight", Color(0xFF0B0C1A), Color(0xFF7C5AF6))
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        presets.forEach { (name, bgColor, acColor) ->
+                            val isSelected = activePreset == name
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) acColor else Color.White.copy(0.1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .background(bgColor)
+                                    .clickable { viewModel.changeThemePreset(name) }
+                                    .padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Mini preview
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(bgColor.copy(alpha = 0.6f))
+                                ) {
+                                    // Fake nav bar
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(10.dp)
+                                            .background(bgColor)
+                                    )
+                                    // Fake card
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(width = 28.dp, height = 20.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(acColor.copy(0.8f))
+                                    )
+                                    // Fake accent dot
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(4.dp)
+                                            .size(6.dp)
+                                            .background(acColor, CircleShape)
+                                    )
+                                }
+                                // Checkmark or name
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .background(acColor, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                                Text(
+                                    name,
+                                    color = if (isSelected) acColor else Color.White.copy(0.6f),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "Pilihan Tema" + if (activePreset != "Default") "  (diatur oleh preset)" else "",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
