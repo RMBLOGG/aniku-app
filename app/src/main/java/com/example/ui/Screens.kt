@@ -5844,7 +5844,7 @@ fun TampilanScreen(
 
                     val presets = listOf(
                         Triple("Default", Color(0xFF0A0A0A), Color(0xFFE53935)),
-                        Triple("Netflix", Color(0xFF141414), Color(0xFFE50914)),
+                        Triple("OLED", Color(0xFF000000), Color(0xFF00E5FF)),
                         Triple("Midnight", Color(0xFF0B0C1A), Color(0xFF7C5AF6))
                     )
 

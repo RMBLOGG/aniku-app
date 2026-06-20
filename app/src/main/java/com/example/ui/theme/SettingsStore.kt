@@ -16,7 +16,7 @@ class SettingsStore(private val context: Context) {
         val ACCENT_COLOR = stringPreferencesKey("accent_color") // "Red", "Green", "Blue", "Purple", "Orange"
         val GRID_LAYOUT = stringPreferencesKey("grid_layout") // "2", "3", "List"
         val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2"
-        val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "Netflix", "Midnight"
+        val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "OLED", "Midnight"
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
