@@ -5924,6 +5924,7 @@ fun TampilanScreen(
                     }
                 }
             }
+            Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
