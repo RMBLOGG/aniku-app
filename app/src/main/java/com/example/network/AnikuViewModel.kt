@@ -828,9 +828,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     if (streamList.isNotEmpty()) {
                         _selectedStreamIndex.value = 0
                         val firstUrl = streamList[0].url
+                        Log.d("AnikuVM", "VideoExtractor.resolve url: $firstUrl")
+                        // Kalau URL-nya Blogger, langsung expose ke debug dialog supaya keliatan di UI
+                        if (firstUrl.contains("blogger.com", ignoreCase = true) ||
+                            firstUrl.contains("blogspot.com", ignoreCase = true)) {
+                            _bloggerDebugLog.value = "[Raw URL masuk extractor]\n$firstUrl"
+                        }
                         val resolved = withContext(Dispatchers.IO) {
                             VideoExtractor.resolve(firstUrl)
                         }
+                        Log.d("AnikuVM", "VideoExtractor.resolve result: url=${resolved?.url} debugLog=${resolved?.debugLog?.take(100)}")
                         if (resolved != null && resolved.url.isNotEmpty()) {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
@@ -912,9 +919,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _activeStreamUrl.value = null
                 _isDirectStream.value = false
                 viewModelScope.launch {
+                    Log.d("AnikuVM", "selectQuality VideoExtractor.resolve url: $rawUrl")
+                    if (rawUrl.contains("blogger.com", ignoreCase = true) ||
+                        rawUrl.contains("blogspot.com", ignoreCase = true)) {
+                        _bloggerDebugLog.value = "[Raw URL masuk extractor]\n$rawUrl"
+                    }
                     val resolved = withContext(Dispatchers.IO) {
                         VideoExtractor.resolve(rawUrl)
                     }
+                    Log.d("AnikuVM", "selectQuality result: url=${resolved?.url} debugLog=${resolved?.debugLog?.take(100)}")
                     if (resolved != null && resolved.url.isNotEmpty()) {
                         _activeStreamUrl.value = resolved.url
                         _resolvedHeaders.value = resolved.headers
