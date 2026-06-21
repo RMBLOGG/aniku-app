@@ -2959,6 +2959,7 @@ fun WatchScreen(
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
+    val bloggerDebugLog by viewModel.bloggerDebugLog.collectAsState()
     val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
     val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
     val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
@@ -3058,6 +3059,33 @@ fun WatchScreen(
         }
 
         // Webview embed stream container
+
+        // ── Blogger Debug Dialog ──────────────────────────────────
+        if (bloggerDebugLog != null) {
+            val debugScrollState = androidx.compose.foundation.rememberScrollState()
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.clearBloggerDebugLog() },
+                title = { Text("Blogger Debug Log", color = MaterialTheme.colorScheme.error) },
+                text = {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.heightIn(max = 300.dp)
+                    ) {
+                        Text(
+                            text = bloggerDebugLog ?: "",
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.verticalScroll(debugScrollState)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.clearBloggerDebugLog() }) {
+                        Text("Tutup")
+                    }
+                }
+            )
+        }
         Box(
             modifier = if (isFullscreen) Modifier.fillMaxSize().background(Color.Black)
                        else Modifier.fillMaxWidth().height(220.dp).background(Color.Black)

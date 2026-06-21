@@ -235,6 +235,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _streamError = MutableStateFlow<String?>(null)
     val streamError: StateFlow<String?> = _streamError.asStateFlow()
 
+    private val _bloggerDebugLog = MutableStateFlow<String?>(null)
+    val bloggerDebugLog: StateFlow<String?> = _bloggerDebugLog.asStateFlow()
+
     private val _isDirectStream = MutableStateFlow(false)
     val isDirectStream: StateFlow<Boolean> = _isDirectStream.asStateFlow()
 
@@ -737,8 +740,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isStreamLoading.value = false
         _isDirectStream.value = false
         _resolvedHeaders.value = emptyMap()
+        _bloggerDebugLog.value = null
     }
 
+
+    fun clearBloggerDebugLog() {
+        _bloggerDebugLog.value = null
+    }
     fun loadEpisodeStream(slug: String) {
         _isStreamLoading.value = true
         _streams.value = emptyList()
@@ -823,11 +831,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         val resolved = withContext(Dispatchers.IO) {
                             VideoExtractor.resolve(firstUrl)
                         }
-                        if (resolved != null) {
+                        if (resolved != null && resolved.url.isNotEmpty()) {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                         } else {
+                            if (resolved?.debugLog != null) {
+                                _bloggerDebugLog.value = resolved.debugLog
+                            }
                             _activeStreamUrl.value = firstUrl
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
@@ -904,11 +915,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val resolved = withContext(Dispatchers.IO) {
                         VideoExtractor.resolve(rawUrl)
                     }
-                    if (resolved != null) {
+                    if (resolved != null && resolved.url.isNotEmpty()) {
                         _activeStreamUrl.value = resolved.url
                         _resolvedHeaders.value = resolved.headers
                         _isDirectStream.value = true
                     } else {
+                        if (resolved?.debugLog != null) {
+                            _bloggerDebugLog.value = resolved.debugLog
+                        }
                         _activeStreamUrl.value = rawUrl
                         _resolvedHeaders.value = emptyMap()
                         _isDirectStream.value = isDirectUrl(rawUrl)

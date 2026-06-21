@@ -13,7 +13,8 @@ import java.util.concurrent.TimeUnit
 data class ResolvedStream(
     val url: String,
     val isHls: Boolean,
-    val headers: Map<String, String> = emptyMap()
+    val headers: Map<String, String> = emptyMap(),
+    val debugLog: String? = null  // diisi saat extractor gagal, berisi 500 char pertama response
 )
 
 /**
@@ -284,8 +285,13 @@ object VideoExtractor {
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
 
-        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: ${html.take(500)}")
-        return null
+        val snippet = html.take(500)
+        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: $snippet")
+        return ResolvedStream(
+            url = "",
+            isHls = false,
+            debugLog = "[Blogger Debug] Semua pattern gagal.\nResponse 500 char pertama:\n$snippet"
+        )
     }
 
     /**
