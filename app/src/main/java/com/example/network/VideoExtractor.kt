@@ -234,11 +234,29 @@ object VideoExtractor {
             return null
         }
 
+        // Pattern 0: Kalau response adalah halaman HTML Blogger biasa (bukan embed),
+        // cari iframe/embed src yang mengarah ke video.g atau embed Blogger, lalu fetch itu.
+        if (html.contains("<!doctype html", ignoreCase = true) || html.contains("<html", ignoreCase = true)) {
+            val iframeSrc = Regex("""<iframe[^>]+src=["']([^"']*(?:blogger\.com/video|video\.g)[^"']*)["']""", RegexOption.IGNORE_CASE)
+                .find(html)?.groupValues?.get(1)
+            if (!iframeSrc.isNullOrBlank()) {
+                Log.d("VideoExtractor", "Blogger: halaman HTML, found iframe src: $iframeSrc")
+                val embedHtml = fetchHtml(iframeSrc, embedUrl)
+                // Rekursif satu level: jalankan pattern 1-5 pada response iframe
+                return extractBloggerFromHtml(iframeSrc, embedHtml)
+            }
+            // Cari juga div/script yang punya data-blogid atau VIDEO_CONFIG langsung
+            Log.d("VideoExtractor", "Blogger: HTML page tapi tidak ada iframe video.g, lanjut ke pattern biasa")
+        }
+
+        return extractBloggerFromHtml(embedUrl, html)
+    }
+
+    private fun extractBloggerFromHtml(sourceUrl: String, html: String): ResolvedStream {
         // Pattern 1: VIDEO_CONFIG = {...} JavaScript object
         val videoConfigJson = Regex("""VIDEO_CONFIG\s*=\s*(\{.+?\})\s*;""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!videoConfigJson.isNullOrBlank()) {
-            // Cari play_url di dalam VIDEO_CONFIG
             val playUrl = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .find(videoConfigJson)?.groupValues?.get(1)?.replace("\\/", "/")
             if (!playUrl.isNullOrBlank()) {
@@ -251,10 +269,9 @@ object VideoExtractor {
         val streamsBlock = Regex(""""streams"\s*:\s*\[(.+?)\]""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!streamsBlock.isNullOrBlank()) {
-            // Ambil play_url tertinggi (biasanya format_id terbesar = kualitas terbaik)
             val allUrls = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .findAll(streamsBlock).map { it.groupValues[1].replace("\\/", "/") }.toList()
-            val best = allUrls.lastOrNull() // last = highest quality
+            val best = allUrls.lastOrNull()
             if (!best.isNullOrBlank()) {
                 return ResolvedStream(url = best, isHls = best.contains(".m3u8"),
                     headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
@@ -285,12 +302,12 @@ object VideoExtractor {
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
 
-        val snippet = html.take(500)
+        val snippet = html.take(800)
         Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: $snippet")
         return ResolvedStream(
             url = "",
             isHls = false,
-            debugLog = "[Blogger Debug] Semua pattern gagal.\nResponse 500 char pertama:\n$snippet"
+            debugLog = "[Blogger Debug] Semua pattern gagal.\n[URL]: $sourceUrl\n\nResponse 800 char pertama:\n$snippet"
         )
     }
 
