@@ -478,10 +478,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     try {
                         val schedRes = retryIO { samehadakuApi.getSchedule() }
                         val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
-                        val dayNames = listOf("minggu","senin","selasa","rabu","kamis","jumat","sabtu")
-                        val todayName = dayNames[todayDay - 1]
+                        // Samehadaku pakai nama hari Inggris
+                        val engDayNames = listOf("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")
+                        val todayEngName = engDayNames[todayDay - 1]
                         val todayList = schedRes.data?.days
-                            ?.firstOrNull { it.day.lowercase().contains(todayName) || it.day.lowercase().contains(todayName.take(3)) }
+                            ?.firstOrNull { it.day.equals(todayEngName, ignoreCase = true) }
                             ?.animeList?.map { it.toAnimeRaw() } ?: emptyList()
                         _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
                     } catch (se: Exception) { Log.e("AnikuVM", "Failed samehadaku home schedule", se) }
