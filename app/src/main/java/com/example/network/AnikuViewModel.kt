@@ -850,6 +850,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _activeStreamUrl.value = resolvedUrl
                                         _resolvedHeaders.value = emptyMap()
                                         _isDirectStream.value = false
+                                        // Debug: tampilkan response Blogger di streamError sementara
+                                        if (resolvedUrl.contains("blogger")) {
+                                            _streamError.value = "[DEBUG Blogger] ${VideoExtractor.lastBloggerDebug.take(300)}"
+                                        }
                                     }
                                 }
                             } catch (e: Exception) {

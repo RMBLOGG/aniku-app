@@ -26,6 +26,8 @@ data class ResolvedStream(
  * ke WebView lama supaya video tetap bisa diputar.
  */
 object VideoExtractor {
+    // Debug field — diisi saat Blogger gagal di-extract, bisa ditampilkan di UI
+    var lastBloggerDebug: String = ""
 
     private const val DESKTOP_UA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -226,21 +228,29 @@ object VideoExtractor {
     // Blogger video embed — URL format: blogger.com/video.g?token=XXX
     // Response bisa berupa JSON dengan "streams" array atau JS dengan VIDEO_CONFIG
     private fun extractBlogger(embedUrl: String, referer: String?): ResolvedStream? {
-        val html = fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
+        // Blogger butuh follow redirect dan cookie
+        val html = try {
+            fetchHtmlBlogger(embedUrl)
+        } catch (e: Exception) {
+            Log.e("VideoExtractor", "Blogger fetch error: ${e.message}")
+            return null
+        }
 
         if (html.isBlank()) {
             Log.d("VideoExtractor", "Blogger: empty response for $embedUrl")
             return null
         }
 
+        Log.d("VideoExtractor", "Blogger response snippet: ${html.take(800)}")
+
         // Pattern 1: VIDEO_CONFIG = {...} JavaScript object
         val videoConfigJson = Regex("""VIDEO_CONFIG\s*=\s*(\{.+?\})\s*;""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!videoConfigJson.isNullOrBlank()) {
-            // Cari play_url di dalam VIDEO_CONFIG
             val playUrl = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .find(videoConfigJson)?.groupValues?.get(1)?.replace("\\/", "/")
             if (!playUrl.isNullOrBlank()) {
+                Log.d("VideoExtractor", "Blogger: found via VIDEO_CONFIG: $playUrl")
                 return ResolvedStream(url = playUrl, isHls = playUrl.contains(".m3u8"),
                     headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
             }
@@ -250,11 +260,11 @@ object VideoExtractor {
         val streamsBlock = Regex(""""streams"\s*:\s*\[(.+?)\]""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!streamsBlock.isNullOrBlank()) {
-            // Ambil play_url tertinggi (biasanya format_id terbesar = kualitas terbaik)
             val allUrls = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .findAll(streamsBlock).map { it.groupValues[1].replace("\\/", "/") }.toList()
-            val best = allUrls.lastOrNull() // last = highest quality
+            val best = allUrls.lastOrNull()
             if (!best.isNullOrBlank()) {
+                Log.d("VideoExtractor", "Blogger: found via streams[]: $best")
                 return ResolvedStream(url = best, isHls = best.contains(".m3u8"),
                     headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
             }
@@ -264,6 +274,7 @@ object VideoExtractor {
         val playUrl = Regex(""""play_url"\s*:\s*"([^"]+)"""")
             .find(html)?.groupValues?.get(1)?.replace("\\/", "/")
         if (!playUrl.isNullOrBlank()) {
+            Log.d("VideoExtractor", "Blogger: found via play_url: $playUrl")
             return ResolvedStream(url = playUrl, isHls = playUrl.contains(".m3u8"),
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
@@ -272,6 +283,7 @@ object VideoExtractor {
         val videoSrc = Regex("""<(?:video|source)[^>]+src=["']([^"']+\.(?:mp4|m3u8)[^"']*)["']""", RegexOption.IGNORE_CASE)
             .find(html)?.groupValues?.get(1)
         if (!videoSrc.isNullOrBlank()) {
+            Log.d("VideoExtractor", "Blogger: found via <video src>: $videoSrc")
             return ResolvedStream(url = videoSrc, isHls = videoSrc.contains(".m3u8"),
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
@@ -280,12 +292,45 @@ object VideoExtractor {
         val directUrl = Regex("""https?://[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*""")
             .find(html)?.value
         if (!directUrl.isNullOrBlank()) {
+            Log.d("VideoExtractor", "Blogger: found via direct URL: $directUrl")
             return ResolvedStream(url = directUrl, isHls = directUrl.contains(".m3u8"),
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
 
-        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: ${html.take(500)}")
+        val debug = "HTTP→${html.take(600)}"
+        Log.d("VideoExtractor", "Blogger: semua pattern gagal. $debug")
+        lastBloggerDebug = debug
         return null
+    }
+
+    private fun fetchHtmlBlogger(url: String): String {
+        // Blogger butuh cookie dan follow redirect manual
+        val cookieJar = object : okhttp3.CookieJar {
+            private val store = mutableListOf<okhttp3.Cookie>()
+            override fun saveFromResponse(url: okhttp3.HttpUrl, cookies: List<okhttp3.Cookie>) { store.addAll(cookies) }
+            override fun loadForRequest(url: okhttp3.HttpUrl): List<okhttp3.Cookie> = store.filter { it.matches(url) }
+        }
+        val bloggerClient = OkHttpClient.Builder()
+            .cookieJar(cookieJar)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", DESKTOP_UA)
+            .header("Referer", "https://www.blogger.com/")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.5")
+            .build()
+
+        bloggerClient.newCall(request).execute().use { resp ->
+            Log.d("VideoExtractor", "Blogger HTTP ${resp.code} for $url")
+            Log.d("VideoExtractor", "Blogger final URL: ${resp.request.url}")
+            return resp.body?.string() ?: ""
+        }
     }
 
     /**
