@@ -953,8 +953,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _activeStreamUrl.value = null
                 _isDirectStream.value = false
                 viewModelScope.launch {
-                    val resolved = withContext(Dispatchers.IO) {
+                    // Blogger butuh Main thread (WebView), host lain pakai IO
+                    val isBlogger = rawUrl.contains("blogger.com") || rawUrl.contains("blogspot.com")
+                    val resolved = if (isBlogger) {
                         VideoExtractor.resolve(rawUrl, null, appContext)
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(rawUrl, null, appContext)
+                        }
                     }
                     if (resolved != null) {
                         _activeStreamUrl.value = resolved.url
