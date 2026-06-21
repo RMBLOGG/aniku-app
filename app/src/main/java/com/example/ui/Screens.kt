@@ -1726,15 +1726,11 @@ fun HomeScreen(
                                     .data(anim.poster).crossfade(300).build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().graphicsLayer {
-                                    colorFilter = android.graphics.ColorFilter.colorMatrix(
-                                        android.graphics.ColorMatrix().also { it.setSaturation(0f) }
-                                    ) as? androidx.compose.ui.graphics.ColorFilter
-                                        ?: androidx.compose.ui.graphics.ColorFilter.colorMatrix(
-                                            androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
-                                        )
-                                    alpha = 0.45f
-                                }
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+                                    androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
+                                ),
+                                alpha = 0.45f,
+                                modifier = Modifier.fillMaxSize()
                             )
                             // Gradient kiri ke kanan
                             Box(modifier = Modifier.fillMaxSize().background(
@@ -1836,7 +1832,6 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(if (idx % 2 == 0) Color(0xFF111111) else Color(0xFF0E0E0E))
-                                        .then(if (idx > 0) Modifier.border(top = androidx.compose.foundation.layout.WindowInsets.Companion.let { 0.dp }, width = 0.dp, color = Color.Transparent) else Modifier)
                                         .clickable { onNavigateToDetail(anim.slug) }
                                         .padding(horizontal = 16.dp, vertical = 12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
