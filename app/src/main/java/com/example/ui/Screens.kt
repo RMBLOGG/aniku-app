@@ -110,7 +110,8 @@ fun AnimeCard(
     modifier: Modifier = Modifier,
     isLoggedIn: Boolean = true,
     onLoginRequired: () -> Unit = {},
-    viewerCount: Int = 0
+    viewerCount: Int = 0,
+    cardStyle: String = "Rounded"
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -124,184 +125,231 @@ fun AnimeCard(
     )
     val context = LocalContext.current
 
+    // corner radius berdasarkan style
+    val cornerRadius = when (cardStyle) {
+        "Sharp"  -> 4.dp
+        "Poster" -> 12.dp
+        "Wide"   -> 10.dp
+        else     -> 16.dp // Rounded
+    }
+
+    // Wide (16:9) — layout berbeda
+    if (cardStyle == "Wide") {
+        Column(
+            modifier = modifier
+                .width(160.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(cornerRadius))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                    contentDescription = anime.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
+                )))
+                anime.type?.let {
+                    Box(modifier = Modifier.padding(6.dp).clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFFFF8C00)).padding(horizontal = 5.dp, vertical = 2.dp)
+                        .align(Alignment.TopStart)) {
+                        Text(it, color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                anime.episode?.let {
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(0.7f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)) {
+                        Text(it, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                IconButton(
+                    onClick = { if (isLoggedIn) onBookmarkToggle() else onLoginRequired() },
+                    modifier = Modifier.padding(4.dp).size(28.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape).align(Alignment.TopEnd)
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Bookmark", tint = if (isBookmarked) accentColor else Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(anime.title, color = MaterialTheme.colorScheme.onBackground, fontSize = 10.sp,
+                fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 2.dp))
+            anime.type?.let {
+                Text(it + " · Sub Indo", color = MaterialTheme.colorScheme.onBackground.copy(0.4f),
+                    fontSize = 9.sp, maxLines = 1, modifier = Modifier.padding(horizontal = 2.dp))
+            }
+        }
+        return
+    }
+
+    // Poster Only style — title overlay di dalam poster
+    if (cardStyle == "Poster") {
+        Box(
+            modifier = modifier
+                .width(115.dp)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(cornerRadius))
+                .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                contentDescription = anime.title, contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(0.85f)),
+                startY = 0f
+            )))
+            anime.type?.let {
+                Box(modifier = Modifier.padding(6.dp).clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFFF8C00)).padding(horizontal = 5.dp, vertical = 2.dp)
+                    .align(Alignment.TopStart)) {
+                    Text(it, color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                }
+            }
+            IconButton(
+                onClick = { if (isLoggedIn) onBookmarkToggle() else onLoginRequired() },
+                modifier = Modifier.padding(2.dp).size(28.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape).align(Alignment.TopEnd)
+            ) {
+                Icon(imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Bookmark", tint = if (isBookmarked) accentColor else Color.White,
+                    modifier = Modifier.size(14.dp))
+            }
+            anime.episode?.let {
+                Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 6.dp, bottom = 26.dp)
+                    .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(0.6f))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)) {
+                    Text(it, color = Color.White, fontSize = 8.sp)
+                }
+            }
+            Text(anime.title, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 13.sp,
+                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp))
+            if (viewerCount > 0) {
+                Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Box(modifier = Modifier.size(5.dp).background(Color(0xFF4CAF50), CircleShape))
+                        Text(if (viewerCount >= 1000) "${viewerCount/1000}k" else "$viewerCount",
+                            color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    // Rounded + Sharp — layout sama, beda corner radius
     Column(
         modifier = modifier
             .testTag("anime_card_${anime.slug}")
             .width(115.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) { onClick() }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
                 .drawBehind {
-                    // Glow shadow bawah card
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f)),
-                            startY = size.height * 0.6f,
-                            endY = size.height + 12f
-                        )
-                    )
+                    drawRect(brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f)),
+                        startY = size.height * 0.6f, endY = size.height + 12f
+                    ))
                 }
-                .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(cornerRadius))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(cornerRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            // Image Poster
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(anime.poster)
-                    .crossfade(300)
-                    .build(),
-                contentDescription = anime.title,
-                contentScale = ContentScale.Crop,
+                model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                contentDescription = anime.title, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
+            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
+                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.4f))
+            )))
 
-            // Dynamic Subtle overlay for depth
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.1f),
-                                Color.Black.copy(alpha = 0.4f)
-                            )
-                        )
-                    )
-            )
-
-            // Type Badge (Top-left) - Orange bg, black bold text as per spec
+            // Type Badge
             anime.type?.let { typeString ->
                 if (typeString.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFFF8C00)) // AccentOrange or FF8C00 in theme
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                            .align(Alignment.TopStart)
-                    ) {
-                        Text(
-                            text = typeString,
-                            color = Color.Black,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Black
-                        )
+                    Box(modifier = Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFFFF8C00)).padding(horizontal = 6.dp, vertical = 2.dp)
+                        .align(Alignment.TopStart)) {
+                        Text(text = typeString, color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Black)
                     }
                 }
             }
 
-            // Bookmark Icon (Top-right)
+            // Bookmark
             IconButton(
                 onClick = { if (isLoggedIn) onBookmarkToggle() else onLoginRequired() },
-                modifier = Modifier
-                    .padding(4.dp)
-                    .size(32.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                    .align(Alignment.TopEnd)
+                modifier = Modifier.padding(4.dp).size(32.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape).align(Alignment.TopEnd)
                     .testTag("bookmark_btn_${anime.slug}")
             ) {
-                Icon(
-                    imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Bookmark",
-                    tint = if (isBookmarked) accentColor else Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
+                Icon(imageVector = if (isBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Bookmark", tint = if (isBookmarked) accentColor else Color.White,
+                    modifier = Modifier.size(16.dp))
             }
 
-            // Episode Badge (Bottom-left) - Dense dark semi-transparent bg
+            // Episode Badge
             anime.episode?.let { epString ->
                 if (epString.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = epString,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Box(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.65f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text(text = epString, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            // Status or Day Badge (Bottom-right) - e.g., Fire emojis or Selesai v
+            // Status Badge
             anime.status_or_day?.let { statusString ->
                 if (statusString.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = statusString,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Box(modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
+                        .clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.65f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Text(text = statusString, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            // Viewer count badge (top-center) - only show if > 0
+            // Viewer count
             if (viewerCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 8.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xCC000000))
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(5.dp)
-                                .background(Color(0xFF4CAF50), CircleShape)
-                        )
-                        Text(
-                            text = if (viewerCount >= 1000) "${viewerCount / 1000}k" else "$viewerCount",
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+                    .clip(RoundedCornerShape(10.dp)).background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Box(modifier = Modifier.size(5.dp).background(Color(0xFF4CAF50), CircleShape))
+                        Text(text = if (viewerCount >= 1000) "${viewerCount / 1000}k" else "$viewerCount",
+                            color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(6.dp))
-
-        // Title text styled as per spec: text-[11px] font-bold line-clamp-2
-        Text(
-            text = anime.title,
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            lineHeight = 14.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp)
-        )
+        Text(text = anime.title, color = MaterialTheme.colorScheme.onBackground, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, lineHeight = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp))
     }
 }
 
@@ -606,6 +654,7 @@ fun HomeScreen(
     val recentList by viewModel.homeRecent.collectAsState()
     val popularList by viewModel.homePopular.collectAsState()
     val moviesList by viewModel.homeMovies.collectAsState()
+    val cardStyle by viewModel.cardStyle.collectAsState()
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
@@ -1511,7 +1560,8 @@ fun HomeScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { showLoginDialog = true },
-                            viewerCount = viewerCounts[anim.slug] ?: 0
+                            viewerCount = viewerCounts[anim.slug] ?: 0,
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1533,7 +1583,8 @@ fun HomeScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { showLoginDialog = true },
-                            viewerCount = viewerCounts[anim.slug] ?: 0
+                            viewerCount = viewerCounts[anim.slug] ?: 0,
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1555,7 +1606,8 @@ fun HomeScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { showLoginDialog = true },
-                            viewerCount = viewerCounts[anim.slug] ?: 0
+                            viewerCount = viewerCounts[anim.slug] ?: 0,
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1577,7 +1629,8 @@ fun HomeScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { showLoginDialog = true },
-                            viewerCount = viewerCounts[anim.slug] ?: 0
+                            viewerCount = viewerCounts[anim.slug] ?: 0,
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1634,6 +1687,7 @@ fun SearchScreen(
     val isLoading by viewModel.isSearchLoading.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val cardStyle by viewModel.cardStyle.collectAsState()
     val gridLayout by viewModel.gridLayout.collectAsState()
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
@@ -1699,7 +1753,8 @@ fun SearchScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = { onLoginRequired() },
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1721,7 +1776,8 @@ fun SearchScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = { onLoginRequired() },
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1752,7 +1808,8 @@ fun SearchScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = { onLoginRequired() },
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1774,7 +1831,8 @@ fun SearchScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = { onLoginRequired() },
+                        cardStyle = cardStyle
                         )
                     }
                 }
@@ -1800,6 +1858,7 @@ fun ExploreScreen(
     val isLoading by viewModel.isExploreLoading.collectAsState()
     val hasNext by viewModel.exploreHasNext.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
     val session by viewModel.session.collectAsState()
@@ -1993,7 +2052,8 @@ fun ExploreScreen(
                                 onClick = { onNavigateToDetail(anim.slug) },
                                 isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                                 onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                cardStyle = cardStyle
                             )
                         }
                         if (isLoading) {
@@ -2273,6 +2333,7 @@ fun BookmarkScreen(
     onNavigateToDetail: (String) -> Unit
 ) {
     val bookmarksList by viewModel.bookmarks.collectAsState()
+    val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
 
@@ -2375,7 +2436,8 @@ fun BookmarkScreen(
                         onBookmarkToggle = {
                             viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster)
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        cardStyle = cardStyle
                     )
                 }
             }
@@ -2383,7 +2445,7 @@ fun BookmarkScreen(
     }
 }
 
-// ================================================================
+)// ================================================================
 // 6. ANIME DETAIL SCREEN
 // ================================================================
 
@@ -5793,6 +5855,8 @@ fun TampilanScreen(
     val activeAccent by viewModel.accentColorName.collectAsState()
     val activeGridLayout by viewModel.gridLayout.collectAsState()
     val activePreset by viewModel.themePreset.collectAsState()
+    val activeCardStyle by viewModel.cardStyle.collectAsState()
+    val activeNavStyle by viewModel.navStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     Column(
@@ -5826,6 +5890,88 @@ fun TampilanScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ── Section: Card Style ──
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Style Card Anime", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val cardOptions = listOf("Rounded" to "Sudut bulat", "Sharp" to "Sudut tajam", "Poster" to "Judul overlay", "Wide" to "Landscape 16:9")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        cardOptions.forEach { (style, desc) ->
+                            val isSelected = activeCardStyle == style
+                            Column(
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                    .border(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else Color.White.copy(0.1f), RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) accentColor.copy(0.08f) else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeCardStyle(style) }
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (isSelected) {
+                                    Box(modifier = Modifier.size(16.dp).background(accentColor, CircleShape), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                    }
+                                } else {
+                                    Box(modifier = Modifier.size(16.dp).background(Color.White.copy(0.08f), CircleShape))
+                                }
+                                Text(style, fontSize = 10.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface.copy(0.6f))
+                                Text(desc, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.4f),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Section: Nav Style ──
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Style Bottom Navigation", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val navOptions = listOf(
+                        "IconLabel" to "Icon + Label",
+                        "IconOnly"  to "Icon + titik aktif",
+                        "PillLabel" to "Pill label aktif",
+                        "PillIcon"  to "Pill icon only"
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        navOptions.forEach { (style, desc) ->
+                            val isSelected = activeNavStyle == style
+                            Column(
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                    .border(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else Color.White.copy(0.1f), RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) accentColor.copy(0.08f) else MaterialTheme.colorScheme.surface)
+                                    .clickable { viewModel.changeNavStyle(style) }
+                                    .padding(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (isSelected) {
+                                    Box(modifier = Modifier.size(16.dp).background(accentColor, CircleShape), contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                                    }
+                                } else {
+                                    Box(modifier = Modifier.size(16.dp).background(Color.White.copy(0.08f), CircleShape))
+                                }
+                                Text(desc, fontSize = 9.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface.copy(0.6f),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Section: Theme Preset ──
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -5844,7 +5990,7 @@ fun TampilanScreen(
 
                     val presets = listOf(
                         Triple("Default", Color(0xFF0A0A0A), Color(0xFFE53935)),
-                        Triple("OLED", Color(0xFF000000), Color(0xFF00E5FF)),
+                        Triple("Netflix", Color(0xFF141414), Color(0xFFE50914)),
                         Triple("Midnight", Color(0xFF0B0C1A), Color(0xFF7C5AF6))
                     )
 
@@ -5924,7 +6070,6 @@ fun TampilanScreen(
                     }
                 }
             }
-            Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()

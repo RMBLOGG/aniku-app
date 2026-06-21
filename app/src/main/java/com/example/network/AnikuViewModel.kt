@@ -66,6 +66,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val accentColorName = settingsStore.accentColorFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Red")
     val gridLayout = settingsStore.gridLayoutFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "2")
     val themePreset = settingsStore.themePresetFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Default")
+    val cardStyle = settingsStore.cardStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Rounded")
+    val navStyle = settingsStore.navStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "IconLabel")
     val dataSource = settingsStore.dataSourceFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
 
     // Session flow
@@ -1335,6 +1337,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun changeThemePreset(preset: String) {
         viewModelScope.launch { settingsStore.setThemePreset(preset) }
+    }
+
+    fun changeCardStyle(style: String) {
+        viewModelScope.launch { settingsStore.setCardStyle(style) }
+    }
+
+    fun changeNavStyle(style: String) {
+        viewModelScope.launch { settingsStore.setNavStyle(style) }
     }
 
     fun changeDataSource(source: String) {

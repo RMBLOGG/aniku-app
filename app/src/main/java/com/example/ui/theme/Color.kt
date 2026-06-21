@@ -10,11 +10,11 @@ val TextPrimary            = Color(0xFFFFFFFF)
 val TextSecondary          = Color(0xFF9E9E9E)
 val BorderColor            = Color(0xFF2A2A2A)
 
-// ── OLED ──
-val OledBackground      = Color(0xFF000000)
-val OledSurface         = Color(0xFF0D0D0D)
-val OledSurfaceVariant  = Color(0xFF1A1A1A)
-val OledAccent          = Color(0xFF00E5FF)
+// ── Netflix ──
+val NetflixBackground      = Color(0xFF141414)
+val NetflixSurface         = Color(0xFF1F1F1F)
+val NetflixSurfaceVariant  = Color(0xFF2A2A2A)
+val NetflixAccent          = Color(0xFFE50914)
 
 // ── Midnight ──
 val MidnightBackground     = Color(0xFF0B0C1A)
@@ -48,11 +48,11 @@ data class ThemeColors(
 )
 
 fun getThemeColors(preset: String, accentName: String): ThemeColors = when (preset) {
-    "OLED" -> ThemeColors(
-        background     = OledBackground,
-        surface        = OledSurface,
-        surfaceVariant = OledSurfaceVariant,
-        accent         = OledAccent
+    "Netflix" -> ThemeColors(
+        background     = NetflixBackground,
+        surface        = NetflixSurface,
+        surfaceVariant = NetflixSurfaceVariant,
+        accent         = NetflixAccent
     )
     "Midnight" -> ThemeColors(
         background     = MidnightBackground,

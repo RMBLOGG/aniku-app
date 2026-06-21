@@ -16,7 +16,9 @@ class SettingsStore(private val context: Context) {
         val ACCENT_COLOR = stringPreferencesKey("accent_color") // "Red", "Green", "Blue", "Purple", "Orange"
         val GRID_LAYOUT = stringPreferencesKey("grid_layout") // "2", "3", "List"
         val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2"
-        val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "OLED", "Midnight"
+        val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "Netflix", "Midnight"
+        val CARD_STYLE = stringPreferencesKey("card_style") // "Rounded", "Sharp", "Poster", "Wide"
+        val NAV_STYLE = stringPreferencesKey("nav_style") // "IconLabel", "IconOnly", "PillLabel", "PillIcon"
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
@@ -55,6 +57,14 @@ class SettingsStore(private val context: Context) {
 
     val themePresetFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_PRESET] ?: "Default"
+    }
+
+    val cardStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[CARD_STYLE] ?: "Rounded"
+    }
+
+    val navStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[NAV_STYLE] ?: "IconLabel"
     }
 
     val sessionFlow: Flow<UserSession> = context.dataStore.data.map { preferences ->
@@ -104,6 +114,18 @@ class SettingsStore(private val context: Context) {
     suspend fun setThemePreset(preset: String) {
         context.dataStore.edit { preferences ->
             preferences[THEME_PRESET] = preset
+        }
+    }
+
+    suspend fun setCardStyle(style: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CARD_STYLE] = style
+        }
+    }
+
+    suspend fun setNavStyle(style: String) {
+        context.dataStore.edit { preferences ->
+            preferences[NAV_STYLE] = style
         }
     }
 

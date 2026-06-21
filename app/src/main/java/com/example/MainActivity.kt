@@ -163,6 +163,8 @@ class MainActivity : ComponentActivity() {
             val accentColorName by viewModel.accentColorName.collectAsState()
             val textSizeScale by viewModel.textSize.collectAsState()
             val themePreset by viewModel.themePreset.collectAsState()
+            val navStyle by viewModel.navStyle.collectAsState()
+            val cardStyle by viewModel.cardStyle.collectAsState()
 
             MyApplicationTheme(
                 darkTheme = isDark,
@@ -429,7 +431,8 @@ class MainActivity : ComponentActivity() {
                                         restoreState = true
                                     }
                                 },
-                                onMoreClick = { showMoreSheet = true }
+                                onMoreClick = { showMoreSheet = true },
+                                navStyle = navStyle
                             )
                         }
                     }
