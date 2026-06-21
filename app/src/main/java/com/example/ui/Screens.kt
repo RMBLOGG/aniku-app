@@ -670,14 +670,6 @@ fun HomeScreen(
     val context = LocalContext.current
     var showLoginDialog by remember { mutableStateOf(false) }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
-    // Tracking slug yang reveal animation-nya udah pernah jalan, biar gak replay tiap scroll keluar-masuk viewport
-    val revealedSlugs = remember { mutableSetOf<String>() }
-    // ColorFilter grayscale di-remember sekali aja — sebelumnya dibikin ulang tiap frame animasi (15-an objek/detik x banyak card = lag)
-    val grayscalePosterFilter = remember {
-        androidx.compose.ui.graphics.ColorFilter.colorMatrix(
-            androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
-        )
-    }
 
     LaunchedEffect(ongoingList, recentList, popularList) {
         val slugs = (ongoingList + recentList + popularList).map { it.slug }
@@ -1613,31 +1605,6 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     popularList.take(8).forEachIndexed { index, anim ->
-                        val alreadyRevealed = anim.slug in revealedSlugs
-                        var cardRevealed by remember(anim.slug) { mutableStateOf(alreadyRevealed) }
-                        var posterRevealed by remember(anim.slug) { mutableStateOf(alreadyRevealed) }
-                        if (!alreadyRevealed) {
-                            LaunchedEffect(anim.slug) {
-                                delay(index * 90L)
-                                cardRevealed = true
-                                delay(180L)
-                                posterRevealed = true
-                                revealedSlugs.add(anim.slug)
-                            }
-                        }
-                        val posterAlpha by animateFloatAsState(
-                            targetValue = if (posterRevealed) 0.45f else 0f,
-                            animationSpec = tween(550, easing = FastOutSlowInEasing),
-                            label = "popularPosterAlpha"
-                        )
-                        AnimatedVisibility(
-                            visible = cardRevealed,
-                            enter = fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
-                                    slideInHorizontally(
-                                        initialOffsetX = { it / 6 },
-                                        animationSpec = tween(420, easing = FastOutSlowInEasing)
-                                    )
-                        ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1652,8 +1619,10 @@ fun HomeScreen(
                                     .data(anim.poster).crossfade(300).build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                colorFilter = grayscalePosterFilter,
-                                alpha = posterAlpha,
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+                                    androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
+                                ),
+                                alpha = 0.45f,
                                 modifier = Modifier.fillMaxSize()
                             )
                             // Gradient kiri ke kanan
@@ -1730,7 +1699,6 @@ fun HomeScreen(
                                     }
                                 }
                             }
-                        }
                         }
                     }
                 }
@@ -1830,31 +1798,6 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     completedList.take(6).forEachIndexed { index, anim ->
-                        val alreadyRevealed = anim.slug in revealedSlugs
-                        var cardRevealed by remember(anim.slug) { mutableStateOf(alreadyRevealed) }
-                        var posterRevealed by remember(anim.slug) { mutableStateOf(alreadyRevealed) }
-                        if (!alreadyRevealed) {
-                            LaunchedEffect(anim.slug) {
-                                delay(index * 90L)
-                                cardRevealed = true
-                                delay(180L)
-                                posterRevealed = true
-                                revealedSlugs.add(anim.slug)
-                            }
-                        }
-                        val posterAlpha by animateFloatAsState(
-                            targetValue = if (posterRevealed) 0.45f else 0f,
-                            animationSpec = tween(550, easing = FastOutSlowInEasing),
-                            label = "completedPosterAlpha"
-                        )
-                        AnimatedVisibility(
-                            visible = cardRevealed,
-                            enter = fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
-                                    slideInHorizontally(
-                                        initialOffsetX = { it / 6 },
-                                        animationSpec = tween(420, easing = FastOutSlowInEasing)
-                                    )
-                        ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1869,8 +1812,10 @@ fun HomeScreen(
                                     .data(anim.poster).crossfade(300).build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
-                                colorFilter = grayscalePosterFilter,
-                                alpha = posterAlpha,
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+                                    androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
+                                ),
+                                alpha = 0.45f,
                                 modifier = Modifier.fillMaxSize()
                             )
                             // Gradient kiri ke kanan
@@ -1934,7 +1879,6 @@ fun HomeScreen(
                                     }
                                 }
                             }
-                        }
                         }
                     }
                 }
