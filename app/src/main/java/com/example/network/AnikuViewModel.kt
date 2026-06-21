@@ -840,7 +840,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                     _isDirectStream.value = true
                                 } else {
                                     val extracted = withContext(Dispatchers.IO) {
-                                        VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/")
+                                        VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/", appContext)
                                     }
                                     if (extracted != null) {
                                         _activeStreamUrl.value = extracted.url
@@ -850,10 +850,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _activeStreamUrl.value = resolvedUrl
                                         _resolvedHeaders.value = emptyMap()
                                         _isDirectStream.value = false
-                                        // Debug: tampilkan response Blogger di streamError sementara
-                                        if (resolvedUrl.contains("blogger")) {
-                                            _streamError.value = "[DEBUG Blogger] ${VideoExtractor.lastBloggerDebug.take(300)}"
-                                        }
                                     }
                                 }
                             } catch (e: Exception) {
@@ -877,7 +873,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _selectedStreamIndex.value = 0
                         val firstUrl = streamList[0].url
                         val resolved = withContext(Dispatchers.IO) {
-                            VideoExtractor.resolve(firstUrl)
+                            VideoExtractor.resolve(firstUrl, null, appContext)
                         }
                         if (resolved != null) {
                             _activeStreamUrl.value = resolved.url
@@ -925,7 +921,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _isDirectStream.value = true
                             } else {
                                 val extracted = withContext(Dispatchers.IO) {
-                                    VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/")
+                                    VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/", appContext)
                                 }
                                 if (extracted != null) {
                                     _activeStreamUrl.value = extracted.url
@@ -958,7 +954,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _isDirectStream.value = false
                 viewModelScope.launch {
                     val resolved = withContext(Dispatchers.IO) {
-                        VideoExtractor.resolve(rawUrl)
+                        VideoExtractor.resolve(rawUrl, null, appContext)
                     }
                     if (resolved != null) {
                         _activeStreamUrl.value = resolved.url
