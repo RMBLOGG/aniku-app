@@ -1753,8 +1753,7 @@ fun SearchScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() },
-                            cardStyle = cardStyle
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }
@@ -1808,8 +1807,7 @@ fun SearchScreen(
                             isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() },
-                            cardStyle = cardStyle
+                            onLoginRequired = { onLoginRequired() }
                         )
                     }
                 }

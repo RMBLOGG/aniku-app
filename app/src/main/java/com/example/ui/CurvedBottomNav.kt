@@ -106,7 +106,7 @@ fun CurvedBottomNav(
                     allItems.forEach { (route, label, icon) ->
                         PillNavItem(icon, label, currentRoute == route, primaryColor, showLabel = true) { onNavigate(route) }
                     }
-                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = moreSelected, pill = true) { onMoreClick() }
+                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = moreSelected, pill = true, onClick = { onMoreClick() })
                 }
             }
         }
