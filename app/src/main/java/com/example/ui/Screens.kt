@@ -1605,6 +1605,27 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     popularList.take(8).forEachIndexed { index, anim ->
+                        var cardRevealed by remember(anim.slug) { mutableStateOf(false) }
+                        var posterRevealed by remember(anim.slug) { mutableStateOf(false) }
+                        LaunchedEffect(anim.slug) {
+                            delay(index * 90L)
+                            cardRevealed = true
+                            delay(180L)
+                            posterRevealed = true
+                        }
+                        val posterAlpha by animateFloatAsState(
+                            targetValue = if (posterRevealed) 0.45f else 0f,
+                            animationSpec = tween(550, easing = FastOutSlowInEasing),
+                            label = "popularPosterAlpha"
+                        )
+                        AnimatedVisibility(
+                            visible = cardRevealed,
+                            enter = fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
+                                    slideInHorizontally(
+                                        initialOffsetX = { it / 6 },
+                                        animationSpec = tween(420, easing = FastOutSlowInEasing)
+                                    )
+                        ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1622,7 +1643,7 @@ fun HomeScreen(
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
                                     androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
                                 ),
-                                alpha = 0.45f,
+                                alpha = posterAlpha,
                                 modifier = Modifier.fillMaxSize()
                             )
                             // Gradient kiri ke kanan
@@ -1699,6 +1720,7 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -1798,6 +1820,27 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     completedList.take(6).forEachIndexed { index, anim ->
+                        var cardRevealed by remember(anim.slug) { mutableStateOf(false) }
+                        var posterRevealed by remember(anim.slug) { mutableStateOf(false) }
+                        LaunchedEffect(anim.slug) {
+                            delay(index * 90L)
+                            cardRevealed = true
+                            delay(180L)
+                            posterRevealed = true
+                        }
+                        val posterAlpha by animateFloatAsState(
+                            targetValue = if (posterRevealed) 0.45f else 0f,
+                            animationSpec = tween(550, easing = FastOutSlowInEasing),
+                            label = "completedPosterAlpha"
+                        )
+                        AnimatedVisibility(
+                            visible = cardRevealed,
+                            enter = fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
+                                    slideInHorizontally(
+                                        initialOffsetX = { it / 6 },
+                                        animationSpec = tween(420, easing = FastOutSlowInEasing)
+                                    )
+                        ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1815,7 +1858,7 @@ fun HomeScreen(
                                 colorFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(
                                     androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
                                 ),
-                                alpha = 0.45f,
+                                alpha = posterAlpha,
                                 modifier = Modifier.fillMaxSize()
                             )
                             // Gradient kiri ke kanan
@@ -1879,6 +1922,7 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }
