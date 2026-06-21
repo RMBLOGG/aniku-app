@@ -73,10 +73,8 @@ object BloggerWebViewExtractor {
                     }
 
                     // Aktifkan cookie supaya Google session bisa dipakai
-                    CookieManager.getInstance().apply {
-                        setAcceptCookie(true)
-                        setAcceptThirdPartyCookies(this@apply, true)
-                    }
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(
