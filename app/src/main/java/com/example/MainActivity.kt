@@ -59,49 +59,35 @@ class MainActivity : ComponentActivity() {
     companion object {
         var isWatchingDirectStream = false
         var pipExoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
-        var currentNavStyle = "IconLabel"
     }
 
-    private fun isPillNav() = currentNavStyle == "PillLabel" || currentNavStyle == "PillIcon"
-
-    private fun hideSystemBars(hidNav: Boolean = true) {
+    private fun hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars())
-                if (hidNav) {
-                    it.hide(WindowInsets.Type.navigationBars())
-                    it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                } else {
-                    it.show(WindowInsets.Type.navigationBars())
-                    it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_DEFAULT
-                }
+                it.hide(WindowInsets.Type.navigationBars() or WindowInsets.Type.statusBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("DEPRECATION")
-            val flags = if (hidNav) {
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            } else {
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            }
-            window.decorView.systemUiVisibility = flags
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
         }
     }
 
     override fun onResume() {
         super.onResume()
-        hideSystemBars(hidNav = !isPillNav())
+        hideSystemBars()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemBars(hidNav = !isPillNav())
+        if (hasFocus) hideSystemBars()
     }
 
     override fun onUserLeaveHint() {
@@ -179,23 +165,6 @@ class MainActivity : ComponentActivity() {
             val themePreset by viewModel.themePreset.collectAsState()
             val navStyle by viewModel.navStyle.collectAsState()
             val cardStyle by viewModel.cardStyle.collectAsState()
-
-            // Sync navStyle ke MainActivity untuk hideSystemBars
-            LaunchedEffect(navStyle) {
-                MainActivity.currentNavStyle = navStyle
-                val isPill = navStyle == "PillLabel" || navStyle == "PillIcon"
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    window.insetsController?.let {
-                        if (isPill) {
-                            it.show(WindowInsets.Type.navigationBars())
-                            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_DEFAULT
-                        } else {
-                            it.hide(WindowInsets.Type.navigationBars())
-                            it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                        }
-                    }
-                }
-            }
 
             MyApplicationTheme(
                 darkTheme = isDark,
