@@ -117,6 +117,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _homeMovies = MutableStateFlow<List<AnimeRaw>>(emptyList())
     val homeMovies: StateFlow<List<AnimeRaw>> = _homeMovies.asStateFlow()
 
+    private val _homeCompleted = MutableStateFlow<List<AnimeRaw>>(emptyList())
+    val homeCompleted: StateFlow<List<AnimeRaw>> = _homeCompleted.asStateFlow()
+
+    private val _homeTodaySchedule = MutableStateFlow<List<AnimeRaw>>(emptyList())
+    val homeTodaySchedule: StateFlow<List<AnimeRaw>> = _homeTodaySchedule.asStateFlow()
+
     private val _featuredSlides = MutableStateFlow<List<FeaturedAnimeDto>>(emptyList())
     val featuredSlides: StateFlow<List<FeaturedAnimeDto>> = _featuredSlides.asStateFlow()
 
@@ -462,6 +468,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _homeMovies.value = (moviesRes.data?.animeList ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     } catch (me: Exception) { Log.e("AnikuVM", "Failed samehadaku home movies", me) }
+
+                    try {
+                        val completedRes = retryIO { samehadakuApi.getCompleted(page = 1) }
+                        _homeCompleted.value = (completedRes.data?.animeList ?: emptyList())
+                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                    } catch (ce: Exception) { Log.e("AnikuVM", "Failed samehadaku home completed", ce) }
+
+                    try {
+                        val schedRes = retryIO { samehadakuApi.getSchedule() }
+                        val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                        val dayNames = listOf("minggu","senin","selasa","rabu","kamis","jumat","sabtu")
+                        val todayName = dayNames[todayDay - 1]
+                        val todayList = schedRes.data?.days
+                            ?.firstOrNull { it.day.lowercase().contains(todayName) || it.day.lowercase().contains(todayName.take(3)) }
+                            ?.animeList?.map { it.toAnimeRaw() } ?: emptyList()
+                        _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                    } catch (se: Exception) { Log.e("AnikuVM", "Failed samehadaku home schedule", se) }
                 } else {
                     val homeRes = retryIO { animeApi.getHome() }
                     _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
@@ -481,6 +504,34 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
                     } catch (me: Exception) {
                         Log.e("AnikuVM", "Failed to load home movies", me)
+                    }
+
+                    // 7. Load Completed for Section
+                    try {
+                        val completedRes = retryIO { animeApi.getCompleted(page = 1) }
+                        _homeCompleted.value = (completedRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                    } catch (ce: Exception) {
+                        Log.e("AnikuVM", "Failed to load home completed", ce)
+                    }
+
+                    // 8. Load Today Schedule
+                    try {
+                        val schedRes = retryIO { animeApi.getSchedule() }
+                        val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                        val sched = schedRes.schedule
+                        val todayList = when (todayDay) {
+                            1 -> sched?.minggu
+                            2 -> sched?.senin
+                            3 -> sched?.selasa
+                            4 -> sched?.rabu
+                            5 -> sched?.kamis
+                            6 -> sched?.jumat ?: sched?.jumatAlt
+                            7 -> sched?.sabtu
+                            else -> null
+                        } ?: emptyList()
+                        _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                    } catch (se: Exception) {
+                        Log.e("AnikuVM", "Failed to load home schedule", se)
                     }
                 }
 

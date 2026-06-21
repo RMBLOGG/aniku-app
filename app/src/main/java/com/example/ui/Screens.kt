@@ -53,6 +53,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
@@ -654,6 +657,8 @@ fun HomeScreen(
     val recentList by viewModel.homeRecent.collectAsState()
     val popularList by viewModel.homePopular.collectAsState()
     val moviesList by viewModel.homeMovies.collectAsState()
+    val completedList by viewModel.homeCompleted.collectAsState()
+    val todayScheduleList by viewModel.homeTodaySchedule.collectAsState()
     val cardStyle by viewModel.cardStyle.collectAsState()
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
@@ -1613,25 +1618,267 @@ fun HomeScreen(
                 }
             }
 
-            // Section 4: Anime Movie
-            item { SectionHeader(title = "Anime Movie", onSeeAllClick = { onSeeAllClicked("Movie") }) }
+            // Section 4: Anime Movie — Landscape 16:9 card
+            item { SectionHeader(title = "Film Anime", onSeeAllClick = { onSeeAllClicked("Movie") }) }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     itemsIndexed(moviesList, key = { idx, it -> "${it.slug}_${idx}" }) { _, anim ->
-                        AnimeCard(
-                            anime = anim,
-                            accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
-                            isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true },
-                            viewerCount = viewerCounts[anim.slug] ?: 0,
-                        cardStyle = cardStyle
-                        )
+                        // Landscape Movie Card — 16:9 sinematik
+                        Box(
+                            modifier = Modifier
+                                .width(200.dp)
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(14.dp))
+                                .background(Color(0xFF161616))
+                                .clickable { onNavigateToDetail(anim.slug) }
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(anim.poster).crossfade(300).build(),
+                                contentDescription = anim.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            // Gradient overlay
+                            Box(modifier = Modifier.fillMaxSize().background(
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(0.85f)),
+                                    startY = 80f
+                                )
+                            ))
+                            // MOVIE badge
+                            Box(
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(accentColor)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .align(Alignment.TopStart)
+                            ) {
+                                Text("MOVIE", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                            }
+                            // Score kanan atas
+                            anim.score?.let { score ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color.Black.copy(0.7f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .align(Alignment.TopEnd)
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(8.dp))
+                                        Text(score, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            // Title + genre overlay bawah
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(8.dp)
+                            ) {
+                                Text(
+                                    text = anim.title,
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 14.sp
+                                )
+                                val genreText = anim.genres?.take(2)?.joinToString(" · ")
+                                if (!genreText.isNullOrBlank()) {
+                                    Text(genreText, color = Color.White.copy(0.5f), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section 5: Baru Tamat — Yoredaze style (grayscale banner)
+            item { SectionHeader(title = "Baru Tamat", onSeeAllClick = { onSeeAllClicked("Completed") }) }
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    completedList.take(6).forEachIndexed { index, anim ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(88.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(16.dp))
+                                .clickable { onNavigateToDetail(anim.slug) }
+                        ) {
+                            // Background grayscale poster
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(anim.poster).crossfade(300).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().graphicsLayer {
+                                    colorFilter = android.graphics.ColorFilter.colorMatrix(
+                                        android.graphics.ColorMatrix().also { it.setSaturation(0f) }
+                                    ) as? androidx.compose.ui.graphics.ColorFilter
+                                        ?: androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+                                            androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }
+                                        )
+                                    alpha = 0.45f
+                                }
+                            )
+                            // Gradient kiri ke kanan
+                            Box(modifier = Modifier.fillMaxSize().background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.Black.copy(0.95f), Color.Black.copy(0.6f), Color.Black.copy(0.2f))
+                                )
+                            ))
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                // Poster kecil kiri
+                                Box(modifier = Modifier.width(60.dp).fillMaxHeight()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(anim.poster).crossfade(300).build(),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    // Ranking badge bawah
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth().background(Color.Black.copy(0.7f)).align(Alignment.BottomCenter).padding(vertical = 2.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("#${index + 1}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+                                // Info tengah
+                                Column(
+                                    modifier = Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    // Dot biru + label
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        Box(modifier = Modifier.size(6.dp).background(Color(0xFF2196F3), CircleShape))
+                                        Text("COMPLETED", color = Color(0xFF64B5F6), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(anim.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        anim.type?.let {
+                                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFFF8C00)).padding(horizontal = 5.dp, vertical = 1.dp)) {
+                                                Text(it, color = Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                                            }
+                                        }
+                                        anim.episode?.let {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White.copy(0.5f), modifier = Modifier.size(10.dp))
+                                                Text(it, color = Color.White.copy(0.6f), fontSize = 9.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                                // Arrow kanan
+                                Box(modifier = Modifier.width(40.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier.size(24.dp).border(1.dp, Color.White.copy(0.2f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(0.5f), modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section 6: Jadwal Hari Ini — Yoredaze table style
+            item {
+                val dayNames = listOf("Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu")
+                val todayName = dayNames[java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK) - 1]
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    // Header
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+                        Column {
+                            Text("ESTIMATED", color = Color.White.copy(0.3f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text("Jadwal Hari Ini", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                            Text(todayName, color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = { onSeeAllClicked("Schedule") }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                            Text("JADWAL LENGKAP", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    // Table container
+                    if (todayScheduleList.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF111111)).border(1.dp, Color.White.copy(0.07f), RoundedCornerShape(16.dp)).padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Tidak ada jadwal tayang hari ini.", color = Color.White.copy(0.3f), fontSize = 13.sp)
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).border(1.dp, Color.White.copy(0.07f), RoundedCornerShape(16.dp))
+                        ) {
+                            todayScheduleList.take(8).forEachIndexed { idx, anim ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(if (idx % 2 == 0) Color(0xFF111111) else Color(0xFF0E0E0E))
+                                        .then(if (idx > 0) Modifier.border(top = androidx.compose.foundation.layout.WindowInsets.Companion.let { 0.dp }, width = 0.dp, color = Color.Transparent) else Modifier)
+                                        .clickable { onNavigateToDetail(anim.slug) }
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Jam estimasi
+                                    Text(
+                                        text = anim.estimation ?: "--:--",
+                                        color = if (anim.estimation != null) Color.White else Color.White.copy(0.3f),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.width(44.dp)
+                                    )
+                                    // Divider vertikal
+                                    Box(modifier = Modifier.width(1.dp).height(20.dp).background(Color.White.copy(0.1f)))
+                                    // Judul
+                                    Text(
+                                        text = anim.title,
+                                        color = Color.White.copy(0.85f),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    // Episode badge
+                                    Box(
+                                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, Color.White.copy(0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = anim.episode?.replace("Episode ", "EP ") ?: "-",
+                                            color = Color.White.copy(0.7f),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                if (idx < todayScheduleList.take(8).size - 1) {
+                                    Divider(color = Color.White.copy(0.05f), thickness = 1.dp)
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(30.dp))
