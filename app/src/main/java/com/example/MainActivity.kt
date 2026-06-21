@@ -166,6 +166,7 @@ class MainActivity : ComponentActivity() {
             val navStyle by viewModel.navStyle.collectAsState()
             val cardStyle by viewModel.cardStyle.collectAsState()
 
+
             MyApplicationTheme(
                 darkTheme = isDark,
                 accentName = accentColorName,
