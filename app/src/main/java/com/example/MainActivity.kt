@@ -416,7 +416,7 @@ class MainActivity : ComponentActivity() {
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = if (navStyle == "PillLabel" || navStyle == "PillIcon") Color.Transparent else MaterialTheme.colorScheme.background,
+                    containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
                         if (showBottomBar) {
                             CurvedBottomNav(
