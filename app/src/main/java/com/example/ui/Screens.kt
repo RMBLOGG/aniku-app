@@ -1754,7 +1754,7 @@ fun SearchScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { onLoginRequired() },
-                        cardStyle = cardStyle
+                            cardStyle = cardStyle
                         )
                     }
                 }
@@ -1777,7 +1777,7 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { onLoginRequired() },
-                        cardStyle = cardStyle
+                            cardStyle = cardStyle
                         )
                     }
                 }
@@ -1809,7 +1809,7 @@ fun SearchScreen(
                             onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { onLoginRequired() },
-                        cardStyle = cardStyle
+                            cardStyle = cardStyle
                         )
                     }
                 }
@@ -1832,7 +1832,7 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
                             onLoginRequired = { onLoginRequired() },
-                        cardStyle = cardStyle
+                            cardStyle = cardStyle
                         )
                     }
                 }
@@ -2445,7 +2445,7 @@ fun BookmarkScreen(
     }
 }
 
-)// ================================================================
+// ================================================================
 // 6. ANIME DETAIL SCREEN
 // ================================================================
 
@@ -6070,6 +6070,7 @@ fun TampilanScreen(
                     }
                 }
             }
+            Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()

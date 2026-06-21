@@ -60,7 +60,7 @@ fun CurvedBottomNav(
                     allItems.forEach { (route, label, icon) ->
                         FlatNavItem(icon, label, currentRoute == route, primaryColor, Modifier.weight(1f)) { onNavigate(route) }
                     }
-                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = true, pill = false) { onMoreClick() }
+                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = true, pill = false, onClick = { onMoreClick() }, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -81,7 +81,7 @@ fun CurvedBottomNav(
                     allItems.forEach { (route, label, icon) ->
                         IconOnlyNavItem(icon, label, currentRoute == route, primaryColor) { onNavigate(route) }
                     }
-                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = false, pill = false) { onMoreClick() }
+                    MoreNavItem(moreSelected, hasUnreadChat, primaryColor, showLabel = false, pill = false, onClick = { onMoreClick() })
                 }
             }
         }
@@ -260,7 +260,8 @@ private fun PillIconOnlyItem(
 @Composable
 private fun MoreNavItem(
     isSelected: Boolean, hasUnreadChat: Boolean,
-    primaryColor: Color, showLabel: Boolean, pill: Boolean, onClick: () -> Unit
+    primaryColor: Color, showLabel: Boolean, pill: Boolean, onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val iconTint by animateColorAsState(
         if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface.copy(0.45f),
@@ -270,11 +271,21 @@ private fun MoreNavItem(
         if (isSelected && pill) primaryColor.copy(0.15f) else Color.Transparent,
         animationSpec = tween(250), label = "more_bg"
     )
+
+    val baseModifier = if (pill) {
+        modifier
+            .clip(RoundedCornerShape(22.dp))
+            .background(bgColor)
+            .padding(horizontal = if (isSelected && showLabel) 14.dp else 12.dp, vertical = 8.dp)
+    } else {
+        modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(bgColor)
+            .padding(vertical = 6.dp)
+    }
+
     Box(
-        modifier = Modifier
-            .then(if (pill) Modifier.clip(RoundedCornerShape(22.dp)).background(bgColor)
-                .padding(horizontal = if (isSelected && showLabel) 14.dp else 12.dp, vertical = 8.dp)
-            else Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(bgColor).padding(vertical = 6.dp))
+        modifier = baseModifier
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
