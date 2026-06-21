@@ -62,7 +62,8 @@ object VideoExtractor {
                 host.contains("pixeldrain") -> extractPixeldrain(embedUrl)
                 host.contains("mediafire") -> extractMediafire(embedUrl)
                 host.contains("filedon") -> extractFiledon(embedUrl, referer)
-                host.contains("blogger") || host.contains("blogspot") -> extractBlogger(embedUrl, referer)
+                // Blogger butuh Google cookie — tidak bisa di-extract tanpa session, fallback ke WebView
+                host.contains("blogger") || host.contains("blogspot") -> null
                 host.contains("filemoon") ||
                 host.contains("vidhide") ||
                 host.contains("wibufile") ||
@@ -226,8 +227,35 @@ object VideoExtractor {
     // ---------------------------------------------------------------------
     // Blogger video embed — URL format: blogger.com/video.g?token=XXX
     // Response bisa berupa JSON dengan "streams" array atau JS dengan VIDEO_CONFIG
+    // Fetch khusus untuk Blogger video.g endpoint — butuh header spesifik
+    private fun fetchBloggerVideo(url: String, origin: String): String {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", DESKTOP_UA)
+            .header("Accept", "application/json, text/javascript, */*; q=0.01")
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Referer", origin)
+            .header("Origin", origin)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+            return resp.body?.string() ?: throw Exception("Body kosong")
+        }
+    }
+
     private fun extractBlogger(embedUrl: String, referer: String?): ResolvedStream? {
-        val html = fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
+        // Ambil origin dari referer (misal: https://imagewskuu.blogspot.com)
+        // atau dari parameter origin di URL video.g
+        val originFromUrl = Regex("""[?&]origin=([^&]+)""").find(embedUrl)?.groupValues?.get(1)
+            ?.let { "https://$it" }
+        val originHeader = originFromUrl ?: referer ?: "https://www.blogger.com/"
+        val html = try {
+            fetchBloggerVideo(embedUrl, originHeader)
+        } catch (e: Exception) {
+            Log.d("VideoExtractor", "Blogger fetchBloggerVideo gagal: ${e.message}, fallback ke fetchHtml")
+            fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
+        }
 
         if (html.isBlank()) {
             Log.d("VideoExtractor", "Blogger: empty response for $embedUrl")

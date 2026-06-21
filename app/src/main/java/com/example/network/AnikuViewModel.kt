@@ -829,26 +829,44 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _selectedStreamIndex.value = 0
                         val firstUrl = streamList[0].url
                         Log.d("AnikuVM", "VideoExtractor.resolve url: $firstUrl")
-                        // Kalau URL-nya Blogger, langsung expose ke debug dialog supaya keliatan di UI
-                        if (firstUrl.contains("blogger.com", ignoreCase = true) ||
-                            firstUrl.contains("blogspot.com", ignoreCase = true)) {
-                            _bloggerDebugLog.value = "[Raw URL masuk extractor]\n$firstUrl"
-                        }
-                        val resolved = withContext(Dispatchers.IO) {
-                            VideoExtractor.resolve(firstUrl)
-                        }
-                        Log.d("AnikuVM", "VideoExtractor.resolve result: url=${resolved?.url} debugLog=${resolved?.debugLog?.take(100)}")
-                        if (resolved != null && resolved.url.isNotEmpty()) {
-                            _activeStreamUrl.value = resolved.url
-                            _resolvedHeaders.value = resolved.headers
-                            _isDirectStream.value = true
-                        } else {
-                            if (resolved?.debugLog != null) {
-                                _bloggerDebugLog.value = resolved.debugLog
+
+                        val isBlogger = firstUrl.contains("blogger.com", ignoreCase = true) ||
+                            firstUrl.contains("blogspot.com", ignoreCase = true)
+
+                        if (isBlogger) {
+                            // Blogger butuh Google cookie — pakai hidden WebView
+                            val googleVideoUrl = withContext(Dispatchers.Main) {
+                                BloggerWebViewExtractor.resolve(appContext, firstUrl)
                             }
-                            _activeStreamUrl.value = firstUrl
-                            _resolvedHeaders.value = emptyMap()
-                            _isDirectStream.value = isDirectUrl(firstUrl)
+                            if (!googleVideoUrl.isNullOrEmpty()) {
+                                Log.d("AnikuVM", "Blogger WV resolved: ${googleVideoUrl.take(80)}")
+                                _activeStreamUrl.value = googleVideoUrl
+                                _resolvedHeaders.value = mapOf(
+                                    "Referer" to "https://www.blogger.com/",
+                                    "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                )
+                                _isDirectStream.value = true
+                            } else {
+                                Log.w("AnikuVM", "Blogger WV timeout/gagal, fallback WebView")
+                                _activeStreamUrl.value = firstUrl
+                                _resolvedHeaders.value = emptyMap()
+                                _isDirectStream.value = false
+                            }
+                        } else {
+                            val resolved = withContext(Dispatchers.IO) {
+                                VideoExtractor.resolve(firstUrl)
+                            }
+                            Log.d("AnikuVM", "VideoExtractor result: url=${resolved?.url} debugLog=${resolved?.debugLog?.take(80)}")
+                            if (resolved != null && resolved.url.isNotEmpty()) {
+                                _activeStreamUrl.value = resolved.url
+                                _resolvedHeaders.value = resolved.headers
+                                _isDirectStream.value = true
+                            } else {
+                                if (resolved?.debugLog != null) _bloggerDebugLog.value = resolved.debugLog
+                                _activeStreamUrl.value = firstUrl
+                                _resolvedHeaders.value = emptyMap()
+                                _isDirectStream.value = isDirectUrl(firstUrl)
+                            }
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -919,26 +937,41 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _activeStreamUrl.value = null
                 _isDirectStream.value = false
                 viewModelScope.launch {
-                    Log.d("AnikuVM", "selectQuality VideoExtractor.resolve url: $rawUrl")
-                    if (rawUrl.contains("blogger.com", ignoreCase = true) ||
-                        rawUrl.contains("blogspot.com", ignoreCase = true)) {
-                        _bloggerDebugLog.value = "[Raw URL masuk extractor]\n$rawUrl"
-                    }
-                    val resolved = withContext(Dispatchers.IO) {
-                        VideoExtractor.resolve(rawUrl)
-                    }
-                    Log.d("AnikuVM", "selectQuality result: url=${resolved?.url} debugLog=${resolved?.debugLog?.take(100)}")
-                    if (resolved != null && resolved.url.isNotEmpty()) {
-                        _activeStreamUrl.value = resolved.url
-                        _resolvedHeaders.value = resolved.headers
-                        _isDirectStream.value = true
-                    } else {
-                        if (resolved?.debugLog != null) {
-                            _bloggerDebugLog.value = resolved.debugLog
+                    Log.d("AnikuVM", "selectQuality resolve url: $rawUrl")
+                    val isBlogger2 = rawUrl.contains("blogger.com", ignoreCase = true) ||
+                        rawUrl.contains("blogspot.com", ignoreCase = true)
+
+                    if (isBlogger2) {
+                        val googleVideoUrl = withContext(Dispatchers.Main) {
+                            BloggerWebViewExtractor.resolve(appContext, rawUrl)
                         }
-                        _activeStreamUrl.value = rawUrl
-                        _resolvedHeaders.value = emptyMap()
-                        _isDirectStream.value = isDirectUrl(rawUrl)
+                        if (!googleVideoUrl.isNullOrEmpty()) {
+                            _activeStreamUrl.value = googleVideoUrl
+                            _resolvedHeaders.value = mapOf(
+                                "Referer" to "https://www.blogger.com/",
+                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                            )
+                            _isDirectStream.value = true
+                        } else {
+                            _activeStreamUrl.value = rawUrl
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = false
+                        }
+                    } else {
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(rawUrl)
+                        }
+                        Log.d("AnikuVM", "selectQuality result: url=${resolved?.url}")
+                        if (resolved != null && resolved.url.isNotEmpty()) {
+                            _activeStreamUrl.value = resolved.url
+                            _resolvedHeaders.value = resolved.headers
+                            _isDirectStream.value = true
+                        } else {
+                            if (resolved?.debugLog != null) _bloggerDebugLog.value = resolved.debugLog
+                            _activeStreamUrl.value = rawUrl
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(rawUrl)
+                        }
                     }
                     _isStreamLoading.value = false
                 }
