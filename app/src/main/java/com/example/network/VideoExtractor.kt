@@ -13,8 +13,7 @@ import java.util.concurrent.TimeUnit
 data class ResolvedStream(
     val url: String,
     val isHls: Boolean,
-    val headers: Map<String, String> = emptyMap(),
-    val debugLog: String? = null  // diisi saat extractor gagal, berisi 500 char pertama response
+    val headers: Map<String, String> = emptyMap()
 )
 
 /**
@@ -62,8 +61,7 @@ object VideoExtractor {
                 host.contains("pixeldrain") -> extractPixeldrain(embedUrl)
                 host.contains("mediafire") -> extractMediafire(embedUrl)
                 host.contains("filedon") -> extractFiledon(embedUrl, referer)
-                // Blogger butuh Google cookie — tidak bisa di-extract tanpa session, fallback ke WebView
-                host.contains("blogger") || host.contains("blogspot") -> null
+                host.contains("blogger") || host.contains("blogspot") -> extractBlogger(embedUrl, referer)
                 host.contains("filemoon") ||
                 host.contains("vidhide") ||
                 host.contains("wibufile") ||
@@ -227,64 +225,19 @@ object VideoExtractor {
     // ---------------------------------------------------------------------
     // Blogger video embed — URL format: blogger.com/video.g?token=XXX
     // Response bisa berupa JSON dengan "streams" array atau JS dengan VIDEO_CONFIG
-    // Fetch khusus untuk Blogger video.g endpoint — butuh header spesifik
-    private fun fetchBloggerVideo(url: String, origin: String): String {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", DESKTOP_UA)
-            .header("Accept", "application/json, text/javascript, */*; q=0.01")
-            .header("Accept-Language", "en-US,en;q=0.9")
-            .header("Referer", origin)
-            .header("Origin", origin)
-            .header("X-Requested-With", "XMLHttpRequest")
-            .build()
-        client.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
-            return resp.body?.string() ?: throw Exception("Body kosong")
-        }
-    }
-
     private fun extractBlogger(embedUrl: String, referer: String?): ResolvedStream? {
-        // Ambil origin dari referer (misal: https://imagewskuu.blogspot.com)
-        // atau dari parameter origin di URL video.g
-        val originFromUrl = Regex("""[?&]origin=([^&]+)""").find(embedUrl)?.groupValues?.get(1)
-            ?.let { "https://$it" }
-        val originHeader = originFromUrl ?: referer ?: "https://www.blogger.com/"
-        val html = try {
-            fetchBloggerVideo(embedUrl, originHeader)
-        } catch (e: Exception) {
-            Log.d("VideoExtractor", "Blogger fetchBloggerVideo gagal: ${e.message}, fallback ke fetchHtml")
-            fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
-        }
+        val html = fetchHtml(embedUrl, referer ?: "https://www.blogger.com/")
 
         if (html.isBlank()) {
             Log.d("VideoExtractor", "Blogger: empty response for $embedUrl")
             return null
         }
 
-        // Pattern 0: Kalau response adalah halaman HTML Blogger biasa (bukan embed),
-        // cari iframe/embed src yang mengarah ke video.g atau embed Blogger, lalu fetch itu.
-        if (html.contains("<!doctype html", ignoreCase = true) || html.contains("<html", ignoreCase = true)) {
-            val iframeSrc = Regex("""<iframe[^>]+src=["']([^"']*(?:blogger\.com/video|video\.g)[^"']*)["']""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.get(1)
-            if (!iframeSrc.isNullOrBlank()) {
-                Log.d("VideoExtractor", "Blogger: halaman HTML, found iframe src: $iframeSrc")
-                val embedHtml = fetchHtml(iframeSrc, embedUrl)
-                // Rekursif satu level: jalankan pattern 1-5 pada response iframe
-                return extractBloggerFromHtml(iframeSrc, embedHtml)
-            }
-            // Cari juga div/script yang punya data-blogid atau VIDEO_CONFIG langsung
-            Log.d("VideoExtractor", "Blogger: HTML page tapi tidak ada iframe video.g, lanjut ke pattern biasa")
-        }
-
-        return extractBloggerFromHtml(embedUrl, html)
-    }
-
-    private fun extractBloggerFromHtml(sourceUrl: String, html: String): ResolvedStream {
         // Pattern 1: VIDEO_CONFIG = {...} JavaScript object
         val videoConfigJson = Regex("""VIDEO_CONFIG\s*=\s*(\{.+?\})\s*;""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!videoConfigJson.isNullOrBlank()) {
+            // Cari play_url di dalam VIDEO_CONFIG
             val playUrl = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .find(videoConfigJson)?.groupValues?.get(1)?.replace("\\/", "/")
             if (!playUrl.isNullOrBlank()) {
@@ -297,9 +250,10 @@ object VideoExtractor {
         val streamsBlock = Regex(""""streams"\s*:\s*\[(.+?)\]""", RegexOption.DOT_MATCHES_ALL)
             .find(html)?.groupValues?.get(1)
         if (!streamsBlock.isNullOrBlank()) {
+            // Ambil play_url tertinggi (biasanya format_id terbesar = kualitas terbaik)
             val allUrls = Regex(""""play_url"\s*:\s*"([^"]+)"""")
                 .findAll(streamsBlock).map { it.groupValues[1].replace("\\/", "/") }.toList()
-            val best = allUrls.lastOrNull()
+            val best = allUrls.lastOrNull() // last = highest quality
             if (!best.isNullOrBlank()) {
                 return ResolvedStream(url = best, isHls = best.contains(".m3u8"),
                     headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
@@ -330,13 +284,8 @@ object VideoExtractor {
                 headers = mapOf("Referer" to "https://www.blogger.com/", "User-Agent" to DESKTOP_UA))
         }
 
-        val snippet = html.take(800)
-        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: $snippet")
-        return ResolvedStream(
-            url = "",
-            isHls = false,
-            debugLog = "[Blogger Debug] Semua pattern gagal.\n[URL]: $sourceUrl\n\nResponse 800 char pertama:\n$snippet"
-        )
+        Log.d("VideoExtractor", "Blogger: tidak ditemukan video URL. HTML snippet: ${html.take(500)}")
+        return null
     }
 
     /**
