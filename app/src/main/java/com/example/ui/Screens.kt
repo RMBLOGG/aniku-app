@@ -3701,6 +3701,16 @@ fun WatchScreen(
     }
 
     // Auto-join kalau dibuka dari halaman daftar Nobar (tap salah satu room di list).
+    // Peringatan kalau host ganti server ke mode WebView saat room Nobar masih aktif —
+    // sync ke member akan diam-diam berhenti kalau ini tidak diberi tahu.
+    LaunchedEffect(isDirectStream, nobarRoom?.roomCode) {
+        if (nobarRoom != null && viewModel.isNobarHost && !isDirectStream) {
+            nobarSnackbarHostState.showSnackbar(
+                "Server ini tidak mendukung sync Nobar. Member tidak akan ikut posisi videomu sampai kamu pindah ke server lain."
+            )
+        }
+    }
+
     LaunchedEffect(autoJoinRoomCode) {
         if (autoJoinRoomCode != null) {
             viewModel.joinNobarRoom(autoJoinRoomCode) { /* error sudah ditangani via nobarError */ }
@@ -3811,7 +3821,17 @@ fun WatchScreen(
                     )
                 }
             } else {
-                IconButton(onClick = { showNobarDialog = true }) {
+                IconButton(onClick = {
+                    if (isDirectStream) {
+                        showNobarDialog = true
+                    } else {
+                        coroutineScope.launch {
+                            nobarSnackbarHostState.showSnackbar(
+                                "Nobar belum bisa dipakai di server ini. Coba pindah ke server lain dulu."
+                            )
+                        }
+                    }
+                }) {
                     Icon(Icons.Default.Groups, contentDescription = "Nobar", tint = MaterialTheme.colorScheme.onBackground)
                 }
             }
