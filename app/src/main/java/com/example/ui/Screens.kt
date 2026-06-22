@@ -3783,9 +3783,6 @@ fun WatchScreen(
                     }
                 } else {
                     // ── WebView: untuk URL embed (iframe, dll) ──
-                    val isBlogger = activeStreamUrl?.contains("blogger.com") == true ||
-                                    activeStreamUrl?.contains("blogspot.com") == true
-
                     var customView by remember { mutableStateOf<android.view.View?>(null) }
                     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
@@ -3817,17 +3814,13 @@ fun WatchScreen(
                     } else {
                         var isWebViewLoading by remember { mutableStateOf(true) }
                         Box(modifier = Modifier.fillMaxSize()) {
-                            var webViewRef by remember { mutableStateOf<WebView?>(null) }
-
-                            // Kalau Blogger — WebView invisible, user lihat loading sampai ExoPlayer siap
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
-                                        webViewRef = this
-                                        // Blogger: invisible di background
-                                        if (isBlogger) {
-                                            alpha = 0f
-                                        }
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
                                         settings.apply {
                                             javaScriptEnabled = true
                                             domStorageEnabled = true
@@ -3835,18 +3828,8 @@ fun WatchScreen(
                                             useWideViewPort = true
                                             loadWithOverviewMode = true
                                             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                            cacheMode = if (isBlogger) android.webkit.WebSettings.LOAD_NO_CACHE
-                                                        else android.webkit.WebSettings.LOAD_DEFAULT
-                                            // Blogger: pakai desktop UA supaya player load lebih cepat
-                                            userAgentString = if (isBlogger)
-                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                            else
-                                                "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                            // Percepat load: matikan fitur yang tidak dibutuhkan
-                                            if (isBlogger) {
-                                                loadsImagesAutomatically = false
-                                                blockNetworkImage = true
-                                            }
+                                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                         }
                                         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
                                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
@@ -3889,26 +3872,29 @@ fun WatchScreen(
                                                 request: android.webkit.WebResourceRequest?
                                             ): android.webkit.WebResourceResponse? {
                                                 val url = request?.url?.toString() ?: return null
-
-                                                // Blogger: blokir CSS, font, gambar untuk percepat load
-                                                if (isBlogger) {
-                                                    val ext = url.substringAfterLast(".").substringBefore("?").lowercase()
-                                                    if (ext in listOf("css", "woff", "woff2", "ttf", "eot", "ico", "png", "jpg", "gif", "svg", "webp")) {
-                                                        return android.webkit.WebResourceResponse("text/plain", "utf-8",
-                                                            java.io.ByteArrayInputStream(ByteArray(0)))
-                                                    }
-                                                }
-
                                                 // Intercept googlevideo.com/videoplayback — URL MP4 Blogger/YouTube
                                                 if (url.contains("googlevideo.com/videoplayback") &&
                                                     url.contains("mime=video") &&
                                                     !url.contains("mime=video/webm")) {
                                                     android.util.Log.d("AnikuWebView", "Intercepted Blogger/YT video: ${url.take(100)}")
                                                     android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                        // Mute & pause SEKARANG, jangan tunggu Compose recompose
+                                                        // ke ExoPlayer — kalau tidak, ada jeda di mana WebView
+                                                        // (masih autoplay) dan ExoPlayer sama-sama bersuara.
                                                         view?.evaluateJavascript(
-                                                            "try{document.querySelectorAll('video,audio').forEach(function(m){m.pause();m.muted=true;m.volume=0;});}catch(e){}",
+                                                            """
+                                                            (function() {
+                                                                document.querySelectorAll('video, audio').forEach(function(el) {
+                                                                    el.muted = true;
+                                                                    el.volume = 0;
+                                                                    el.pause();
+                                                                });
+                                                            })();
+                                                            """.trimIndent(),
                                                             null
                                                         )
+                                                        view?.onPause()
+                                                        view?.pauseTimers()
                                                         viewModel.switchToDirectStream(
                                                             url = url,
                                                             headers = mapOf(
@@ -3938,6 +3924,25 @@ fun WatchScreen(
                                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                                 super.onPageStarted(view, url, favicon)
                                                 isWebViewLoading = true
+                                                // WebView ini cuma jembatan sampai ExoPlayer dapat URL direct-nya.
+                                                // Mute dari awal supaya gak kedengaran sama sekali, bukan cuma
+                                                // setelah URL googlevideo ketemu.
+                                                view?.evaluateJavascript(
+                                                    """
+                                                    (function() {
+                                                        function muteAll() {
+                                                            document.querySelectorAll('video, audio').forEach(function(el) {
+                                                                el.muted = true;
+                                                                el.volume = 0;
+                                                            });
+                                                        }
+                                                        muteAll();
+                                                        var observer = new MutationObserver(muteAll);
+                                                        observer.observe(document.documentElement, { childList: true, subtree: true });
+                                                    })();
+                                                    """.trimIndent(),
+                                                    null
+                                                )
                                             }
                                             override fun onPageFinished(view: WebView?, url: String?) {
                                                 super.onPageFinished(view, url)
@@ -3959,16 +3964,6 @@ fun WatchScreen(
                                 },
                                 update = { view ->
                                     val url = activeStreamUrl ?: return@AndroidView
-                                    // Kalau sudah switch ke ExoPlayer, matikan audio WebView
-                                    if (isDirectStream) {
-                                        view.evaluateJavascript(
-                                            "try { document.querySelectorAll('video,audio').forEach(function(m){m.pause();m.muted=true;m.volume=0;}); } catch(e){}",
-                                            null
-                                        )
-                                        return@AndroidView
-                                    }
-                                    view.resumeTimers()
-                                    view.onResume()
                                     val headers = mapOf(
                                         "Referer" to "https://v2.samehadaku.how/",
                                         "Origin" to "https://v2.samehadaku.how",
@@ -3976,14 +3971,28 @@ fun WatchScreen(
                                     )
                                     view.loadUrl(url, headers)
                                 },
+                                onRelease = { view ->
+                                    // KRUSIAL: tanpa ini, WebView (dan video yang sedang autoplay
+                                    // di dalamnya) tetap hidup di memori walau node-nya sudah dibuang
+                                    // dari composition (misal saat pindah ke cabang ExoPlayer setelah
+                                    // direct stream URL ketemu). Itu sebabnya suara kedengaran dobel.
+                                    view.apply {
+                                        loadUrl("about:blank")
+                                        stopLoading()
+                                        onPause()
+                                        pauseTimers()
+                                        clearHistory()
+                                        removeAllViews()
+                                        destroy()
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
-                            // Loading overlay
-                            if (isWebViewLoading || isBlogger) {
+                            if (isWebViewLoading) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Black),
+                                        .background(Color.Black.copy(alpha = 0.85f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
@@ -3992,7 +4001,7 @@ fun WatchScreen(
                                     ) {
                                         CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
                                         Text(
-                                            if (isBlogger) "Memuat video Blogger..." else "Sedang memuat video...",
+                                            "Sedang memuat video...",
                                             color = Color.White,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium

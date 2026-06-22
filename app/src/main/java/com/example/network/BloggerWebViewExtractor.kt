@@ -37,6 +37,8 @@ object BloggerWebViewExtractor {
                 fun cleanup() {
                     webView?.apply {
                         stopLoading()
+                        onPause()
+                        pauseTimers()
                         destroy()
                     }
                     webView = null
@@ -77,6 +79,30 @@ object BloggerWebViewExtractor {
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                     webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            // Mute SEDINI mungkin, sebelum video sempat autoplay & bersuara.
+                            // WebView ini cuma alat extract URL, bukan untuk diputar — kalau tidak
+                            // dimute, dia akan autoplay sendiri dan dobel dengan ExoPlayer di UI.
+                            view?.evaluateJavascript(
+                                """
+                                (function() {
+                                    function muteAll() {
+                                        document.querySelectorAll('video, audio').forEach(function(el) {
+                                            el.muted = true;
+                                            el.volume = 0;
+                                        });
+                                    }
+                                    muteAll();
+                                    // Elemen video Blogger sering muncul belakangan (lazy), jadi observe juga.
+                                    var observer = new MutationObserver(muteAll);
+                                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                                })();
+                                """.trimIndent(),
+                                null
+                            )
+                        }
+
                         override fun shouldInterceptRequest(
                             view: WebView?,
                             request: WebResourceRequest?
@@ -101,6 +127,11 @@ object BloggerWebViewExtractor {
                             view?.evaluateJavascript(
                                 """
                                 (function() {
+                                    document.querySelectorAll('video, audio').forEach(function(el) {
+                                        el.muted = true;
+                                        el.volume = 0;
+                                        el.pause();
+                                    });
                                     var videos = document.querySelectorAll('video');
                                     for (var v of videos) {
                                         if (v.src && v.src.includes('googlevideo')) return v.src;
