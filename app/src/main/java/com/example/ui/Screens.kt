@@ -3835,8 +3835,18 @@ fun WatchScreen(
                                             useWideViewPort = true
                                             loadWithOverviewMode = true
                                             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                                            userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                            cacheMode = if (isBlogger) android.webkit.WebSettings.LOAD_NO_CACHE
+                                                        else android.webkit.WebSettings.LOAD_DEFAULT
+                                            // Blogger: pakai desktop UA supaya player load lebih cepat
+                                            userAgentString = if (isBlogger)
+                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                            else
+                                                "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                            // Percepat load: matikan fitur yang tidak dibutuhkan
+                                            if (isBlogger) {
+                                                loadsImagesAutomatically = false
+                                                blockNetworkImage = true
+                                            }
                                         }
                                         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
                                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
@@ -3879,12 +3889,22 @@ fun WatchScreen(
                                                 request: android.webkit.WebResourceRequest?
                                             ): android.webkit.WebResourceResponse? {
                                                 val url = request?.url?.toString() ?: return null
+
+                                                // Blogger: blokir CSS, font, gambar untuk percepat load
+                                                if (isBlogger) {
+                                                    val ext = url.substringAfterLast(".").substringBefore("?").lowercase()
+                                                    if (ext in listOf("css", "woff", "woff2", "ttf", "eot", "ico", "png", "jpg", "gif", "svg", "webp")) {
+                                                        return android.webkit.WebResourceResponse("text/plain", "utf-8",
+                                                            java.io.ByteArrayInputStream(ByteArray(0)))
+                                                    }
+                                                }
+
+                                                // Intercept googlevideo.com/videoplayback — URL MP4 Blogger/YouTube
                                                 if (url.contains("googlevideo.com/videoplayback") &&
                                                     url.contains("mime=video") &&
                                                     !url.contains("mime=video/webm")) {
                                                     android.util.Log.d("AnikuWebView", "Intercepted Blogger/YT video: ${url.take(100)}")
                                                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                                        // Mute WebView dulu sebelum ExoPlayer mulai
                                                         view?.evaluateJavascript(
                                                             "try{document.querySelectorAll('video,audio').forEach(function(m){m.pause();m.muted=true;m.volume=0;});}catch(e){}",
                                                             null
