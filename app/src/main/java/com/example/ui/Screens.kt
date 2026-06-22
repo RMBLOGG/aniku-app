@@ -3814,13 +3814,24 @@ fun WatchScreen(
                     } else {
                         var isWebViewLoading by remember { mutableStateOf(true) }
                         Box(modifier = Modifier.fillMaxSize()) {
+                            var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+                            // Stop WebView saat switch ke ExoPlayer
+                            LaunchedEffect(isDirectStream) {
+                                if (isDirectStream) {
+                                    webViewRef?.let { wv ->
+                                        wv.stopLoading()
+                                        wv.loadUrl("about:blank")
+                                        wv.pauseTimers()
+                                        wv.onPause()
+                                    }
+                                }
+                            }
+
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
+                                        webViewRef = this
                                         settings.apply {
                                             javaScriptEnabled = true
                                             domStorageEnabled = true
@@ -3928,6 +3939,16 @@ fun WatchScreen(
                                 },
                                 update = { view ->
                                     val url = activeStreamUrl ?: return@AndroidView
+                                    // Kalau sudah switch ke ExoPlayer, stop WebView
+                                    if (isDirectStream) {
+                                        view.stopLoading()
+                                        view.loadUrl("about:blank")
+                                        view.pauseTimers()
+                                        view.onPause()
+                                        return@AndroidView
+                                    }
+                                    view.resumeTimers()
+                                    view.onResume()
                                     val headers = mapOf(
                                         "Referer" to "https://v2.samehadaku.how/",
                                         "Origin" to "https://v2.samehadaku.how",
