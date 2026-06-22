@@ -3798,7 +3798,7 @@ fun WatchScreen(
                                 model = posterUrl,
                                 contentDescription = animeTitle,
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Cover
+                                contentScale = ContentScale.Crop
                             )
                             Box(
                                 modifier = Modifier
