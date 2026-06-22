@@ -44,6 +44,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -3607,6 +3609,7 @@ fun WatchScreen(
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val coroutineScope = rememberCoroutineScope()
+    val clipboardManager = LocalClipboardManager.current
     val session by viewModel.session.collectAsState()
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
@@ -3766,6 +3769,24 @@ fun WatchScreen(
                 )
             }
             if (nobarRoom != null) {
+                // Salin kode room — aksi terpisah dari badge (yang dipakai untuk keluar room)
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(nobarRoom?.roomCode ?: ""))
+                        coroutineScope.launch {
+                            nobarSnackbarHostState.showSnackbar("Kode room disalin: ${nobarRoom?.roomCode}")
+                        }
+                    },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = "Salin kode room",
+                        tint = accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
                 // Status room aktif: tampilkan kode + jumlah member, tap untuk keluar room
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -3808,7 +3829,13 @@ fun WatchScreen(
                         episodeSlug = currentEpisodeSlug,
                         episodeTitle = episodeTitle ?: ""
                     ) { code ->
-                        if (code != null) showNobarDialog = false
+                        if (code != null) {
+                            showNobarDialog = false
+                            clipboardManager.setText(AnnotatedString(code))
+                            coroutineScope.launch {
+                                nobarSnackbarHostState.showSnackbar("Room dibuat! Kode $code disalin, share ke temanmu.")
+                            }
+                        }
                     }
                 },
                 onJoinRoom = { code ->
