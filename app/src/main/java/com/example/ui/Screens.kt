@@ -3404,14 +3404,92 @@ fun NobarDialog(
 
 @Composable
 fun NobarListScreen(
-    viewModel: AnikuViewModel
+    viewModel: AnikuViewModel,
+    onJoinRoom: (episodeSlug: String, animeTitle: String, roomCode: String) -> Unit = { _, _, _ -> }
 ) {
     val activeRooms by viewModel.activeNobarRooms.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
+    // State untuk dialog join
+    var selectedRoom by remember { mutableStateOf<NobarManager.ActiveRoomSummary?>(null) }
+    var joinCodeInput by remember { mutableStateOf("") }
+    var joinError by remember { mutableStateOf<String?>(null) }
+
     DisposableEffect(Unit) {
         viewModel.startObservingActiveNobarRooms()
         onDispose { viewModel.stopObservingActiveNobarRooms() }
+    }
+
+    // Dialog masukkan kode room
+    selectedRoom?.let { room ->
+        AlertDialog(
+            onDismissRequest = {
+                selectedRoom = null
+                joinCodeInput = ""
+                joinError = null
+            },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = {
+                Text(
+                    text = "Masuk ke Room",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = room.animeTitle,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = joinCodeInput,
+                        onValueChange = {
+                            joinCodeInput = it.uppercase().take(8)
+                            joinError = null
+                        },
+                        label = { Text("Kode Room") },
+                        placeholder = { Text("Contoh: ABC123") },
+                        singleLine = true,
+                        isError = joinError != null,
+                        supportingText = joinError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentColor,
+                            focusedLabelColor = accentColor
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (joinCodeInput.isBlank()) {
+                            joinError = "Kode room tidak boleh kosong"
+                        } else {
+                            onJoinRoom(room.episodeSlug, room.animeTitle, joinCodeInput.trim())
+                            selectedRoom = null
+                            joinCodeInput = ""
+                            joinError = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    Text("Join", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    selectedRoom = null
+                    joinCodeInput = ""
+                    joinError = null
+                }) {
+                    Text("Batal", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        )
     }
 
     Column(
@@ -3475,7 +3553,8 @@ fun NobarListScreen(
                 items(activeRooms, key = { it.roomCode }) { room ->
                     NobarRoomCard(
                         room = room,
-                        accentColor = accentColor
+                        accentColor = accentColor,
+                        onClick = { selectedRoom = room }
                     )
                 }
             }
@@ -3486,13 +3565,15 @@ fun NobarListScreen(
 @Composable
 fun NobarRoomCard(
     room: NobarManager.ActiveRoomSummary,
-    accentColor: Color
+    accentColor: Color,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { onClick() }
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

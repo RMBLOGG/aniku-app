@@ -599,7 +599,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("nobar_list") {
-                            NobarListScreen(viewModel = viewModel)
+                            NobarListScreen(
+                                viewModel = viewModel,
+                                onJoinRoom = { slug, title, roomCode ->
+                                    val encodedTitle = java.net.URLEncoder.encode(title, "UTF-8")
+                                    navController.navigate("watch/$slug/$encodedTitle?joinRoom=$roomCode")
+                                }
+                            )
                         }
                         composable("chat") {
                             ChatScreen(
