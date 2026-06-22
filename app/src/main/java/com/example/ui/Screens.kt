@@ -3677,7 +3677,7 @@ fun WatchScreen(
                                 // Member yang join room saat host sudah nonton beberapa menit
                                 // langsung diseek ke posisi terkini, bukan mulai dari 00:00.
                                 val room = nobarRoom
-                                if (room != null && room.hostUid != session.value.userId) {
+                                if (room != null && room.hostUid != session.userId) {
                                     seekTo(NobarManager.estimateCurrentPositionMs(room))
                                 }
                             }
