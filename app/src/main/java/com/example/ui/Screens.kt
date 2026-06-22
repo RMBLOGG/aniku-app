@@ -3783,6 +3783,9 @@ fun WatchScreen(
                     }
                 } else {
                     // ── WebView: untuk URL embed (iframe, dll) ──
+                    val isBlogger = activeStreamUrl?.contains("blogger.com") == true ||
+                                    activeStreamUrl?.contains("blogspot.com") == true
+
                     var customView by remember { mutableStateOf<android.view.View?>(null) }
                     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
@@ -3816,10 +3819,15 @@ fun WatchScreen(
                         Box(modifier = Modifier.fillMaxSize()) {
                             var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
+                            // Kalau Blogger — WebView invisible, user lihat loading sampai ExoPlayer siap
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
                                         webViewRef = this
+                                        // Blogger: invisible di background
+                                        if (isBlogger) {
+                                            alpha = 0f
+                                        }
                                         settings.apply {
                                             javaScriptEnabled = true
                                             domStorageEnabled = true
@@ -3950,11 +3958,12 @@ fun WatchScreen(
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
-                            if (isWebViewLoading) {
+                            // Loading overlay
+                            if (isWebViewLoading || isBlogger) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.85f)),
+                                        .background(Color.Black),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Column(
@@ -3963,7 +3972,7 @@ fun WatchScreen(
                                     ) {
                                         CircularProgressIndicator(color = accentColor, strokeWidth = 3.dp)
                                         Text(
-                                            "Sedang memuat video...",
+                                            if (isBlogger) "Memuat video Blogger..." else "Sedang memuat video...",
                                             color = Color.White,
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Medium
