@@ -35,6 +35,7 @@ object NobarManager {
 
     private const val TAG = "NobarManager"
     private const val ROOMS_PATH = "rooms"
+    private const val ACTIVE_ROOMS_PATH = "active_rooms"
 
     // Toleransi sync: kalau selisih posisi member vs host < ini, jangan seek
     // (biar gak terlalu sering micro-seek yang bikin video nyendat-nyendat)
@@ -51,6 +52,7 @@ object NobarManager {
         val hostUsername: String = "",
         val animeSlug: String = "",
         val animeTitle: String = "",
+        val animePoster: String = "",
         val episodeSlug: String = "",
         val episodeTitle: String = "",
         val isPlaying: Boolean = false,
@@ -58,6 +60,24 @@ object NobarManager {
         val updatedAt: Long = 0L,
         val createdAt: Long = 0L,
         val memberCount: Int = 0
+    )
+
+    /**
+     * Ringkasan room untuk ditampilkan di halaman "Nobar" (daftar room aktif publik).
+     * Disimpan terpisah dari rooms/{code} di node active_rooms/{code} supaya halaman
+     * listing bisa observe satu node ringan tanpa fetch detail tiap room satu-satu.
+     */
+    data class ActiveRoomSummary(
+        val roomCode: String = "",
+        val hostUsername: String = "",
+        val animeSlug: String = "",
+        val animeTitle: String = "",
+        val animePoster: String = "",
+        val episodeSlug: String = "",
+        val episodeTitle: String = "",
+        val dataSource: String = "",
+        val memberCount: Int = 0,
+        val updatedAt: Long = 0L
     )
 
     /**
@@ -78,8 +98,10 @@ object NobarManager {
         hostUsername: String,
         animeSlug: String,
         animeTitle: String,
+        animePoster: String,
         episodeSlug: String,
-        episodeTitle: String
+        episodeTitle: String,
+        dataSource: String
     ): String? {
         repeat(5) { attempt ->
             val code = generateRoomCode()
@@ -96,8 +118,10 @@ object NobarManager {
                     "hostUsername" to hostUsername,
                     "animeSlug" to animeSlug,
                     "animeTitle" to animeTitle,
+                    "animePoster" to animePoster,
                     "episodeSlug" to episodeSlug,
                     "episodeTitle" to episodeTitle,
+                    "dataSource" to dataSource,
                     "isPlaying" to false,
                     "positionMs" to 0L,
                     "updatedAt" to now,
@@ -107,6 +131,19 @@ object NobarManager {
                     )
                 )
                 roomRef.setValue(data).await()
+                // Index ringan untuk halaman "Nobar" (daftar room aktif publik)
+                val summary = mapOf(
+                    "hostUsername" to hostUsername,
+                    "animeSlug" to animeSlug,
+                    "animeTitle" to animeTitle,
+                    "animePoster" to animePoster,
+                    "episodeSlug" to episodeSlug,
+                    "episodeTitle" to episodeTitle,
+                    "dataSource" to dataSource,
+                    "memberCount" to 1,
+                    "updatedAt" to now
+                )
+                database.getReference("$ACTIVE_ROOMS_PATH/$code").setValue(summary).await()
                 Log.d(TAG, "Room created: $code")
                 return code
             } catch (e: Exception) {
@@ -132,7 +169,9 @@ object NobarManager {
             roomRef.child("members").child(userId).setValue(
                 mapOf("username" to username, "joinedAt" to System.currentTimeMillis())
             ).await()
-            parseRoomSnapshot(normalizedCode, snapshot)
+            val state = parseRoomSnapshot(normalizedCode, roomRef.get().await())
+            syncActiveRoomMemberCount(normalizedCode, state.memberCount)
+            state
         } catch (e: Exception) {
             Log.e(TAG, "Failed to join room $normalizedCode: ${e.message}", e)
             null
@@ -146,6 +185,11 @@ object NobarManager {
     suspend fun leaveRoom(roomCode: String, userId: String) {
         try {
             database.getReference("$ROOMS_PATH/$roomCode/members/$userId").removeValue().await()
+            val freshSnapshot = database.getReference("$ROOMS_PATH/$roomCode").get().await()
+            if (freshSnapshot.exists()) {
+                val count = freshSnapshot.child("members").childrenCount.toInt()
+                syncActiveRoomMemberCount(roomCode, count)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to leave room $roomCode: ${e.message}", e)
         }
@@ -157,9 +201,53 @@ object NobarManager {
     suspend fun closeRoom(roomCode: String) {
         try {
             database.getReference("$ROOMS_PATH/$roomCode").removeValue().await()
+            database.getReference("$ACTIVE_ROOMS_PATH/$roomCode").removeValue().await()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to close room $roomCode: ${e.message}", e)
         }
+    }
+
+    private suspend fun syncActiveRoomMemberCount(roomCode: String, count: Int) {
+        try {
+            database.getReference("$ACTIVE_ROOMS_PATH/$roomCode/memberCount").setValue(count).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync active room member count for $roomCode: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Listen daftar semua room aktif publik secara realtime, untuk halaman "Nobar".
+     * Diurutkan dari yang paling baru di-update (paling ramai/baru aktif duluan).
+     */
+    fun observeActiveRooms(): Flow<List<ActiveRoomSummary>> = callbackFlow {
+        val ref = database.getReference(ACTIVE_ROOMS_PATH)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val rooms = snapshot.children.mapNotNull { child ->
+                    val code = child.key ?: return@mapNotNull null
+                    ActiveRoomSummary(
+                        roomCode = code,
+                        hostUsername = child.child("hostUsername").getValue(String::class.java) ?: "",
+                        animeSlug = child.child("animeSlug").getValue(String::class.java) ?: "",
+                        animeTitle = child.child("animeTitle").getValue(String::class.java) ?: "",
+                        animePoster = child.child("animePoster").getValue(String::class.java) ?: "",
+                        episodeSlug = child.child("episodeSlug").getValue(String::class.java) ?: "",
+                        episodeTitle = child.child("episodeTitle").getValue(String::class.java) ?: "",
+                        dataSource = child.child("dataSource").getValue(String::class.java) ?: "",
+                        memberCount = child.child("memberCount").getValue(Int::class.java) ?: 0,
+                        updatedAt = child.child("updatedAt").getValue(Long::class.java) ?: 0L
+                    )
+                }.sortedByDescending { it.updatedAt }
+                trySend(rooms)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "observeActiveRooms cancelled: ${error.message}")
+                trySend(emptyList())
+            }
+        }
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
     }
 
     /**
@@ -194,6 +282,7 @@ object NobarManager {
             hostUsername = snapshot.child("hostUsername").getValue(String::class.java) ?: "",
             animeSlug = snapshot.child("animeSlug").getValue(String::class.java) ?: "",
             animeTitle = snapshot.child("animeTitle").getValue(String::class.java) ?: "",
+            animePoster = snapshot.child("animePoster").getValue(String::class.java) ?: "",
             episodeSlug = snapshot.child("episodeSlug").getValue(String::class.java) ?: "",
             episodeTitle = snapshot.child("episodeTitle").getValue(String::class.java) ?: "",
             isPlaying = snapshot.child("isPlaying").getValue(Boolean::class.java) ?: false,

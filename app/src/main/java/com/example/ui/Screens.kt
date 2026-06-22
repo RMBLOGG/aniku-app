@@ -3397,6 +3397,203 @@ fun NobarDialog(
 }
 
 // ================================================================
+// 6c. NOBAR LIST SCREEN — daftar semua room Nobar yang sedang aktif
+// ================================================================
+
+@Composable
+fun NobarListScreen(
+    viewModel: AnikuViewModel
+) {
+    val activeRooms by viewModel.activeNobarRooms.collectAsState()
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    DisposableEffect(Unit) {
+        viewModel.startObservingActiveNobarRooms()
+        onDispose { viewModel.stopObservingActiveNobarRooms() }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Nobar",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Nonton bareng yang sedang berlangsung sekarang.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+            )
+        }
+
+        if (activeRooms.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Groups,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(72.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Belum Ada Nobar Aktif",
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Buat room dari halaman nonton episode untuk mulai nobar bareng teman.",
+                    color = Color.Gray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(activeRooms, key = { it.roomCode }) { room ->
+                    NobarRoomCard(
+                        room = room,
+                        accentColor = accentColor
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NobarRoomCard(
+    room: NobarManager.ActiveRoomSummary,
+    accentColor: Color
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(64.dp)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            AsyncImage(
+                model = room.animePoster,
+                contentDescription = room.animeTitle,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Indikator "LIVE" — room ini sedang aktif sekarang
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Red)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .align(Alignment.TopStart)
+            ) {
+                Text("LIVE", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black)
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = room.animeTitle,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            if (room.episodeTitle.isNotBlank()) {
+                Text(
+                    text = room.episodeTitle,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Host: ${room.hostUsername}",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (room.dataSource.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val sourceLabel = when (room.dataSource) {
+                    "Dayynime-v1" -> "Server 1 (Utama)"
+                    "Dayynime-v2" -> "Server 2 (Alternatif)"
+                    else -> room.dataSource
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = sourceLabel,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(accentColor.copy(alpha = 0.15f))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Icon(
+                Icons.Default.Groups,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "${room.memberCount}",
+                color = accentColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+// ================================================================
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
 
@@ -3405,7 +3602,8 @@ fun WatchScreen(
     episodeSlug: String,
     animeTitle: String,
     viewModel: AnikuViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    autoJoinRoomCode: String? = null
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val coroutineScope = rememberCoroutineScope()
@@ -3496,6 +3694,13 @@ fun WatchScreen(
         nobarError?.let {
             nobarSnackbarHostState.showSnackbar(it)
             viewModel.clearNobarError()
+        }
+    }
+
+    // Auto-join kalau dibuka dari halaman daftar Nobar (tap salah satu room di list).
+    LaunchedEffect(autoJoinRoomCode) {
+        if (autoJoinRoomCode != null) {
+            viewModel.joinNobarRoom(autoJoinRoomCode) { /* error sudah ditangani via nobarError */ }
         }
     }
 
@@ -3599,6 +3804,7 @@ fun WatchScreen(
                     viewModel.createNobarRoom(
                         animeSlug = currentAnimeSlug,
                         animeTitle = animeTitle,
+                        animePoster = detail?.poster ?: "",
                         episodeSlug = currentEpisodeSlug,
                         episodeTitle = episodeTitle ?: ""
                     ) { code ->

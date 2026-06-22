@@ -309,6 +309,7 @@ class MainActivity : ComponentActivity() {
                 val sheetNavItems = listOf(
                     Triple("chat", "Chat", Icons.Default.Chat),
                     Triple("feed", "Feed", Icons.Default.GridView),
+                    Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                 )
@@ -578,21 +579,27 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(
-                            route = "watch/{slug}/{title}",
+                            route = "watch/{slug}/{title}?joinRoom={joinRoom}",
                             arguments = listOf(
                                 navArgument("slug") { type = NavType.StringType },
-                                navArgument("title") { type = NavType.StringType }
+                                navArgument("title") { type = NavType.StringType },
+                                navArgument("joinRoom") { type = NavType.StringType; defaultValue = "" }
                             )
                         ) { backStackEntry ->
                             val epSlug = backStackEntry.arguments?.getString("slug") ?: ""
                             val encodedTitle = backStackEntry.arguments?.getString("title") ?: ""
                             val title = java.net.URLDecoder.decode(encodedTitle, "UTF-8")
+                            val joinRoomCode = backStackEntry.arguments?.getString("joinRoom")?.takeIf { it.isNotBlank() }
                             WatchScreen(
                                 episodeSlug = epSlug,
                                 animeTitle = title,
                                 viewModel = viewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                autoJoinRoomCode = joinRoomCode
                             )
+                        }
+                        composable("nobar_list") {
+                            NobarListScreen(viewModel = viewModel)
                         }
                         composable("chat") {
                             ChatScreen(

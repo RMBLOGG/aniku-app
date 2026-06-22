@@ -2018,6 +2018,26 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     private var nobarObserveJob: kotlinx.coroutines.Job? = null
 
+    private val _activeNobarRooms = MutableStateFlow<List<NobarManager.ActiveRoomSummary>>(emptyList())
+    val activeNobarRooms: StateFlow<List<NobarManager.ActiveRoomSummary>> = _activeNobarRooms.asStateFlow()
+    private var activeRoomsObserveJob: kotlinx.coroutines.Job? = null
+
+    /** Dipanggil saat halaman daftar Nobar dibuka. Aman dipanggil berkali-kali. */
+    fun startObservingActiveNobarRooms() {
+        if (activeRoomsObserveJob?.isActive == true) return
+        activeRoomsObserveJob = viewModelScope.launch {
+            NobarManager.observeActiveRooms().collect { rooms ->
+                _activeNobarRooms.value = rooms
+            }
+        }
+    }
+
+    /** Dipanggil saat halaman daftar Nobar ditutup, supaya listener tidak nyangkut terus. */
+    fun stopObservingActiveNobarRooms() {
+        activeRoomsObserveJob?.cancel()
+        activeRoomsObserveJob = null
+    }
+
     /** Apakah user saat ini adalah host dari room yang sedang diikuti. */
     val isNobarHost: Boolean
         get() = _nobarRoom.value?.hostUid == session.value.userId && _nobarRoom.value != null
@@ -2025,6 +2045,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     fun createNobarRoom(
         animeSlug: String,
         animeTitle: String,
+        animePoster: String,
         episodeSlug: String,
         episodeTitle: String,
         onResult: (roomCode: String?) -> Unit
@@ -2044,8 +2065,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 hostUsername = username,
                 animeSlug = animeSlug,
                 animeTitle = animeTitle,
+                animePoster = animePoster,
                 episodeSlug = episodeSlug,
-                episodeTitle = episodeTitle
+                episodeTitle = episodeTitle,
+                dataSource = dataSource.value
             )
             _isNobarLoading.value = false
             if (code != null) {
