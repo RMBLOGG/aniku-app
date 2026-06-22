@@ -3846,6 +3846,7 @@ fun WatchScreen(
                                                 "mega.nz", "mega.co.nz",
                                                 "blogger.com", "blogspot.com",
                                                 "googlevideo.com", "googleapis.com",
+                                                "youtube.com", "youtube.googleapis.com",
                                                 "gstatic.com", "jwplatform.com", "jwpcdn.com",
                                                 "akamaized.net", "cloudfront.net", "fastly.net",
                                                 "cdnjs.cloudflare.com", "cloudflare.com",
@@ -3865,6 +3866,31 @@ fun WatchScreen(
                                                 "pucuk.eu.org",
                                                 "cdn.jsdelivr.net", "unpkg.com"
                                             )
+
+                                            override fun shouldInterceptRequest(
+                                                view: WebView?,
+                                                request: android.webkit.WebResourceRequest?
+                                            ): android.webkit.WebResourceResponse? {
+                                                val url = request?.url?.toString() ?: return null
+                                                // Intercept googlevideo.com/videoplayback — URL MP4 Blogger/YouTube
+                                                if (url.contains("googlevideo.com/videoplayback") &&
+                                                    url.contains("mime=video") &&
+                                                    !url.contains("mime=video/webm")) {
+                                                    android.util.Log.d("AnikuWebView", "Intercepted Blogger/YT video: ${url.take(100)}")
+                                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                        viewModel.switchToDirectStream(
+                                                            url = url,
+                                                            headers = mapOf(
+                                                                "Referer" to "https://www.blogger.com/",
+                                                                "Origin" to "https://www.blogger.com",
+                                                                "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                                return null
+                                            }
+
                                             override fun shouldOverrideUrlLoading(
                                                 view: WebView?,
                                                 request: WebResourceRequest?

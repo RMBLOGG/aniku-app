@@ -977,6 +977,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun switchToDirectStream(url: String, headers: Map<String, String> = emptyMap()) {
+        _activeStreamUrl.value = url
+        _resolvedHeaders.value = headers
+        _isDirectStream.value = true
+    }
+
     private fun isDirectUrl(url: String): Boolean {
         val lower = url.lowercase()
         return lower.contains(".mp4") || lower.contains(".m3u8") || lower.contains(".mkv")
