@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -3270,6 +3271,132 @@ fun AnimeDetailScreen(
 }
 
 // ================================================================
+// 6b. NOBAR DIALOG (Create / Join Room)
+// ================================================================
+
+@Composable
+fun NobarDialog(
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onCreateRoom: () -> Unit,
+    onJoinRoom: (String) -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Buat Room, 1 = Join Room
+    var joinCode by remember { mutableStateOf("") }
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "Nobar (Nonton Bareng)",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Nonton episode ini bareng teman secara realtime.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                )
+
+                // Tab switcher
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(4.dp)
+                ) {
+                    listOf("Buat Room", "Join Room").forEachIndexed { index, label ->
+                        val selected = selectedTab == index
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (selected) accentColor else Color.Transparent)
+                                .clickable { selectedTab = index }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (selectedTab == 0) {
+                    Text(
+                        text = "Kamu jadi host. Cuma kamu yang bisa play/pause/seek — teman yang join akan otomatis ikut posisi videomu.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Button(
+                        onClick = onCreateRoom,
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Text("Buat Room", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = joinCode,
+                        onValueChange = { joinCode = it.uppercase().take(6) },
+                        label = { Text("Kode Room") },
+                        placeholder = { Text("Contoh: XKQP91") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { if (joinCode.isNotBlank()) onJoinRoom(joinCode) },
+                        enabled = !isLoading && joinCode.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Text("Join Room", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("Batal", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
 
@@ -3281,6 +3408,8 @@ fun WatchScreen(
     onBack: () -> Unit
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
+    val coroutineScope = rememberCoroutineScope()
+    val session by viewModel.session.collectAsState()
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
     val isDirectStream by viewModel.isDirectStream.collectAsState()
@@ -3356,6 +3485,47 @@ fun WatchScreen(
         }
     }
 
+    // ── Nobar (Watch Party) state ──
+    val nobarRoom by viewModel.nobarRoom.collectAsState()
+    val nobarError by viewModel.nobarError.collectAsState()
+    val isNobarLoading by viewModel.isNobarLoading.collectAsState()
+    var showNobarDialog by remember { mutableStateOf(false) }
+    val nobarSnackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(nobarError) {
+        nobarError?.let {
+            nobarSnackbarHostState.showSnackbar(it)
+            viewModel.clearNobarError()
+        }
+    }
+
+    // Kalau host pindah episode lewat tombol Sebelumnya/Selanjutnya, sinkronkan
+    // perubahan episode itu juga ke room (member ikut pindah episode).
+    LaunchedEffect(currentEpisodeSlug, nobarRoom?.roomCode) {
+        val room = nobarRoom
+        if (room != null && viewModel.isNobarHost && room.episodeSlug != currentEpisodeSlug) {
+            // Episode lokal sudah berubah duluan (host), broadcast nanti ditangani
+            // saat ExoPlayer baru siap — lihat nobarUpdatePlayback di blok ExoPlayer.
+        }
+    }
+
+    // Member (bukan host): kalau room pindah episode, ikuti otomatis.
+    LaunchedEffect(nobarRoom?.episodeSlug) {
+        val room = nobarRoom
+        if (room != null && !viewModel.isNobarHost && room.episodeSlug.isNotEmpty() &&
+            room.episodeSlug != currentEpisodeSlug
+        ) {
+            currentEpisodeSlug = room.episodeSlug
+        }
+    }
+
+    // Leave room otomatis kalau keluar dari WatchScreen
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.leaveNobarRoom()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -3390,7 +3560,60 @@ fun WatchScreen(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            if (nobarRoom != null) {
+                // Status room aktif: tampilkan kode + jumlah member, tap untuk keluar room
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .clickable { viewModel.leaveNobarRoom() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Groups,
+                        contentDescription = "Nobar aktif",
+                        tint = accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${nobarRoom?.roomCode} · ${nobarRoom?.memberCount}",
+                        color = accentColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            } else {
+                IconButton(onClick = { showNobarDialog = true }) {
+                    Icon(Icons.Default.Groups, contentDescription = "Nobar", tint = MaterialTheme.colorScheme.onBackground)
+                }
+            }
         }
+
+        if (showNobarDialog) {
+            NobarDialog(
+                isLoading = isNobarLoading,
+                onDismiss = { showNobarDialog = false },
+                onCreateRoom = {
+                    viewModel.createNobarRoom(
+                        animeSlug = currentAnimeSlug,
+                        animeTitle = animeTitle,
+                        episodeSlug = currentEpisodeSlug,
+                        episodeTitle = episodeTitle ?: ""
+                    ) { code ->
+                        if (code != null) showNobarDialog = false
+                    }
+                },
+                onJoinRoom = { code ->
+                    viewModel.joinNobarRoom(code) { success ->
+                        if (success) showNobarDialog = false
+                    }
+                }
+            )
+        }
+
+        SnackbarHost(hostState = nobarSnackbarHostState)
 
         // Webview embed stream container
         Box(
@@ -3451,6 +3674,12 @@ fun WatchScreen(
                                 setMediaItem(MediaItem.fromUri(url))
                                 prepare()
                                 playWhenReady = true
+                                // Member yang join room saat host sudah nonton beberapa menit
+                                // langsung diseek ke posisi terkini, bukan mulai dari 00:00.
+                                val room = nobarRoom
+                                if (room != null && room.hostUid != session.value.userId) {
+                                    seekTo(NobarManager.estimateCurrentPositionMs(room))
+                                }
                             }
                     }
 
@@ -3499,10 +3728,21 @@ fun WatchScreen(
                         pipMode.value
                     } else false
 
+                    // Member di room Nobar tidak boleh kontrol playback — hanya host yang bisa.
+                    // Tap/seek tetap terdeteksi tapi tidak dieksekusi, dan kasih info ke user.
+                    val canControlPlayback = nobarRoom == null || viewModel.isNobarHost
+
                     // Listener
                     DisposableEffect(exoPlayer) {
                         val listener = object : Player.Listener {
-                            override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+                            override fun onIsPlayingChanged(playing: Boolean) {
+                                isPlaying = playing
+                                // Host: broadcast segera setiap kali play/pause berubah,
+                                // supaya member tidak menunggu tick periodik untuk ikut pause/play.
+                                if (nobarRoom != null && viewModel.isNobarHost) {
+                                    viewModel.nobarUpdatePlayback(playing, exoPlayer.currentPosition)
+                                }
+                            }
                             override fun onPlaybackStateChanged(state: Int) {
                                 isBuffering = state == Player.STATE_BUFFERING
                             }
@@ -3516,7 +3756,28 @@ fun WatchScreen(
                         while (true) {
                             currentPosition = exoPlayer.currentPosition
                             duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
-                            kotlinx.coroutines.delay(500)
+                            // Host: broadcast posisi berkala (menangkap perubahan dari seek
+                            // manual lewat slider/tap -10s/+10s, yang tidak memicu onIsPlayingChanged).
+                            if (nobarRoom != null && viewModel.isNobarHost) {
+                                viewModel.nobarUpdatePlayback(exoPlayer.isPlaying, exoPlayer.currentPosition)
+                            }
+                            kotlinx.coroutines.delay(if (nobarRoom != null && viewModel.isNobarHost) 2_000 else 500)
+                        }
+                    }
+
+                    // Member (bukan host): ikuti state play/pause/posisi dari room secara realtime.
+                    LaunchedEffect(nobarRoom?.isPlaying, nobarRoom?.positionMs, nobarRoom?.updatedAt) {
+                        val room = nobarRoom
+                        if (room == null || viewModel.isNobarHost) return@LaunchedEffect
+                        val targetPositionMs = NobarManager.estimateCurrentPositionMs(room)
+                        val drift = kotlin.math.abs(exoPlayer.currentPosition - targetPositionMs)
+                        if (drift > NobarManager.SYNC_TOLERANCE_MS) {
+                            exoPlayer.seekTo(targetPositionMs)
+                        }
+                        if (room.isPlaying && !exoPlayer.isPlaying) {
+                            exoPlayer.play()
+                        } else if (!room.isPlaying && exoPlayer.isPlaying) {
+                            exoPlayer.pause()
                         }
                     }
 
@@ -3606,10 +3867,16 @@ fun WatchScreen(
                                     val now = System.currentTimeMillis()
                                     val side = if (offset.x < size.width / 2f) "left" else "right"
                                     if (now - lastTapTime < 300 && lastTapSide == side) {
-                                        if (side == "left") exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
-                                        else exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
-                                        doubleTapSide = side
-                                        showControls = false
+                                        if (canControlPlayback) {
+                                            if (side == "left") exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
+                                            else exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
+                                            doubleTapSide = side
+                                            showControls = false
+                                        } else {
+                                            coroutineScope.launch {
+                                                nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
+                                            }
+                                        }
                                     } else {
                                         showControls = !showControls
                                     }
@@ -3688,8 +3955,14 @@ fun WatchScreen(
                                                     .background(accentColor.copy(alpha = 0.9f), CircleShape)
                                                     .border(1.5.dp, Color.White.copy(0.15f), CircleShape)
                                                     .clickable {
-                                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                                        showControls = true
+                                                        if (canControlPlayback) {
+                                                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                                            showControls = true
+                                                        } else {
+                                                            coroutineScope.launch {
+                                                                nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
+                                                            }
+                                                        }
                                                     },
                                                 contentAlignment = Alignment.Center
                                             ) {
@@ -3717,7 +3990,15 @@ fun WatchScreen(
                                             // Progress bar
                                             Slider(
                                                 value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
-                                                onValueChange = { exoPlayer.seekTo((it * duration).toLong()) },
+                                                onValueChange = {
+                                                    if (canControlPlayback) {
+                                                        exoPlayer.seekTo((it * duration).toLong())
+                                                    } else {
+                                                        coroutineScope.launch {
+                                                            nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
+                                                        }
+                                                    }
+                                                },
                                                 colors = SliderDefaults.colors(
                                                     thumbColor = accentColor,
                                                     activeTrackColor = accentColor,

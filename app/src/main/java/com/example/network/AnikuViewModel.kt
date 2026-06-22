@@ -2003,4 +2003,129 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ================================================================
+    // NOBAR (Watch Party) — sinkronisasi realtime via Firebase Realtime DB
+    // ================================================================
+
+    private val _nobarRoom = MutableStateFlow<NobarManager.RoomState?>(null)
+    val nobarRoom: StateFlow<NobarManager.RoomState?> = _nobarRoom.asStateFlow()
+
+    private val _nobarError = MutableStateFlow<String?>(null)
+    val nobarError: StateFlow<String?> = _nobarError.asStateFlow()
+
+    private val _isNobarLoading = MutableStateFlow(false)
+    val isNobarLoading: StateFlow<Boolean> = _isNobarLoading.asStateFlow()
+
+    private var nobarObserveJob: kotlinx.coroutines.Job? = null
+
+    /** Apakah user saat ini adalah host dari room yang sedang diikuti. */
+    val isNobarHost: Boolean
+        get() = _nobarRoom.value?.hostUid == session.value.userId && _nobarRoom.value != null
+
+    fun createNobarRoom(
+        animeSlug: String,
+        animeTitle: String,
+        episodeSlug: String,
+        episodeTitle: String,
+        onResult: (roomCode: String?) -> Unit
+    ) {
+        val userId = session.value.userId
+        val username = session.value.username ?: "Host"
+        if (userId == null) {
+            _nobarError.value = "Kamu harus login untuk membuat room Nobar."
+            onResult(null)
+            return
+        }
+        _isNobarLoading.value = true
+        _nobarError.value = null
+        viewModelScope.launch {
+            val code = NobarManager.createRoom(
+                hostUid = userId,
+                hostUsername = username,
+                animeSlug = animeSlug,
+                animeTitle = animeTitle,
+                episodeSlug = episodeSlug,
+                episodeTitle = episodeTitle
+            )
+            _isNobarLoading.value = false
+            if (code != null) {
+                startObservingNobarRoom(code)
+            } else {
+                _nobarError.value = "Gagal membuat room Nobar, coba lagi."
+            }
+            onResult(code)
+        }
+    }
+
+    fun joinNobarRoom(roomCode: String, onResult: (success: Boolean) -> Unit) {
+        val userId = session.value.userId
+        val username = session.value.username ?: "Guest"
+        if (userId == null) {
+            _nobarError.value = "Kamu harus login untuk join room Nobar."
+            onResult(false)
+            return
+        }
+        _isNobarLoading.value = true
+        _nobarError.value = null
+        viewModelScope.launch {
+            val state = NobarManager.joinRoom(roomCode, userId, username)
+            _isNobarLoading.value = false
+            if (state != null) {
+                startObservingNobarRoom(state.roomCode)
+                onResult(true)
+            } else {
+                _nobarError.value = "Room tidak ditemukan. Cek lagi kode room-nya."
+                onResult(false)
+            }
+        }
+    }
+
+    private fun startObservingNobarRoom(roomCode: String) {
+        nobarObserveJob?.cancel()
+        nobarObserveJob = viewModelScope.launch {
+            NobarManager.observeRoom(roomCode).collect { state ->
+                _nobarRoom.value = state
+                if (state == null) {
+                    // Room sudah dihapus (host close room)
+                    _nobarError.value = "Room Nobar telah ditutup oleh host."
+                }
+            }
+        }
+    }
+
+    /**
+     * Dipanggil oleh host setiap kali user melakukan play/pause/seek di ExoPlayer.
+     * Hanya akan terkirim kalau user saat ini memang host room tersebut —
+     * mencegah member non-host mengirim event kontrol yang mempengaruhi semua orang.
+     */
+    fun nobarUpdatePlayback(isPlaying: Boolean, positionMs: Long) {
+        val room = _nobarRoom.value ?: return
+        if (!isNobarHost) return
+        viewModelScope.launch {
+            NobarManager.updatePlaybackState(room.roomCode, isPlaying, positionMs)
+        }
+    }
+
+    fun leaveNobarRoom() {
+        val room = _nobarRoom.value
+        val userId = session.value.userId
+        nobarObserveJob?.cancel()
+        nobarObserveJob = null
+        if (room != null && userId != null) {
+            viewModelScope.launch {
+                if (room.hostUid == userId) {
+                    NobarManager.closeRoom(room.roomCode)
+                } else {
+                    NobarManager.leaveRoom(room.roomCode, userId)
+                }
+            }
+        }
+        _nobarRoom.value = null
+        _nobarError.value = null
+    }
+
+    fun clearNobarError() {
+        _nobarError.value = null
+    }
+
 }
