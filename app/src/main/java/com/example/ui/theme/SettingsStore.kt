@@ -145,6 +145,7 @@ class SettingsStore(private val context: Context) {
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
             preferences.remove(AUTH_TOKEN)
+            preferences.remove(REFRESH_TOKEN) // Fix: juga hapus refresh token agar tidak dipakai ulang setelah expired
             preferences.remove(USER_ID)
             preferences.remove(USER_EMAIL)
             preferences.remove(USERNAME)

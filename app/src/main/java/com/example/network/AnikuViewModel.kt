@@ -290,6 +290,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             refreshSession()
         }
+        // Periodic refresh setiap 50 menit selama app aktif (sebelum JWT 1 jam expire)
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(50 * 60 * 1000L) // 50 menit
+                if (!session.value.refreshToken.isNullOrEmpty()) {
+                    refreshSession()
+                }
+            }
+        }
     }
 
     fun checkForUpdate() {

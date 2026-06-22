@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import androidx.work.*
 import coil.Coil
 import coil.ImageLoader
 import coil.disk.DiskCache
@@ -11,6 +12,9 @@ import java.io.File
 class AnikuApp : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Jadwalkan background token refresh setiap 50 menit (tetap jalan walau app di-kill)
+        TokenRefreshWorker.schedule(this)
 
         val imageLoader = ImageLoader.Builder(this)
             // Memory cache: 25% dari RAM app (default Coil cuma 20%)
