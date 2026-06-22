@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.ui.theme.SettingsStore
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -2143,17 +2144,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val userId = session.value.userId
         nobarObserveJob?.cancel()
         nobarObserveJob = null
+        _nobarRoom.value = null
+        _nobarError.value = null
         if (room != null && userId != null) {
             viewModelScope.launch {
-                if (room.hostUid == userId) {
-                    NobarManager.closeRoom(room.roomCode)
-                } else {
-                    NobarManager.leaveRoom(room.roomCode, userId)
+                withContext(NonCancellable) {
+                    if (room.hostUid == userId) {
+                        NobarManager.closeRoom(room.roomCode)
+                    } else {
+                        NobarManager.leaveRoom(room.roomCode, userId)
+                    }
                 }
             }
         }
-        _nobarRoom.value = null
-        _nobarError.value = null
     }
 
     fun clearNobarError() {

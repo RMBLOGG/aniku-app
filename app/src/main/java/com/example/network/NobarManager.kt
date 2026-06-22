@@ -143,7 +143,11 @@ object NobarManager {
                     "memberCount" to 1,
                     "updatedAt" to now
                 )
-                database.getReference("$ACTIVE_ROOMS_PATH/$code").setValue(summary).await()
+                val activeRoomRef = database.getReference("$ACTIVE_ROOMS_PATH/$code")
+                activeRoomRef.setValue(summary).await()
+                // Kalau host di-kill / crash / network putus, Firebase otomatis bersihkan room
+                activeRoomRef.onDisconnect().removeValue()
+                database.getReference("$ROOMS_PATH/$code").onDisconnect().removeValue()
                 Log.d(TAG, "Room created: $code")
                 return code
             } catch (e: Exception) {
@@ -197,9 +201,12 @@ object NobarManager {
 
     /**
      * Host menghapus room secara permanen (misal saat host keluar / selesai nobar).
+     * Cancel onDisconnect dulu supaya tidak dobel dengan hapus manual di bawah.
      */
     suspend fun closeRoom(roomCode: String) {
         try {
+            database.getReference("$ROOMS_PATH/$roomCode").onDisconnect().cancel().await()
+            database.getReference("$ACTIVE_ROOMS_PATH/$roomCode").onDisconnect().cancel().await()
             database.getReference("$ROOMS_PATH/$roomCode").removeValue().await()
             database.getReference("$ACTIVE_ROOMS_PATH/$roomCode").removeValue().await()
         } catch (e: Exception) {
