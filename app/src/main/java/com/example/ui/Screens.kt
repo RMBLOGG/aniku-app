@@ -3296,6 +3296,12 @@ fun WatchScreen(
         watchHistory.filter { it.animeSlug == currentAnimeSlug }.map { it.episodeSlug }.toSet()
     }
 
+    // Gate: WebView embed (sumber audio yang bisa dobel dengan ExoPlayer) hanya
+    // dibuat SETELAH user tap tombol play. Reset setiap ganti episode supaya
+    // user harus tap lagi untuk episode baru (mencegah WebView auto-load saat
+    // app masih di episode sebelumnya, yang sebelumnya jadi penyebab dobel suara).
+    var userStartedPlayback by remember(currentEpisodeSlug) { mutableStateOf(false) }
+
     LaunchedEffect(currentEpisodeSlug) {
         viewModel.loadEpisodeStream(currentEpisodeSlug)
         com.example.AnikuAnalytics.trackEpisodeWatched(animeTitle, currentEpisodeSlug)
@@ -3781,8 +3787,43 @@ fun WatchScreen(
                             }
                         }
                     }
+                } else if (!userStartedPlayback) {
+                    // ── Gate: tunggu user tap play sebelum WebView dibuat ──
+                    // WebView baru di-mount setelah ini true, jadi tidak ada
+                    // jendela waktu di mana WebView autoplay tanpa sepengetahuan user.
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        val posterUrl = detail?.poster
+                        if (!posterUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = posterUrl,
+                                contentDescription = animeTitle,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Cover
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.35f))
+                            )
+                        }
+                        IconButton(
+                            onClick = { userStartedPlayback = true },
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(64.dp)
+                                .background(accentColor, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Putar",
+                                tint = Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
                 } else {
                     // ── WebView: untuk URL embed (iframe, dll) ──
+                    // Dibuat hanya setelah userStartedPlayback = true (lihat gate di atas).
                     var customView by remember { mutableStateOf<android.view.View?>(null) }
                     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
@@ -3878,23 +3919,17 @@ fun WatchScreen(
                                                     !url.contains("mime=video/webm")) {
                                                     android.util.Log.d("AnikuWebView", "Intercepted Blogger/YT video: ${url.take(100)}")
                                                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                                        // Mute & pause SEKARANG, jangan tunggu Compose recompose
-                                                        // ke ExoPlayer — kalau tidak, ada jeda di mana WebView
-                                                        // (masih autoplay) dan ExoPlayer sama-sama bersuara.
-                                                        view?.evaluateJavascript(
-                                                            """
-                                                            (function() {
-                                                                document.querySelectorAll('video, audio').forEach(function(el) {
-                                                                    el.muted = true;
-                                                                    el.volume = 0;
-                                                                    el.pause();
-                                                                });
-                                                            })();
-                                                            """.trimIndent(),
-                                                            null
-                                                        )
+                                                        // Bisukan WebView TEPAT sebelum pindah ke ExoPlayer, supaya
+                                                        // tidak ada jeda di mana keduanya bersuara bersamaan.
+                                                        // Sengaja ringan (1 statement, tanpa observer) agar tidak
+                                                        // mengganggu render WebView.
+                                                        try {
+                                                            view?.evaluateJavascript(
+                                                                "document.querySelectorAll('video,audio').forEach(function(e){e.muted=true;e.pause();});",
+                                                                null
+                                                            )
+                                                        } catch (_: Exception) {}
                                                         view?.onPause()
-                                                        view?.pauseTimers()
                                                         viewModel.switchToDirectStream(
                                                             url = url,
                                                             headers = mapOf(
@@ -3924,25 +3959,6 @@ fun WatchScreen(
                                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                                 super.onPageStarted(view, url, favicon)
                                                 isWebViewLoading = true
-                                                // WebView ini cuma jembatan sampai ExoPlayer dapat URL direct-nya.
-                                                // Mute dari awal supaya gak kedengaran sama sekali, bukan cuma
-                                                // setelah URL googlevideo ketemu.
-                                                view?.evaluateJavascript(
-                                                    """
-                                                    (function() {
-                                                        function muteAll() {
-                                                            document.querySelectorAll('video, audio').forEach(function(el) {
-                                                                el.muted = true;
-                                                                el.volume = 0;
-                                                            });
-                                                        }
-                                                        muteAll();
-                                                        var observer = new MutationObserver(muteAll);
-                                                        observer.observe(document.documentElement, { childList: true, subtree: true });
-                                                    })();
-                                                    """.trimIndent(),
-                                                    null
-                                                )
                                             }
                                             override fun onPageFinished(view: WebView?, url: String?) {
                                                 super.onPageFinished(view, url)
@@ -3972,19 +3988,14 @@ fun WatchScreen(
                                     view.loadUrl(url, headers)
                                 },
                                 onRelease = { view ->
-                                    // KRUSIAL: tanpa ini, WebView (dan video yang sedang autoplay
-                                    // di dalamnya) tetap hidup di memori walau node-nya sudah dibuang
-                                    // dari composition (misal saat pindah ke cabang ExoPlayer setelah
-                                    // direct stream URL ketemu). Itu sebabnya suara kedengaran dobel.
-                                    view.apply {
-                                        loadUrl("about:blank")
-                                        stopLoading()
-                                        onPause()
-                                        pauseTimers()
-                                        clearHistory()
-                                        removeAllViews()
-                                        destroy()
-                                    }
+                                    // Pastikan WebView benar-benar mati (bukan cuma di-detach) saat
+                                    // Compose membuang node ini, misal saat pindah ke ExoPlayer.
+                                    try {
+                                        view.stopLoading()
+                                        view.onPause()
+                                        view.loadUrl("about:blank")
+                                        view.destroy()
+                                    } catch (_: Exception) {}
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
