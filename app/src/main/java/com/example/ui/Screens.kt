@@ -3816,18 +3816,6 @@ fun WatchScreen(
                         Box(modifier = Modifier.fillMaxSize()) {
                             var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
-                            // Stop WebView saat switch ke ExoPlayer
-                            LaunchedEffect(isDirectStream) {
-                                if (isDirectStream) {
-                                    webViewRef?.let { wv ->
-                                        wv.stopLoading()
-                                        wv.loadUrl("about:blank")
-                                        wv.pauseTimers()
-                                        wv.onPause()
-                                    }
-                                }
-                            }
-
                             AndroidView(
                                 factory = { ctx ->
                                     WebView(ctx).apply {
@@ -3883,12 +3871,16 @@ fun WatchScreen(
                                                 request: android.webkit.WebResourceRequest?
                                             ): android.webkit.WebResourceResponse? {
                                                 val url = request?.url?.toString() ?: return null
-                                                // Intercept googlevideo.com/videoplayback — URL MP4 Blogger/YouTube
                                                 if (url.contains("googlevideo.com/videoplayback") &&
                                                     url.contains("mime=video") &&
                                                     !url.contains("mime=video/webm")) {
                                                     android.util.Log.d("AnikuWebView", "Intercepted Blogger/YT video: ${url.take(100)}")
                                                     android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                        // Mute WebView dulu sebelum ExoPlayer mulai
+                                                        view?.evaluateJavascript(
+                                                            "try{document.querySelectorAll('video,audio').forEach(function(m){m.pause();m.muted=true;m.volume=0;});}catch(e){}",
+                                                            null
+                                                        )
                                                         viewModel.switchToDirectStream(
                                                             url = url,
                                                             headers = mapOf(
@@ -3939,12 +3931,12 @@ fun WatchScreen(
                                 },
                                 update = { view ->
                                     val url = activeStreamUrl ?: return@AndroidView
-                                    // Kalau sudah switch ke ExoPlayer, stop WebView
+                                    // Kalau sudah switch ke ExoPlayer, matikan audio WebView
                                     if (isDirectStream) {
-                                        view.stopLoading()
-                                        view.loadUrl("about:blank")
-                                        view.pauseTimers()
-                                        view.onPause()
+                                        view.evaluateJavascript(
+                                            "try { document.querySelectorAll('video,audio').forEach(function(m){m.pause();m.muted=true;m.volume=0;}); } catch(e){}",
+                                            null
+                                        )
                                         return@AndroidView
                                     }
                                     view.resumeTimers()
