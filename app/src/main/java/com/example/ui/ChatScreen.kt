@@ -546,35 +546,9 @@ private fun ChatBubble(
                         color = MaterialTheme.colorScheme.primary
                     )
                     if (message.role == "admin" || message.is_admin == true) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.error)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "ADMIN",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
+                        AdminBadge()
                     } else if (message.role == "moderator") {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF7C4DFF))
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "MOD",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
+                        ModeratorBadge()
                     }
                 }
             }
