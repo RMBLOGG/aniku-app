@@ -25,6 +25,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.toArgb
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
@@ -393,60 +396,63 @@ fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
 }
 
 @Composable
-fun RainbowBadge(label: String, textColor: Color = Color.White) {
-    val infiniteTransition = rememberInfiniteTransition(label = "rainbow")
-    val angle by infiniteTransition.animateFloat(
+fun RainbowBadge(label: String, textColor: Color, bgColor: Color = Color(0xFF120D1E)) {
+    val infiniteTransition = rememberInfiniteTransition(label = "foil")
+    val offset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(2500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "angle"
+        label = "offset"
     )
 
-    val rainbowColors = listOf(
-        Color(0xFFFF0080),
-        Color(0xFFFF8C00),
-        Color(0xFFFFD700),
-        Color(0xFF00FF88),
-        Color(0xFF00CFFF),
-        Color(0xFF7C4DFF),
-        Color(0xFFFF0080),
+    val borderColors = listOf(
+        Color(0xFF7C3AED),
+        Color(0xFFDB2777),
+        Color(0xFFF59E0B),
+        Color(0xFF06B6D4),
+        Color(0xFF7C3AED),
+        Color(0xFFDB2777),
+        Color(0xFFF59E0B),
     )
 
-    val brush = Brush.sweepGradient(rainbowColors)
+    // Shift gradient start point for animation effect
+    val startIndex = (offset * (borderColors.size - 1)).toInt().coerceIn(0, borderColors.size - 2)
+    val localOffset = (offset * (borderColors.size - 1)) - startIndex
+    val animatedColors = borderColors.drop(startIndex) + borderColors.take(startIndex + 1)
+
+    val borderBrush = Brush.sweepGradient(animatedColors)
+    val bgBrush = Brush.linearGradient(
+        colors = listOf(Color(0xFF1E1B2E), Color(0xFF2D1D40), Color(0xFF1A1230)),
+        start = Offset(0f, 0f),
+        end = Offset(200f, 0f)
+    )
 
     Box(
-        contentAlignment = androidx.compose.ui.Alignment.Center,
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(Color(0xFF0D0D0D))
-            .padding(1.5.dp)
-    ) {
-        Canvas(modifier = Modifier.matchParentSize()) {
-            rotate(angle) {
+            .clip(RoundedCornerShape(6.dp))
+            .drawBehind {
+                // Draw animated border
                 drawRoundRect(
-                    brush = brush,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
-                    style = Stroke(width = 3.dp.toPx())
+                    brush = borderBrush,
+                    cornerRadius = CornerRadius(6.dp.toPx()),
                 )
             }
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(3.dp))
-                .background(Color(0xFF0D0D0D))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        ) {
-            Text(
-                label,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = textColor,
-                letterSpacing = 1.sp
-            )
-        }
+            .padding(1.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(bgBrush)
+            .padding(horizontal = 7.dp, vertical = 3.dp)
+    ) {
+        Text(
+            label,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            letterSpacing = 1.2.sp
+        )
     }
 }
 
@@ -454,7 +460,7 @@ fun RainbowBadge(label: String, textColor: Color = Color.White) {
 fun AdminBadge() {
     RainbowBadge(
         label = "ADMIN",
-        textColor = Color(0xFFFF4D4D)
+        textColor = Color(0xFFC4B5FD)
     )
 }
 
@@ -462,7 +468,7 @@ fun AdminBadge() {
 fun ModeratorBadge() {
     RainbowBadge(
         label = "MOD",
-        textColor = Color(0xFF9B6DFF)
+        textColor = Color(0xFFC4B5FD)
     )
 }
 
