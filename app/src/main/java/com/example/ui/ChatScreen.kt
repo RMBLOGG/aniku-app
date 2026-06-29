@@ -19,6 +19,11 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +37,62 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.regex.Pattern
+
+// Regex sederhana buat deteksi URL (http/https/www) di dalam teks pesan chat.
+// Trailing punctuation umum (.,!?)]}>"') tidak ikut dianggap bagian dari URL,
+// supaya kalimat seperti "cek aniku.id, makasih" tidak ikut nge-link tanda komanya.
+private val urlPattern: Pattern = Pattern.compile(
+    "(https?://[^\\s]+|www\\.[^\\s]+?)(?=[.,!?)\\]}>\"']*(?:\\s|$))",
+    Pattern.CASE_INSENSITIVE
+)
+
+/**
+ * Pecah teks pesan jadi AnnotatedString dengan bagian URL dijadikan link
+ * yang bisa di-tap (warna beda + underline), sisanya tetap teks biasa.
+ */
+private fun linkifyMessage(
+    text: String,
+    linkColor: Color
+): androidx.compose.ui.text.AnnotatedString {
+    val matcher = urlPattern.matcher(text)
+    return buildAnnotatedString {
+        var lastEnd = 0
+        while (matcher.find()) {
+            val start = matcher.start()
+            val end = matcher.end()
+            // Teks biasa sebelum URL
+            append(text.substring(lastEnd, start))
+
+            val rawUrl = text.substring(start, end)
+            val fullUrl = if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+                rawUrl
+            } else {
+                "https://$rawUrl"
+            }
+
+            withLink(
+                LinkAnnotation.Url(
+                    url = fullUrl,
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = linkColor,
+                            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                )
+            ) {
+                append(rawUrl)
+            }
+            lastEnd = end
+        }
+        // Sisa teks setelah URL terakhir (atau semua teks kalau ga ada URL)
+        if (lastEnd < text.length) {
+            append(text.substring(lastEnd))
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -623,11 +684,14 @@ private fun ChatBubble(
                         }
                     }
                     if (message.message.isNotEmpty()) {
-                        Text(
-                            text = message.message,
-                            fontSize = 14.sp,
-                            color = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
+                        val baseColor = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
                             else MaterialTheme.colorScheme.onSurfaceVariant
+                        val linkColor = if (isOwnMessage) Color.White
+                            else MaterialTheme.colorScheme.primary
+                        Text(
+                            text = linkifyMessage(message.message, linkColor),
+                            fontSize = 14.sp,
+                            color = baseColor
                         )
                     }
                 }
