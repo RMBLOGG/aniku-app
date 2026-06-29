@@ -1017,48 +1017,96 @@ fun HomeScreen(
         ) {
             // ── Header ──────────────────────────────────────────────
             item {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = if (session.username != null) "Halo, ${session.username} 👋" else "Halo, Otaku! 👋",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Normal
-                        )
-                        Text(
-                            text = "ANIKU",
-                            color = Color.White,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 3.sp,
-                            style = LocalTextStyle.current.copy(
-                                shadow = androidx.compose.ui.graphics.Shadow(
-                                    color = accentColor.copy(alpha = 0.8f),
-                                    blurRadius = 8f
+                    // Kiri: greeting + logo
+                    Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                        // Greeting pill
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor)
+                            )
+                            Text(
+                                text = if (session.username != null) "Halo, ${session.username}" else "Halo, Otaku!",
+                                color = Color.White.copy(alpha = 0.55f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                letterSpacing = 0.3.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // Logo ANIKU dengan aksen merah di huruf terakhir
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "ANIK",
+                                color = Color.White,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 3.sp,
+                                style = LocalTextStyle.current.copy(
+                                    shadow = androidx.compose.ui.graphics.Shadow(
+                                        color = Color.Black.copy(alpha = 0.4f),
+                                        blurRadius = 4f
+                                    )
                                 )
                             )
-                        )
+                            Text(
+                                text = "U",
+                                color = accentColor,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 3.sp,
+                                style = LocalTextStyle.current.copy(
+                                    shadow = androidx.compose.ui.graphics.Shadow(
+                                        color = accentColor.copy(alpha = 0.6f),
+                                        blurRadius = 8f
+                                    )
+                                )
+                            )
+                        }
                     }
-                    // Settings button di header
+
+                    // Kanan: Settings button modern
                     Box(
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .align(Alignment.CenterEnd)
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.10f),
+                                        Color.White.copy(alpha = 0.05f)
+                                    )
+                                )
+                            )
+                            .border(
+                                width = 1.dp,
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.2f),
+                                        Color.White.copy(alpha = 0.05f)
+                                    )
+                                ),
+                                shape = RoundedCornerShape(14.dp)
+                            )
                             .clickable { navController.navigate("settings") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = "Settings",
-                            tint = Color.White,
+                            tint = Color.White.copy(alpha = 0.9f),
                             modifier = Modifier.size(22.dp)
                         )
                     }
