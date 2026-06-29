@@ -5551,6 +5551,7 @@ fun AdminPanelScreen(
     val blacklist by viewModel.adminBlacklist.collectAsState()
     val isLoading by viewModel.isAdminLoading.collectAsState()
     val banStatusMessage by viewModel.banStatusMessage.collectAsState()
+    val sess by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
 
@@ -5797,7 +5798,7 @@ fun AdminPanelScreen(
 
                                         // Set Role button - hanya admin
                                         var showRoleDialog by remember { mutableStateOf(false) }
-                                        if (session.isAdmin) IconButton(
+                                        if (sess.isAdmin) IconButton(
                                             onClick = { showRoleDialog = true },
                                             modifier = Modifier
                                                 .size(38.dp)

@@ -75,7 +75,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val session = settingsStore.sessionFlow.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        UserSession(null, null, null, null, null, null, false, false)
+        UserSession(null, null, null, null, null, null, false, false, false)
     )
 
     // Update check state
