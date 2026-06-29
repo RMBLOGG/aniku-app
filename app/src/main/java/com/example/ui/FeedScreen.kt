@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.lerp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
@@ -396,80 +399,78 @@ fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
 }
 
 @Composable
-fun RainbowBadge(label: String, textColor: Color, bgColor: Color = Color(0xFF120D1E)) {
+fun FoilBadge(icon: String, label: String, textColor: Color = Color(0xFFC4B5FD)) {
     val infiniteTransition = rememberInfiniteTransition(label = "foil")
-    val offset by infiniteTransition.animateFloat(
+    // Animate gradient position 0→1 over 3s (matches CSS background-position 0%→300%)
+    val progress by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
+            animation = tween(3000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "offset"
+        label = "foil_progress"
     )
 
-    val borderColors = listOf(
-        Color(0xFF7C3AED),
-        Color(0xFFDB2777),
-        Color(0xFFF59E0B),
-        Color(0xFF06B6D4),
-        Color(0xFF7C3AED),
-        Color(0xFFDB2777),
-        Color(0xFFF59E0B),
+    // Border gradient colors: #7c3aed → #db2777 → #f59e0b → #7c3aed
+    // Simulate background-position shift by rotating color stops
+    val c1 = Color(0xFF7C3AED)
+    val c2 = Color(0xFFDB2777)
+    val c3 = Color(0xFFF59E0B)
+
+    // Interpolate border brush based on progress
+    val borderBrush = Brush.linearGradient(
+        colorStops = arrayOf(
+            0f to lerp(c1, c2, progress),
+            0.33f to lerp(c2, c3, progress),
+            0.66f to lerp(c3, c1, progress),
+            1f to lerp(c1, c2, progress),
+        ),
+        start = Offset(progress * 300f, 0f),
+        end = Offset(progress * 300f + 200f, 40f)
     )
 
-    // Shift gradient start point for animation effect
-    val startIndex = (offset * (borderColors.size - 1)).toInt().coerceIn(0, borderColors.size - 2)
-    val localOffset = (offset * (borderColors.size - 1)) - startIndex
-    val animatedColors = borderColors.drop(startIndex) + borderColors.take(startIndex + 1)
-
-    val borderBrush = Brush.sweepGradient(animatedColors)
     val bgBrush = Brush.linearGradient(
         colors = listOf(Color(0xFF1E1B2E), Color(0xFF2D1D40), Color(0xFF1A1230)),
         start = Offset(0f, 0f),
-        end = Offset(200f, 0f)
+        end = Offset(150f, 0f)
     )
 
+    // Outer box = border (1dp padding = border thickness)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .drawBehind {
-                // Draw animated border
-                drawRoundRect(
-                    brush = borderBrush,
-                    cornerRadius = CornerRadius(6.dp.toPx()),
-                )
-            }
+            .clip(RoundedCornerShape(8.dp))
+            .background(borderBrush)
             .padding(1.dp)
-            .clip(RoundedCornerShape(5.dp))
+            .clip(RoundedCornerShape(7.dp))
             .background(bgBrush)
-            .padding(horizontal = 7.dp, vertical = 3.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
-        Text(
-            label,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            color = textColor,
-            letterSpacing = 1.2.sp
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(icon, fontSize = 9.sp, lineHeight = 9.sp)
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                letterSpacing = 1.2.sp
+            )
+        }
     }
 }
 
 @Composable
 fun AdminBadge() {
-    RainbowBadge(
-        label = "ADMIN",
-        textColor = Color(0xFFC4B5FD)
-    )
+    FoilBadge(icon = "⚙", label = "ADMIN", textColor = Color(0xFFFCA5A5))
 }
 
 @Composable
 fun ModeratorBadge() {
-    RainbowBadge(
-        label = "MOD",
-        textColor = Color(0xFFC4B5FD)
-    )
+    FoilBadge(icon = "🛡", label = "MOD", textColor = Color(0xFFC4B5FD))
 }
 
 @Composable
