@@ -18,6 +18,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
@@ -386,39 +393,77 @@ fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
 }
 
 @Composable
-fun AdminBadge() {
+fun RainbowBadge(label: String, textColor: Color = Color.White) {
+    val infiniteTransition = rememberInfiniteTransition(label = "rainbow")
+    val angle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "angle"
+    )
+
+    val rainbowColors = listOf(
+        Color(0xFFFF0080),
+        Color(0xFFFF8C00),
+        Color(0xFFFFD700),
+        Color(0xFF00FF88),
+        Color(0xFF00CFFF),
+        Color(0xFF7C4DFF),
+        Color(0xFFFF0080),
+    )
+
+    val brush = Brush.sweepGradient(rainbowColors)
+
     Box(
+        contentAlignment = androidx.compose.ui.Alignment.Center,
         modifier = Modifier
-            .clip(RoundedCornerShape(3.dp))
-            .background(MaterialTheme.colorScheme.error)
-            .padding(horizontal = 5.dp, vertical = 1.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFF0D0D0D))
+            .padding(1.5.dp)
     ) {
-        Text(
-            "ADMIN",
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            letterSpacing = 1.sp
-        )
+        Canvas(modifier = Modifier.matchParentSize()) {
+            rotate(angle) {
+                drawRoundRect(
+                    brush = brush,
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
+                    style = Stroke(width = 3.dp.toPx())
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color(0xFF0D0D0D))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                label,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                letterSpacing = 1.sp
+            )
+        }
     }
 }
 
 @Composable
+fun AdminBadge() {
+    RainbowBadge(
+        label = "ADMIN",
+        textColor = Color(0xFFFF4D4D)
+    )
+}
+
+@Composable
 fun ModeratorBadge() {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(3.dp))
-            .background(Color(0xFF7C4DFF))
-            .padding(horizontal = 5.dp, vertical = 1.dp)
-    ) {
-        Text(
-            "MOD",
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            letterSpacing = 1.sp
-        )
-    }
+    RainbowBadge(
+        label = "MOD",
+        textColor = Color(0xFF9B6DFF)
+    )
 }
 
 @Composable
