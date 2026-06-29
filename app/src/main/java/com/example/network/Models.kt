@@ -221,7 +221,6 @@ data class CloudinaryResponse(
 
 // Chat Room models
 @JsonClass(generateAdapter = true)
-@JsonClass(generateAdapter = true)
 data class ChatMessage(
     val id: String,
     val user_id: String,
