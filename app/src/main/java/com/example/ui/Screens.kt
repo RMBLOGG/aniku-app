@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.testTag
@@ -1035,20 +1036,20 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(460.dp)
+                            .aspectRatio(16f / 9f)
                     ) {
-                        // HorizontalPager dengan peek style B
+                        // HorizontalPager style A — full width, radius 16dp, 16:9
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = heroPagerState,
-                            contentPadding = PaddingValues(start = 0.dp, end = 40.dp),
-                            pageSpacing = 12.dp,
+                            contentPadding = PaddingValues(0.dp),
+                            pageSpacing = 0.dp,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             val slide = sliderItems[page]
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                             ) {
                                 // Poster
                                 AsyncImage(
@@ -1095,7 +1096,7 @@ fun HomeScreen(
                                         }
                                 )
 
-                                // Slider metadata info (Bottom aligned)
+                                // Slider metadata info (Bottom overlay — style A)
                                 if (page == heroPagerState.currentPage) {
                                     Column(
                                         modifier = Modifier
