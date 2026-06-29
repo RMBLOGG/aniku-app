@@ -1046,31 +1046,21 @@ fun HomeScreen(
                             )
                         )
                     }
-                    // Avatar
+                    // Settings button di header
                     Box(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.2f))
-                            .border(2.dp, accentColor.copy(alpha = 0.5f), CircleShape)
-                            .clickable { navController.navigate("profile") },
+                            .background(Color.White.copy(alpha = 0.08f))
+                            .clickable { navController.navigate("settings") },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!session.avatarUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = session.avatarUrl,
-                                contentDescription = "Avatar",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Text(
-                                text = (session.username?.firstOrNull() ?: session.email?.firstOrNull() ?: 'A').uppercaseChar().toString(),
-                                color = Color.White,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             }
@@ -1096,7 +1086,7 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(400.dp)
+                            .height(280.dp)
                     ) {
                         // HorizontalPager — card style dengan peek
                         androidx.compose.foundation.pager.HorizontalPager(
@@ -2030,35 +2020,7 @@ fun HomeScreen(
             }
         }
 
-        // Floating Settings Button (sticky, tidak ikut scroll)
-        Box(
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(end = 16.dp, top = 12.dp)
-                .size(38.dp)
-                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                .clickable { navController.navigate("settings") }
-                .align(Alignment.TopEnd),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!session.avatarUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = session.avatarUrl,
-                    contentDescription = "Profile",
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
+
         } // end Box
     }
 }
