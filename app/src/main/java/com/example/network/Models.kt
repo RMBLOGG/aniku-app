@@ -179,10 +179,19 @@ data class ProfileDto(
     val id: String,
     val username: String? = null,
     val avatar_url: String? = null,
+    val role: String? = "user",
     val is_admin: Boolean? = false,
     val is_banned: Boolean? = false,
     val created_at: String? = null
-)
+) {
+    fun isAdmin() = role == "admin" || is_admin == true
+    fun isModerator() = role == "moderator"
+    fun roleLabel() = when (role) {
+        "admin" -> "Admin"
+        "moderator" -> "Moderator"
+        else -> "Pengguna"
+    }
+}
 
 @JsonClass(generateAdapter = true)
 data class AnnouncementDto(

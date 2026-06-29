@@ -401,6 +401,24 @@ fun AdminBadge() {
 }
 
 @Composable
+fun ModeratorBadge() {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(Color(0xFF7C4DFF))
+            .padding(horizontal = 5.dp, vertical = 1.dp)
+    ) {
+        Text(
+            "MOD",
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            letterSpacing = 1.sp
+        )
+    }
+}
+
+@Composable
 fun ActionButton(
     icon: ImageVector,
     label: String,

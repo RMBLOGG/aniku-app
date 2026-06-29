@@ -1290,6 +1290,34 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun updateUserRole(profile: ProfileDto, newRole: String) {
+        if (!session.value.isAdmin) return
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.${profile.id}",
+                    profile = mapOf(
+                        "role" to newRole,
+                        "is_admin" to (newRole == "admin")
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 204) {
+                    _banStatusMessage.value = "Role ${profile.username} diubah ke $newRole"
+                    loadAdminDetails()
+                } else {
+                    val errBody = response.errorBody()?.string() ?: "Unknown error"
+                    _banStatusMessage.value = "Gagal: ${response.code()} - $errBody"
+                }
+            } catch (e: Exception) {
+                _banStatusMessage.value = "Error: ${e.message}"
+                Log.e("AnikuVM", "Failed updating role for ${profile.id}", e)
+            }
+        }
+    }
+
     fun sendAuthRecovery(email: String, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {

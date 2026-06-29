@@ -5729,9 +5729,12 @@ fun AdminPanelScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 15.sp
                                                 )
-                                                if (usr.is_admin == true) {
+                                                if (usr.isAdmin()) {
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     AdminBadge()
+                                                } else if (usr.isModerator()) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    ModeratorBadge()
                                                 }
                                             }
                                             Spacer(modifier = Modifier.height(4.dp))
@@ -5750,7 +5753,7 @@ fun AdminPanelScreen(
                                                     fontWeight = FontWeight.SemiBold
                                                 )
                                                 Text(
-                                                    text = "  •  ${if (usr.is_admin == true) "Admin" else "Pengguna"}",
+                                                    text = "  •  ${usr.roleLabel()}",
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                                     fontSize = 12.sp
                                                 )
@@ -5792,19 +5795,48 @@ fun AdminPanelScreen(
                                             )
                                         }
 
-                                        // Reset password option triggers recovery email link from Supabase auth
+                                        // Set Role button
+                                        var showRoleDialog by remember { mutableStateOf(false) }
                                         IconButton(
-                                            onClick = {
-                                                viewModel.sendAuthRecovery(usr.id) { sent ->
-                                                    if (sent) Toast.makeText(context, "Recovery email sent successfully", Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
+                                            onClick = { showRoleDialog = true },
                                             modifier = Modifier
                                                 .size(38.dp)
                                                 .clip(RoundedCornerShape(10.dp))
                                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                                         ) {
-                                            Icon(Icons.Default.Refresh, contentDescription = "Password reset link", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Default.ManageAccounts, contentDescription = "Set Role", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                        }
+                                        if (showRoleDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showRoleDialog = false },
+                                                title = { Text("Set Role: ${usr.username}") },
+                                                text = {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        listOf("user", "moderator", "admin").forEach { roleOption ->
+                                                            val isSelected = usr.role == roleOption
+                                                            Button(
+                                                                onClick = {
+                                                                    viewModel.updateUserRole(usr, roleOption)
+                                                                    showRoleDialog = false
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(
+                                                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                                                                ),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Text(
+                                                                    text = when(roleOption) { "admin" -> "Admin"; "moderator" -> "Moderator"; else -> "Pengguna" },
+                                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                confirmButton = {},
+                                                dismissButton = {
+                                                    TextButton(onClick = { showRoleDialog = false }) { Text("Batal") }
+                                                }
+                                            )
                                         }
                                     }
                                 }
