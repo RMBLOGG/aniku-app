@@ -1620,7 +1620,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = "Bearer $SUPABASE_ANON_KEY",
                     apiKey = SUPABASE_ANON_KEY
                 )
-                _chatMessages.value = messages
+                // API mengembalikan urutan terbaru dulu (desc) agar limit menangkap
+                // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
+                // supaya tampilan chat tetap normal dari atas ke bawah.
+                _chatMessages.value = messages.reversed()
             } catch (e: Exception) {
                 _chatError.value = "Gagal memuat pesan: ${e.message}"
             } finally {

@@ -221,6 +221,7 @@ data class CloudinaryResponse(
 
 // Chat Room models
 @JsonClass(generateAdapter = true)
+@JsonClass(generateAdapter = true)
 data class ChatMessage(
     val id: String,
     val user_id: String,
@@ -249,6 +250,7 @@ data class ChatMessageRequest(
 )
 
 // Referensi anime yang dibagikan ke feed (dipakai di CreatePostScreen)
+@JsonClass(generateAdapter = true)
 data class SharedAnimeRef(
     val slug: String,
     val title: String,

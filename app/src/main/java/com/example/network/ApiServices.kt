@@ -286,7 +286,7 @@ interface SupabaseDbApi {
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
-        @Query("order") order: String = "created_at.asc",
+        @Query("order") order: String = "created_at.desc",
         @Query("limit") limit: Int = 100,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
