@@ -445,19 +445,19 @@ fun FoilBadge(icon: String, label: String, textColor: Color = Color(0xFFC4B5FD))
             .padding(1.dp)
             .clip(RoundedCornerShape(7.dp))
             .background(bgBrush)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            Text(icon, fontSize = 9.sp, lineHeight = 9.sp)
+            Text(icon, fontSize = 7.sp, lineHeight = 7.sp)
             Text(
                 text = label,
-                fontSize = 9.sp,
+                fontSize = 7.sp,
                 fontWeight = FontWeight.Bold,
                 color = textColor,
-                letterSpacing = 1.2.sp
+                letterSpacing = 1.sp
             )
         }
     }
