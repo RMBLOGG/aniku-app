@@ -28,6 +28,7 @@ class SettingsStore(private val context: Context) {
         val USERNAME = stringPreferencesKey("username")
         val AVATAR_URL = stringPreferencesKey("avatar_url")
         val IS_ADMIN = booleanPreferencesKey("is_admin")
+        val IS_MODERATOR = booleanPreferencesKey("is_moderator")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
         val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
@@ -77,6 +78,7 @@ class SettingsStore(private val context: Context) {
             username = preferences[USERNAME],
             avatarUrl = preferences[AVATAR_URL],
             isAdmin = preferences[IS_ADMIN] ?: false,
+            isModerator = preferences[IS_MODERATOR] ?: false,
             isBanned = preferences[IS_BANNED] ?: false
         )
     }
@@ -138,6 +140,7 @@ class SettingsStore(private val context: Context) {
             preferences[USERNAME] = session.username ?: ""
             preferences[AVATAR_URL] = session.avatarUrl ?: ""
             preferences[IS_ADMIN] = session.isAdmin
+            preferences[IS_MODERATOR] = session.isModerator
             preferences[IS_BANNED] = session.isBanned
         }
     }
@@ -151,6 +154,7 @@ class SettingsStore(private val context: Context) {
             preferences.remove(USERNAME)
             preferences.remove(AVATAR_URL)
             preferences.remove(IS_ADMIN)
+            preferences.remove(IS_MODERATOR)
             preferences.remove(IS_BANNED)
         }
     }
