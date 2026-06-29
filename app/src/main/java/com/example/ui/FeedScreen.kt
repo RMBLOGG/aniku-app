@@ -216,9 +216,12 @@ private fun TweetCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                if (post.is_admin == true) {
+                if (post.role == "admin" || post.is_admin == true) {
                     Spacer(modifier = Modifier.width(4.dp))
                     AdminBadge()
+                } else if (post.role == "moderator") {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    ModeratorBadge()
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(

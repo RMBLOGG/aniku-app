@@ -5503,15 +5503,17 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // User role notice badge
-            if (sess.isAdmin) {
+            if (sess.isAdmin || sess.isModerator) {
+                val roleColor = if (sess.isAdmin) Color.Red else Color(0xFF7C4DFF)
+                val roleText = if (sess.isAdmin) "Tingkatan Pengguna: Administrator (ADMIN)" else "Tingkatan Pengguna: Moderator (MOD)"
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isDark) Color(0xFF331E1E) else Color(0xFFFFEBEE))
-                        .border(1.dp, Color.Red, RoundedCornerShape(12.dp))
+                        .background(if (isDark) Color(0xFF1E1A2E) else Color(0xFFF3F0FF))
+                        .border(1.dp, roleColor, RoundedCornerShape(12.dp))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text(text = "Tingkatan Pengguna: Administrator (ADMIN)", color = Color.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = roleText, color = roleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -6390,16 +6392,27 @@ fun SettingsScreen(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
                                                     .background(
-                                                        if (sess.isAdmin) Color(0xFFD32F2F).copy(alpha = 0.15f)
-                                                        else accentColor.copy(alpha = 0.12f)
+                                                        when {
+                                                            sess.isAdmin -> Color(0xFFD32F2F).copy(alpha = 0.15f)
+                                                            sess.isModerator -> Color(0xFF7C4DFF).copy(alpha = 0.15f)
+                                                            else -> accentColor.copy(alpha = 0.12f)
+                                                        }
                                                     )
                                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
-                                                    text = if (sess.isAdmin) "Admin" else "Member",
+                                                    text = when {
+                                                        sess.isAdmin -> "Admin"
+                                                        sess.isModerator -> "Moderator"
+                                                        else -> "Member"
+                                                    },
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = if (sess.isAdmin) Color(0xFFD32F2F) else accentColor
+                                                    color = when {
+                                                        sess.isAdmin -> Color(0xFFD32F2F)
+                                                        sess.isModerator -> Color(0xFF7C4DFF)
+                                                        else -> accentColor
+                                                    }
                                                 )
                                             }
                                         }

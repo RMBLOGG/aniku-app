@@ -420,9 +420,12 @@ private fun PostHeader(
                         fontSize = 15.sp,
                         letterSpacing = 0.sp
                     )
-                    if (post.is_admin == true) {
+                    if (post.role == "admin" || post.is_admin == true) {
                         Spacer(modifier = Modifier.width(5.dp))
                         AdminBadge()
+                    } else if (post.role == "moderator") {
+                        Spacer(modifier = Modifier.width(5.dp))
+                        ModeratorBadge()
                     }
                 }
                 Text(
