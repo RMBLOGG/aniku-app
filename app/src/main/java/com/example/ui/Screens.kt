@@ -1017,210 +1017,223 @@ fun HomeScreen(
             // Edeg-to-Edge Hero Billboard Slider
             if (sliderItems.isNotEmpty()) {
                 item {
-                    val activeSlide = sliderItems.getOrNull(slideIndex)
-                    if (activeSlide != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(460.dp)
-                        ) {
-                            // Crossfade antar slide
-                            androidx.compose.animation.Crossfade(
-                                targetState = activeSlide,
-                                animationSpec = tween(600, easing = EaseInOutCubic),
-                                label = "hero_crossfade"
-                            ) { slide ->
-                            // Bleeding Poster Graphic
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(slide.poster)
-                                    .crossfade(400)
-                                    .build(),
-                                contentDescription = slide.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            }
+                    val heroPagerState = androidx.compose.foundation.pager.rememberPagerState(
+                        initialPage = 0,
+                        pageCount = { sliderItems.size }
+                    )
 
-                            // Immersive Linear Gradients
+                    // Sync slideIndex ke pagerState supaya auto-slide tetap jalan
+                    LaunchedEffect(slideIndex) {
+                        if (heroPagerState.currentPage != slideIndex) {
+                            heroPagerState.animateScrollToPage(slideIndex)
+                        }
+                    }
+                    LaunchedEffect(heroPagerState.currentPage) {
+                        slideIndex = heroPagerState.currentPage
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(460.dp)
+                    ) {
+                        // HorizontalPager dengan peek style B
+                        androidx.compose.foundation.pager.HorizontalPager(
+                            state = heroPagerState,
+                            contentPadding = PaddingValues(start = 0.dp, end = 40.dp),
+                            pageSpacing = 12.dp,
+                            modifier = Modifier.fillMaxSize()
+                        ) { page ->
+                            val slide = sliderItems[page]
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Black.copy(alpha = 0.6f),
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.3f),
-                                                MaterialTheme.colorScheme.background
-                                            )
-                                        )
-                                    )
-                            )
-
-                            // Atmospheric Radial Bleeding overlay
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .drawBehind {
-                                        drawRect(
-                                            brush = Brush.radialGradient(
-                                                colors = listOf(
-                                                    accentColor.copy(alpha = 0.15f),
-                                                    Color.Transparent
-                                                ),
-                                                center = center,
-                                                radius = size.width * 0.7f
-                                            )
-                                        )
-                                    }
-                            )
-
-                            // Slider metadata info (Bottom aligned)
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(horizontal = 20.dp, vertical = 24.dp)
+                                    .clip(RoundedCornerShape(20.dp))
                             ) {
-                                // Dynamic Glassmorphism Categories Row (above title)
-                                val genresToShow = activeSlide.genres?.filter { it.isNotBlank() } ?: listOf("Action", "Fantasy", "Adventure")
-                                Row(
+                                // Poster
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(slide.poster)
+                                        .crossfade(400)
+                                        .build(),
+                                    contentDescription = slide.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
+                                // Immersive Linear Gradients
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    genresToShow.take(3).forEach { genre ->
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(Color.White.copy(alpha = 0.12f))
-                                                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
-                                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                                        ) {
-                                            Text(
-                                                text = genre,
-                                                color = Color.White,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                letterSpacing = 0.5.sp
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Black.copy(alpha = 0.6f),
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.3f),
+                                                    MaterialTheme.colorScheme.background
+                                                )
                                             )
+                                        )
+                                )
+
+                                // Atmospheric Radial Bleeding overlay
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .drawBehind {
+                                            drawRect(
+                                                brush = Brush.radialGradient(
+                                                    colors = listOf(
+                                                        accentColor.copy(alpha = 0.15f),
+                                                        Color.Transparent
+                                                    ),
+                                                    center = center,
+                                                    radius = size.width * 0.7f
+                                                )
+                                            )
+                                        }
+                                )
+
+                                // Slider metadata info (Bottom aligned)
+                                if (page == heroPagerState.currentPage) {
+                                    Column(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomStart)
+                                            .padding(horizontal = 20.dp, vertical = 24.dp)
+                                    ) {
+                                        val genresToShow = slide.genres?.filter { it.isNotBlank() } ?: listOf("Action", "Fantasy", "Adventure")
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            genresToShow.take(3).forEach { genre ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(Color.White.copy(alpha = 0.12f))
+                                                        .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
+                                                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = genre,
+                                                        color = Color.White,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        letterSpacing = 0.5.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Text(
+                                            text = slide.title,
+                                            color = Color.White,
+                                            fontSize = 28.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Button(
+                                                onClick = { onNavigateToDetail(slide.slug) },
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(44.dp)
+                                                    .testTag("hero_play_btn")
+                                            ) {
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
+                                            }
+
+                                            val isHeroBookmarked = bookmarkedAnimes.any { it.slug == slide.slug }
+                                            IconButton(
+                                                onClick = { viewModel.toggleBookmark(slide.slug, slide.title, slide.poster) },
+                                                modifier = Modifier
+                                                    .size(44.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(Color.White.copy(alpha = 0.12f))
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                                    .testTag("hero_bookmark_btn")
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isHeroBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                                    contentDescription = "Bookmark Hero",
+                                                    tint = if (isHeroBookmarked) accentColor else Color.White,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        // Dot selectors
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            sliderItems.forEachIndexed { idx, _ ->
+                                                val isSelected = idx == heroPagerState.currentPage
+                                                val dotWidthPx by animateFloatAsState(
+                                                    targetValue = if (isSelected) 20f else 6f,
+                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                                                    label = "dot_width_$idx"
+                                                )
+                                                val dotAlpha by animateFloatAsState(
+                                                    targetValue = if (isSelected) 1f else 0.3f,
+                                                    animationSpec = tween(300),
+                                                    label = "dot_alpha_$idx"
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .padding(horizontal = 3.dp)
+                                                        .width(dotWidthPx.dp)
+                                                        .height(6.dp)
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(if (isSelected) accentColor else Color.White.copy(alpha = dotAlpha))
+                                                        .clickable { slideIndex = idx }
+                                                )
+                                            }
                                         }
                                     }
                                 }
-
-                                androidx.compose.animation.AnimatedContent(
-                                    targetState = activeSlide.title,
-                                    transitionSpec = {
-                                        fadeIn(tween(500)) togetherWith fadeOut(tween(200))
-                                    },
-                                    label = "hero_title"
-                                ) { title ->
-                                Text(
-                                    text = title,
-                                    color = Color.White,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                }
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Button(
-                                        onClick = { onNavigateToDetail(activeSlide.slug) },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(44.dp)
-                                            .testTag("hero_play_btn")
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
-                                    }
-
-                                    val isHeroBookmarked = bookmarkedAnimes.any { it.slug == activeSlide.slug }
-                                    IconButton(
-                                        onClick = { viewModel.toggleBookmark(activeSlide.slug, activeSlide.title, activeSlide.poster) },
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color.White.copy(alpha = 0.12f))
-                                            .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                            .testTag("hero_bookmark_btn")
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isHeroBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                            contentDescription = "Bookmark Hero",
-                                            tint = if (isHeroBookmarked) accentColor else Color.White,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                // Dot selectors
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    sliderItems.forEachIndexed { idx, _ ->
-                                        val isSelected = idx == slideIndex
-                                        val dotWidthPx by animateFloatAsState(
-                                            targetValue = if (isSelected) 20f else 6f,
-                                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                                            label = "dot_width_$idx"
-                                        )
-                                        val dotAlpha by animateFloatAsState(
-                                            targetValue = if (isSelected) 1f else 0.3f,
-                                            animationSpec = tween(300),
-                                            label = "dot_alpha_$idx"
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(horizontal = 3.dp)
-                                                .width(dotWidthPx.dp)
-                                                .height(6.dp)
-                                                .clip(RoundedCornerShape(50))
-                                                .background(if (isSelected) accentColor else Color.White.copy(alpha = dotAlpha))
-                                                .clickable { slideIndex = idx }
-                                        )
-                                    }
-                                }
                             }
+                        }
 
-                            // Header Bar (logo only - settings button is now a floating overlay)
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    .align(Alignment.TopStart)
-                            ) {
-                                Text(
-                                    text = "ANIKU",
-                                    color = Color.White,
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 3.sp,
-                                    style = LocalTextStyle.current.copy(
-                                        shadow = androidx.compose.ui.graphics.Shadow(
-                                            color = accentColor.copy(alpha = 0.8f),
-                                            blurRadius = 8f
-                                        )
+                        // Header Bar (logo only)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .align(Alignment.TopStart)
+                        ) {
+                            Text(
+                                text = "ANIKU",
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 3.sp,
+                                style = LocalTextStyle.current.copy(
+                                    shadow = androidx.compose.ui.graphics.Shadow(
+                                        color = accentColor.copy(alpha = 0.8f),
+                                        blurRadius = 8f
                                     )
                                 )
-                            }
+                            )
                         }
                     }
                 }
@@ -3744,6 +3757,15 @@ fun WatchScreen(
 
     val activity = LocalContext.current as? android.app.Activity
     var isFullscreen by remember { mutableStateOf(false) }
+
+    // Jaga layar tetap nyala selama di WatchScreen
+    DisposableEffect(Unit) {
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
 
     // Handle back press to exit fullscreen
     BackHandler(enabled = isFullscreen) {

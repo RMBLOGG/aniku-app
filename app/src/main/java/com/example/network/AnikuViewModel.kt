@@ -291,15 +291,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             refreshSession()
         }
-        // Periodic refresh setiap 50 menit selama app aktif (sebelum JWT 1 jam expire)
-        viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(50 * 60 * 1000L) // 50 menit
-                if (!session.value.refreshToken.isNullOrEmpty()) {
-                    refreshSession()
-                }
-            }
-        }
     }
 
     fun checkForUpdate() {
@@ -388,6 +379,22 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun getAuthHeader(): String {
         val currentToken = session.value.token
         return if (!currentToken.isNullOrEmpty()) "Bearer $currentToken" else "Bearer $SUPABASE_ANON_KEY"
+    }
+
+    // Helper: Jalankan block dengan token valid, auto-refresh + retry kalau 401
+    private suspend fun <T> withValidToken(block: suspend (token: String) -> T): T {
+        val token = session.value.token
+            ?: throw Exception("Belum login")
+        return try {
+            block(token)
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 401) {
+                refreshSession()
+                val newToken = session.value.token
+                    ?: throw Exception("Sesi habis, silakan login ulang")
+                block(newToken)
+            } else throw e
+        }
     }
 
     fun refreshBookmarks() {
@@ -1025,10 +1032,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 refreshToken = res.refresh_token ?: refreshToken
             )
             settingsStore.saveSession(updatedSession)
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 401 || e.code() == 400) {
+                Log.e("AnikuVM", "Refresh token invalid (${e.code()}), clearing session")
+                settingsStore.clearSession()
+            } else {
+                Log.e("AnikuVM", "Token refresh failed with HTTP ${e.code()}, keeping session")
+            }
         } catch (e: Exception) {
-            Log.e("AnikuVM", "Token refresh failed: ${e.message}")
-            // Token sudah tidak bisa di-refresh, clear session → user perlu login ulang
-            settingsStore.clearSession()
+            // Network error (timeout, no internet) - jangan logout user
+            Log.e("AnikuVM", "Token refresh network error: ${e.message}, keeping session")
+            return
         }
     }
 
@@ -1640,21 +1654,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
         viewModelScope.launch {
             try {
-                NetworkClient.supabaseDbApi.insertChatMessage(
-                    data = ChatMessageRequest(
-                        user_id = currentSession.userId ?: "",
-                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
-                        avatar_url = currentSession.avatarUrl,
-                        is_admin = currentSession.isAdmin,
-                        message = trimmed,
-                        reply_to_id = replyToId,
-                        reply_to_username = replyToUsername,
-                        reply_to_message = replyToMessage,
-                        image_url = imageUrl
-                    ),
-                    authHeader = "Bearer ${currentSession.token}",
-                    apiKey = SUPABASE_ANON_KEY
-                )
+                withValidToken { token ->
+                    NetworkClient.supabaseDbApi.insertChatMessage(
+                        data = ChatMessageRequest(
+                            user_id = currentSession.userId ?: "",
+                            username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                            avatar_url = currentSession.avatarUrl,
+                            is_admin = currentSession.isAdmin,
+                            message = trimmed,
+                            reply_to_id = replyToId,
+                            reply_to_username = replyToUsername,
+                            reply_to_message = replyToMessage,
+                            image_url = imageUrl
+                        ),
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
                 loadChatMessages()
             } catch (e: Exception) {
                 _chatError.value = "Gagal kirim pesan: ${e.message}"
@@ -1833,22 +1849,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             _isCreatingPost.value = true
             try {
-                NetworkClient.supabaseDbApi.insertPost(
-                    data = PostRequest(
-                        user_id = currentSession.userId ?: "",
-                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
-                        avatar_url = currentSession.avatarUrl,
-                        is_admin = currentSession.isAdmin,
-                        caption = caption?.trim(),
-                        image_url = imageUrl,
-                        anime_slug = sharedAnime?.slug,
-                        anime_title = sharedAnime?.title,
-                        anime_poster = sharedAnime?.poster,
-                        anime_type = sharedAnime?.type
-                    ),
-                    authHeader = "Bearer ${currentSession.token}",
-                    apiKey = SUPABASE_ANON_KEY
-                )
+                withValidToken { token ->
+                    NetworkClient.supabaseDbApi.insertPost(
+                        data = PostRequest(
+                            user_id = currentSession.userId ?: "",
+                            username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                            avatar_url = currentSession.avatarUrl,
+                            is_admin = currentSession.isAdmin,
+                            caption = caption?.trim(),
+                            image_url = imageUrl,
+                            anime_slug = sharedAnime?.slug,
+                            anime_title = sharedAnime?.title,
+                            anime_poster = sharedAnime?.poster,
+                            anime_type = sharedAnime?.type
+                        ),
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
                 _pendingSharedAnime.value = null
                 loadFeed()
             } catch (e: Exception) {
