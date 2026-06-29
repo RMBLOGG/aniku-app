@@ -6388,32 +6388,22 @@ fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(
-                                                        when {
-                                                            sess.isAdmin -> Color(0xFFD32F2F).copy(alpha = 0.15f)
-                                                            sess.isModerator -> Color(0xFF7C4DFF).copy(alpha = 0.15f)
-                                                            else -> accentColor.copy(alpha = 0.12f)
-                                                        }
+                                            when {
+                                                sess.isAdmin -> AdminBadge()
+                                                sess.isModerator -> ModeratorBadge()
+                                                else -> Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(accentColor.copy(alpha = 0.12f))
+                                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Member",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = accentColor
                                                     )
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = when {
-                                                        sess.isAdmin -> "Admin"
-                                                        sess.isModerator -> "Moderator"
-                                                        else -> "Member"
-                                                    },
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = when {
-                                                        sess.isAdmin -> Color(0xFFD32F2F)
-                                                        sess.isModerator -> Color(0xFF7C4DFF)
-                                                        else -> accentColor
-                                                    }
-                                                )
+                                                }
                                             }
                                         }
                                     }
