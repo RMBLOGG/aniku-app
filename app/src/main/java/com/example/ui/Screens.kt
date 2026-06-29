@@ -1015,7 +1015,67 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Edeg-to-Edge Hero Billboard Slider
+            // ── Header ──────────────────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = if (session.username != null) "Halo, ${session.username} 👋" else "Halo, Otaku! 👋",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                        Text(
+                            text = "ANIKU",
+                            color = Color.White,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 3.sp,
+                            style = LocalTextStyle.current.copy(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = accentColor.copy(alpha = 0.8f),
+                                    blurRadius = 8f
+                                )
+                            )
+                        )
+                    }
+                    // Avatar
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(accentColor.copy(alpha = 0.2f))
+                            .border(2.dp, accentColor.copy(alpha = 0.5f), CircleShape)
+                            .clickable { navController.navigate("profile") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!session.avatarUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = session.avatarUrl,
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Text(
+                                text = (session.username?.firstOrNull() ?: session.email?.firstOrNull() ?: 'A').uppercaseChar().toString(),
+                                color = Color.White,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Carousel ─────────────────────────────────────────────
             if (sliderItems.isNotEmpty()) {
                 item {
                     val heroPagerState = androidx.compose.foundation.pager.rememberPagerState(
@@ -1036,20 +1096,27 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(460.dp)
+                            .height(400.dp)
                     ) {
-                        // HorizontalPager style A — full width, radius 16dp, 16:9
+                        // HorizontalPager — card style dengan peek
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = heroPagerState,
-                            contentPadding = PaddingValues(0.dp),
-                            pageSpacing = 0.dp,
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            pageSpacing = 12.dp,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
                             val slide = sliderItems[page]
+                            val pageOffset = (heroPagerState.currentPage - page) + heroPagerState.currentPageOffsetFraction
+                            val scale by animateFloatAsState(
+                                targetValue = if (pageOffset == 0f) 1f else 0.93f,
+                                animationSpec = tween(300),
+                                label = "card_scale_$page"
+                            )
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .graphicsLayer { scaleY = scale; scaleX = scale }
+                                    .clip(RoundedCornerShape(20.dp))
                             ) {
                                 // Poster
                                 AsyncImage(
@@ -1214,28 +1281,7 @@ fun HomeScreen(
                             }
                         }
 
-                        // Header Bar (logo only)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .align(Alignment.TopStart)
-                        ) {
-                            Text(
-                                text = "ANIKU",
-                                color = Color.White,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 3.sp,
-                                style = LocalTextStyle.current.copy(
-                                    shadow = androidx.compose.ui.graphics.Shadow(
-                                        color = accentColor.copy(alpha = 0.8f),
-                                        blurRadius = 8f
-                                    )
-                                )
-                            )
-                        }
+
                     }
                 }
             }
