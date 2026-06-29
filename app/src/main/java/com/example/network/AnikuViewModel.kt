@@ -1084,7 +1084,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     email = email,
                     username = profile?.username ?: (res.user?.user_metadata?.get("username")?.toString() ?: email.substringBefore("@")),
                     avatarUrl = profile?.avatar_url,
-                    isAdmin = profile?.is_admin ?: false,
+                    isAdmin = profile?.isAdmin() ?: false,
+                    isModerator = profile?.isModerator() ?: false,
                     isBanned = profile?.is_banned ?: false
                 )
 
@@ -1135,7 +1136,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     email = email,
                     username = profile?.username ?: username,
                     avatarUrl = profile?.avatar_url,
-                    isAdmin = profile?.is_admin ?: false,
+                    isAdmin = profile?.isAdmin() ?: false,
+                    isModerator = profile?.isModerator() ?: false,
                     isBanned = profile?.is_banned ?: false
                 )
 
@@ -1237,7 +1239,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     // Admin Panel Database Operations
     fun loadAdminDetails() {
-        if (!session.value.isAdmin) return
+        if (!session.value.isAdmin && !session.value.isModerator) return
         val authHeader = getAuthHeader()
         _isAdminLoading.value = true
         viewModelScope.launch {

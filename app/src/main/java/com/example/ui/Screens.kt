@@ -5795,9 +5795,9 @@ fun AdminPanelScreen(
                                             )
                                         }
 
-                                        // Set Role button
+                                        // Set Role button - hanya admin
                                         var showRoleDialog by remember { mutableStateOf(false) }
-                                        IconButton(
+                                        if (session.isAdmin) IconButton(
                                             onClick = { showRoleDialog = true },
                                             modifier = Modifier
                                                 .size(38.dp)
@@ -6442,7 +6442,7 @@ fun SettingsScreen(
                 }
 
                 // ── Section B: Admin Panel ───────────────────────────
-                if (!sess.token.isNullOrEmpty() && sess.isAdmin) {
+                if (!sess.token.isNullOrEmpty() && sess.canModerate()) {
                     AnimatedSettingsItem(index = 1) {
                         val pulseAnim = rememberInfiniteTransition(label = "pulse")
                         val pulseAlpha by pulseAnim.animateFloat(

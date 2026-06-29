@@ -439,7 +439,7 @@ fun ChatScreen(
                                 message = message,
                                 isOwnMessage = isOwn,
                                 onReply = if (isLoggedIn) { { replyTarget = message } } else null,
-                                onDelete = if (isOwn || session.isAdmin) {
+                                onDelete = if (isOwn || session.canModerate()) {
                                     { viewModel.deleteChatMessage(message.id) }
                                 } else null
                             )

@@ -137,7 +137,7 @@ fun FeedScreen(
                             val likes = postLikes[post.id] ?: emptyList()
                             val commentCount = postComments[post.id]?.size ?: 0
                             val isLiked = !session.userId.isNullOrEmpty() && session.userId in likes
-                            val canDelete = post.user_id == session.userId || session.isAdmin
+                            val canDelete = post.user_id == session.userId || session.canModerate()
 
                             TweetCard(
                                 post = post,

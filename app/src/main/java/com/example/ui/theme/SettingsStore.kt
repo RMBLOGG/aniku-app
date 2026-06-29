@@ -186,5 +186,8 @@ data class UserSession(
     val username: String?,
     val avatarUrl: String?,
     val isAdmin: Boolean,
+    val isModerator: Boolean = false,
     val isBanned: Boolean
-)
+) {
+    fun canModerate() = isAdmin || isModerator
+}

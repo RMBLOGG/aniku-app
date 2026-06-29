@@ -278,7 +278,7 @@ fun PostDetailScreen(
             } else {
                 // Top-level komentar beserta reply-nya masing-masing
                 items(topLevel, key = { it.id }) { comment ->
-                    val canDelete = comment.user_id == session.userId || session.isAdmin
+                    val canDelete = comment.user_id == session.userId || session.canModerate()
                     val replies = repliesMap[comment.id] ?: emptyList()
                     var expanded by remember { mutableStateOf(false) }
 
@@ -298,7 +298,7 @@ fun PostDetailScreen(
                             val visibleReplies = if (expanded || replies.size <= 1) replies else replies.take(1)
 
                             visibleReplies.forEach { reply ->
-                                val canDeleteReply = reply.user_id == session.userId || session.isAdmin
+                                val canDeleteReply = reply.user_id == session.userId || session.canModerate()
                                 CommentRow(
                                     comment = reply,
                                     isReply = true,
