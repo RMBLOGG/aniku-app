@@ -404,15 +404,15 @@ fun ChipBadge(label: String, dotColor: Color) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
+            .border(0.5.dp, Color(0xFF333333), RoundedCornerShape(100.dp))
             .clip(RoundedCornerShape(100.dp))
             .background(Color(0xFF1A1A1A))
-            .border(0.5.dp, Color(0xFF333333), RoundedCornerShape(100.dp))
-            .padding(start = 6.dp, end = 8.dp, top = 3.dp, bottom = 3.dp)
+            .padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 2.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(6.dp)
-                .clip(RoundedCornerShape(50))
+                .size(5.dp)
+                .clip(CircleShape)
                 .background(dotColor)
         )
         Text(
