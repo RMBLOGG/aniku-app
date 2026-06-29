@@ -1036,7 +1036,7 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(16f / 9f)
+                            .height(460.dp)
                     ) {
                         // HorizontalPager style A — full width, radius 16dp, 16:9
                         androidx.compose.foundation.pager.HorizontalPager(
