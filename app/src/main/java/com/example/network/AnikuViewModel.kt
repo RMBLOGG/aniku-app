@@ -1689,8 +1689,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
                 // supaya tampilan chat tetap normal dari atas ke bawah.
                 _chatMessages.value = messages.map { it.toChatMessage() }.reversed()
+            } catch (e: retrofit2.HttpException) {
+                val errBody = e.response()?.errorBody()?.string() ?: "no body"
+                _chatError.value = "HTTP ${e.code()}: $errBody"
+                Log.e("AnikuVM", "loadChatMessages failed: HTTP ${e.code()} - $errBody")
             } catch (e: Exception) {
                 _chatError.value = "Gagal memuat pesan: ${e.message}"
+                Log.e("AnikuVM", "loadChatMessages failed", e)
             } finally {
                 _isChatLoading.value = false
             }
