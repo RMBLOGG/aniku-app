@@ -277,6 +277,54 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _banStatusMessage = MutableStateFlow<String?>(null)
     val banStatusMessage: StateFlow<String?> = _banStatusMessage.asStateFlow()
 
+    // Popup ban real-time (deteksi via polling) — tampil + force logout begitu kedeteksi banned
+    private val _showBannedDialog = MutableStateFlow(false)
+    val showBannedDialog: StateFlow<Boolean> = _showBannedDialog.asStateFlow()
+
+    private var banWatcherJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Mulai cek status ban tiap 15 detik selama session aktif.
+     * Dipanggil sekali waktu app start / setelah login sukses (lihat init block & login()).
+     */
+    fun startBanWatcher() {
+        banWatcherJob?.cancel()
+        banWatcherJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(15_000L)
+                val sess = session.value
+                val uid = sess.userId
+                val token = sess.token
+                if (uid == null || token == null) continue
+                try {
+                    val profileList = NetworkClient.supabaseDbApi.getProfileByUserId(
+                        idQuery = "eq.$uid",
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    val profile = profileList.firstOrNull()
+                    if (profile?.is_banned == true) {
+                        _showBannedDialog.value = true
+                        settingsStore.clearSession()
+                        stopBanWatcher()
+                    }
+                } catch (e: Exception) {
+                    // Network error sementara — jangan logout, coba lagi di siklus berikutnya
+                    Log.e("AnikuVM", "Ban watcher check failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun stopBanWatcher() {
+        banWatcherJob?.cancel()
+        banWatcherJob = null
+    }
+
+    fun dismissBannedDialog() {
+        _showBannedDialog.value = false
+    }
+
     init {
         // Load initial state
         refreshBookmarks()
@@ -290,6 +338,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         // Auto-refresh token saat app dibuka
         viewModelScope.launch {
             refreshSession()
+        }
+        // Pantau status ban tiap 15 detik selama ada user login.
+        // Otomatis start saat userId muncul, stop saat logout (userId null).
+        viewModelScope.launch {
+            session.map { it.userId }.distinctUntilChanged().collect { userId ->
+                if (userId != null) startBanWatcher() else stopBanWatcher()
+            }
         }
     }
 

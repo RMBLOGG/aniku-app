@@ -233,7 +233,28 @@ class MainActivity : ComponentActivity() {
                 val latestDonation by viewModel.latestDonation.collectAsState()
                 var showDonationBanner by remember { mutableStateOf(false) }
 
-                // Tampilkan banner saat ada donasi baru
+                // Popup ban real-time — muncul begitu ban kedeteksi (polling tiap 15s),
+                // session udah otomatis di-clear di ViewModel, di sini cuma redirect + tampilkan info
+                val showBannedDialog by viewModel.showBannedDialog.collectAsState()
+                if (showBannedDialog) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { /* tidak bisa di-dismiss tanpa konfirmasi */ },
+                        title = { Text("Akun Dibanned") },
+                        text = { Text("Akunmu telah ditangguhkan (banned) oleh Admin. Kamu akan keluar dari sesi ini.") },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                viewModel.dismissBannedDialog()
+                                navController.navigate("auth") {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
+
+                // Banner donasi popup
                 LaunchedEffect(hasNewDonation) {
                     if (hasNewDonation) {
                         showDonationBanner = true
