@@ -286,7 +286,7 @@ interface SupabaseDbApi {
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
-        @Query("select") select: String = "id,user_id,username,avatar_url,role,is_admin,message,created_at,reply_to_id,reply_to_username,reply_to_message,image_url,profiles!user_id(user_number)",
+        @Query("select") select: String = "*,profiles(user_number)",
         @Query("order") order: String = "created_at.desc",
         @Query("limit") limit: Int = 100,
         @Header("Authorization") authHeader: String,
