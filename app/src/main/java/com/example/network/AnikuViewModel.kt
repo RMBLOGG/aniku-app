@@ -1681,14 +1681,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             _isChatLoading.value = true
             try {
-                val messages = NetworkClient.supabaseDbApi.getChatMessages(
+                val messagesDeferred = NetworkClient.supabaseDbApi.getChatMessages(
                     authHeader = "Bearer $SUPABASE_ANON_KEY",
                     apiKey = SUPABASE_ANON_KEY
                 )
+                // Fetch semua profiles sekali untuk manual-join user_number
+                // (Supabase auto-join via PostgREST schema cache tidak reliable)
+                val profilesMap = try {
+                    NetworkClient.supabaseDbApi.getProfiles(
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    ).associateBy { it.id }
+                } catch (e: Exception) {
+                    emptyMap()
+                }
+                val messages = messagesDeferred.map { msg ->
+                    msg.copy(user_number = profilesMap[msg.user_id]?.user_number)
+                }
                 // API mengembalikan urutan terbaru dulu (desc) agar limit menangkap
                 // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
                 // supaya tampilan chat tetap normal dari atas ke bawah.
-                _chatMessages.value = messages.map { it.toChatMessage() }.reversed()
+                _chatMessages.value = messages.reversed()
             } catch (e: retrofit2.HttpException) {
                 val errBody = e.response()?.errorBody()?.string() ?: "no body"
                 _chatError.value = "HTTP ${e.code()}: $errBody"
