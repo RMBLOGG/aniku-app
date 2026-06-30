@@ -1160,14 +1160,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun register(email: String, password: String, username: String, onSuccess: () -> Unit) {
+    fun register(email: String, password: String, username: String, captchaToken: String?, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
         _registerInfoMessage.value = null
+        if (captchaToken.isNullOrBlank()) {
+            _authLoading.value = false
+            _authError.value = "Verifikasi captcha belum selesai, tunggu sebentar lalu coba lagi."
+            return
+        }
         viewModelScope.launch {
             try {
                 val res = NetworkClient.supabaseAuthApi.signUp(
-                    request = SignUpRequest(email, password, SignUpData(username)),
+                    request = SignUpRequest(
+                        email = email,
+                        password = password,
+                        data = SignUpData(username),
+                        gotrue_meta_security = GotrueMetaSecurity(captchaToken)
+                    ),
                     apiKey = SUPABASE_ANON_KEY
                 )
                 val token = res.access_token

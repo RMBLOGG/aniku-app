@@ -132,7 +132,13 @@ data class EpisodeResponse(
 data class SignUpRequest(
     val email: String,
     val password: String,
-    val data: SignUpData
+    val data: SignUpData,
+    val gotrue_meta_security: GotrueMetaSecurity? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GotrueMetaSecurity(
+    val captcha_token: String
 )
 
 @JsonClass(generateAdapter = true)
