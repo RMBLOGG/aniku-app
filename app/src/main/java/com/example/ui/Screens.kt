@@ -5581,6 +5581,9 @@ fun AdminPanelScreen(
     var blacklistTitle by remember { mutableStateOf("") }
     var blacklistReason by remember { mutableStateOf("") }
 
+    // Search query for user management tab
+    var userSearchQuery by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         viewModel.loadAdminDetails()
     }
@@ -5693,7 +5696,59 @@ fun AdminPanelScreen(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        users.forEach { usr ->
+                        OutlinedTextField(
+                            value = userSearchQuery,
+                            onValueChange = { userSearchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Cari username atau #id...", fontSize = 13.sp) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+                            },
+                            trailingIcon = {
+                                if (userSearchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { userSearchQuery = "" }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Hapus pencarian", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(50),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = accentColor,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val filteredUsers = remember(users, userSearchQuery) {
+                            if (userSearchQuery.isBlank()) {
+                                users
+                            } else {
+                                val q = userSearchQuery.trim().removePrefix("#")
+                                users.filter { u ->
+                                    (u.username?.contains(q, ignoreCase = true) == true) ||
+                                        (u.user_number?.toString()?.contains(q, ignoreCase = true) == true)
+                                }
+                            }
+                        }
+
+                        if (filteredUsers.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Pengguna tidak ditemukan",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+
+                        filteredUsers.forEach { usr ->
                             val isBanned = usr.is_banned == true
                             val statusColor = if (isBanned) Color(0xFFFF5252) else Color(0xFF4CAF50)
 
