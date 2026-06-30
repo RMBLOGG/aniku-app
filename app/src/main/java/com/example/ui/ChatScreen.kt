@@ -477,6 +477,13 @@ private fun ChatBubble(
     var swipeOffset by remember { mutableStateOf(0f) }
     val swipeThreshold = 80f
 
+    // Warna nama berdasarkan role: admin = merah, moderator = ungu, lainnya = putih/abu
+    val nameColor = when {
+        message.role == "admin" || message.is_admin == true -> Color(0xFFFF5555)
+        message.role == "moderator" -> Color(0xFFB388FF)
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -495,210 +502,184 @@ private fun ChatBubble(
                         }
                     }
                 )
-            },
-        horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
+            }
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { if (onDelete != null) showDeleteDialog = true }
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.Start
     ) {
-        if (!isOwnMessage) {
-            if (!message.avatar_url.isNullOrEmpty()) {
-                AsyncImage(
-                    model = message.avatar_url,
-                    contentDescription = message.username,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    error = null,
-                    fallback = null,
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = message.username.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-
-        Column(
-            horizontalAlignment = if (isOwnMessage) Alignment.End else Alignment.Start,
-            modifier = Modifier.widthIn(max = 280.dp)
-        ) {
-            if (!isOwnMessage) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
-                ) {
-                    Text(
-                        text = message.username,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    message.user_number?.let { num ->
-                        Text(
-                            text = "#$num",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
-                    }
-                    if (message.role == "admin" || message.is_admin == true) {
-                        AdminBadge()
-                    } else if (message.role == "moderator") {
-                        ModeratorBadge()
-                    }
-                }
-            }
-
+        // Avatar selalu di kiri (flat layout, gaya AniKme)
+        if (!message.avatar_url.isNullOrEmpty()) {
+            AsyncImage(
+                model = message.avatar_url,
+                contentDescription = message.username,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = null,
+                fallback = null,
+            )
+        } else {
             Box(
                 modifier = Modifier
-                    .offset(x = (swipeOffset * 0.4f).dp)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = if (isOwnMessage) 16.dp else 4.dp,
-                            topEnd = if (isOwnMessage) 4.dp else 16.dp,
-                            bottomStart = 16.dp,
-                            bottomEnd = 16.dp
-                        )
-                    )
-                    .background(
-                        if (isOwnMessage) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    )
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = { if (onDelete != null) showDeleteDialog = true }
-                    )
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
             ) {
-                Column {
-                    // Quoted reply preview
-                    if (!message.reply_to_message.isNullOrEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (isOwnMessage)
-                                        Color.Black.copy(alpha = 0.2f)
-                                    else
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(2.dp)
-                                    .height(32.dp)
-                                    .background(
-                                        if (isOwnMessage) Color.White.copy(alpha = 0.7f)
-                                        else MaterialTheme.colorScheme.primary,
-                                        RoundedCornerShape(1.dp)
-                                    )
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
-                                Text(
-                                    text = message.reply_to_username ?: "",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isOwnMessage) Color.White.copy(alpha = 0.9f)
-                                            else MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = message.reply_to_message ?: "",
-                                    fontSize = 11.sp,
-                                    color = if (isOwnMessage) Color.White.copy(alpha = 0.7f)
-                                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
+                Text(
+                    text = message.username.take(1).uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
 
-                    // Gambar jika ada
-                    var showFullImage by remember { mutableStateOf(false) }
-                    if (!message.image_url.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = message.image_url,
-                            contentDescription = "Foto",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 220.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showFullImage = true },
-                            contentScale = ContentScale.FillWidth
-                        )
-                        if (showFullImage) {
-                            androidx.compose.ui.window.Dialog(
-                                onDismissRequest = { showFullImage = false }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.95f))
-                                        .clickable { showFullImage = false },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    AsyncImage(
-                                        model = message.image_url,
-                                        contentDescription = "Foto penuh",
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentScale = ContentScale.FillWidth
-                                    )
-                                    IconButton(
-                                        onClick = { showFullImage = false },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Close,
-                                            contentDescription = "Tutup",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        if (message.message.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                        }
-                    }
-                    if (message.message.isNotEmpty()) {
-                        val baseColor = if (isOwnMessage) MaterialTheme.colorScheme.onPrimary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        val linkColor = if (isOwnMessage) Color.White
-                            else MaterialTheme.colorScheme.primary
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    text = message.username,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = nameColor
+                )
+                message.user_number?.let { num ->
+                    Text(
+                        text = "#$num",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                if (message.role == "admin" || message.is_admin == true) {
+                    Text(
+                        text = "ADMIN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFC107),
+                        letterSpacing = 0.5.sp
+                    )
+                } else if (message.role == "moderator") {
+                    Text(
+                        text = "MODERATOR",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFB388FF),
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Quoted reply preview
+            if (!message.reply_to_message.isNullOrEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(2.dp)
+                            .height(32.dp)
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
                         Text(
-                            text = linkifyMessage(message.message, linkColor),
-                            fontSize = 14.sp,
-                            color = baseColor
+                            text = message.reply_to_username ?: "",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = message.reply_to_message ?: "",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Gambar jika ada
+            var showFullImage by remember { mutableStateOf(false) }
+            if (!message.image_url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = message.image_url,
+                    contentDescription = "Foto",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showFullImage = true },
+                    contentScale = ContentScale.FillWidth
+                )
+                if (showFullImage) {
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { showFullImage = false }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.95f))
+                                .clickable { showFullImage = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AsyncImage(
+                                model = message.image_url,
+                                contentDescription = "Foto penuh",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentScale = ContentScale.FillWidth
+                            )
+                            IconButton(
+                                onClick = { showFullImage = false },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Tutup",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+                if (message.message.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+            if (message.message.isNotEmpty()) {
+                Text(
+                    text = linkifyMessage(message.message, MaterialTheme.colorScheme.primary),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                )
             }
 
             Text(
                 text = timeStr,
                 fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 0.dp)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
     }
