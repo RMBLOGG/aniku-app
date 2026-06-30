@@ -653,7 +653,6 @@ private fun ChatBubble(
                         fontWeight = FontWeight.Medium
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
                 if (message.role == "admin" || message.is_admin == true) {
                     GlossyGradientText(
                         text = "ADMIN",
