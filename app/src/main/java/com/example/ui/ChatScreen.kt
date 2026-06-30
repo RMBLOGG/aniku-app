@@ -898,7 +898,7 @@ private fun OwnChatBubble(
 
             Column(
                 modifier = Modifier
-                    .width(IntrinsicSize.Min)
+                    .width(IntrinsicSize.Max)
                     .shadow(
                         elevation = 8.dp,
                         shape = bubbleShape,
