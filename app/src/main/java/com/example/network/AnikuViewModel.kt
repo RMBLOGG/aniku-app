@@ -1689,10 +1689,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // (Supabase auto-join via PostgREST schema cache tidak reliable)
                 val profilesMap = try {
                     NetworkClient.supabaseDbApi.getProfiles(
-                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        authHeader = getAuthHeader(),
                         apiKey = SUPABASE_ANON_KEY
                     ).associateBy { it.id }
                 } catch (e: Exception) {
+                    Log.e("AnikuVM", "Failed fetching profiles for chat join", e)
                     emptyMap()
                 }
                 val messages = messagesDeferred.map { msg ->
