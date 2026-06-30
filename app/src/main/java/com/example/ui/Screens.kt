@@ -8200,7 +8200,7 @@ private fun PodiumPlaque(
     delayMillis: Int = 0
 ) {
     val avatarSize = if (isGold) 50.dp else 42.dp
-    val rankSize = if (isGold) 26.dp else 22.dp
+    val rankSize = if (isGold) 28.dp else 25.dp
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -8239,16 +8239,12 @@ private fun PodiumPlaque(
                 .background(rankGradient, shape = CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            val rankIcon = when (rank) {
-                1 -> Icons.Default.EmojiEvents
-                2 -> Icons.Default.MilitaryTech
-                else -> Icons.Default.WorkspacePremium
-            }
+            // Pakai bentuk trofi yang sama biar tetep jelas di ukuran kecil — perbedaan rank dari warna gradient badge
             Icon(
-                rankIcon,
+                Icons.Default.EmojiEvents,
                 contentDescription = "Peringkat $rank",
                 tint = Color(0xFF120F16),
-                modifier = Modifier.size(if (isGold) 14.dp else 12.dp)
+                modifier = Modifier.size(if (isGold) 16.dp else 14.dp)
             )
         }
         Spacer(modifier = Modifier.height(9.dp))
