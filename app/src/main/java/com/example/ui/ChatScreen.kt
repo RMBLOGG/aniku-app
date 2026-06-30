@@ -492,30 +492,40 @@ private fun ChatBubble(
         else -> null
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(onReply) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (swipeOffset > swipeThreshold && onReply != null) {
-                            onReply()
-                        }
-                        swipeOffset = 0f
-                    },
-                    onDragCancel = { swipeOffset = 0f },
-                    onHorizontalDrag = { _, dragAmount ->
-                        if (dragAmount > 0) {
-                            swipeOffset = (swipeOffset + dragAmount).coerceAtMost(swipeThreshold * 1.2f)
-                        }
+    val dragModifier = Modifier
+        .fillMaxWidth()
+        .pointerInput(onReply) {
+            detectHorizontalDragGestures(
+                onDragEnd = {
+                    if (swipeOffset > swipeThreshold && onReply != null) {
+                        onReply()
                     }
-                )
-            }
-            .combinedClickable(
-                onClick = {},
-                onLongClick = { if (onDelete != null) showDeleteDialog = true }
+                    swipeOffset = 0f
+                },
+                onDragCancel = { swipeOffset = 0f },
+                onHorizontalDrag = { _, dragAmount ->
+                    val delta = if (isOwnMessage) -dragAmount else dragAmount
+                    if (delta > 0) {
+                        swipeOffset = (swipeOffset + delta).coerceAtMost(swipeThreshold * 1.2f)
+                    }
+                }
             )
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+        }
+        .combinedClickable(
+            onClick = {},
+            onLongClick = { if (onDelete != null) showDeleteDialog = true }
+        )
+        .padding(horizontal = 12.dp, vertical = 2.dp)
+
+    if (isOwnMessage) {
+        OwnChatBubble(
+            message = message,
+            timeStr = timeStr,
+            modifier = dragModifier
+        )
+    } else {
+    Row(
+        modifier = dragModifier,
         horizontalArrangement = Arrangement.Start
     ) {
         // Avatar selalu di kiri (flat layout, gaya AniKme)
@@ -701,6 +711,7 @@ private fun ChatBubble(
             )
         }
     }
+    }
 
     // Dialog konfirmasi hapus (long press)
     if (showDeleteDialog && onDelete != null) {
@@ -722,5 +733,143 @@ private fun ChatBubble(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun OwnChatBubble(
+    message: ChatMessage,
+    timeStr: String,
+    modifier: Modifier = Modifier
+) {
+    var showFullImage by remember { mutableStateOf(false) }
+    val bubbleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.End
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 280.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            Column(
+                modifier = Modifier
+                    .clip(
+                        RoundedCornerShape(
+                            topStart = 14.dp,
+                            topEnd = 14.dp,
+                            bottomStart = 14.dp,
+                            bottomEnd = 4.dp
+                        )
+                    )
+                    .background(bubbleColor)
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                // Quoted reply preview
+                if (!message.reply_to_message.isNullOrEmpty()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.35f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .height(22.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Column {
+                            Text(
+                                text = message.reply_to_username ?: "",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = message.reply_to_message ?: "",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                // Gambar jika ada
+                if (!message.image_url.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = message.image_url,
+                        contentDescription = "Foto",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 220.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showFullImage = true },
+                        contentScale = ContentScale.FillWidth
+                    )
+                    if (message.message.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+
+                if (message.message.isNotEmpty()) {
+                    Text(
+                        text = linkifyMessage(message.message, MaterialTheme.colorScheme.primary),
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            Text(
+                text = timeStr,
+                fontSize = 9.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                modifier = Modifier.padding(top = 2.dp, end = 2.dp)
+            )
+        }
+    }
+
+    if (showFullImage && !message.image_url.isNullOrEmpty()) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showFullImage = false }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .clickable { showFullImage = false },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = message.image_url,
+                    contentDescription = "Foto penuh",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentScale = ContentScale.FillWidth
+                )
+                IconButton(
+                    onClick = { showFullImage = false },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Tutup",
+                        tint = Color.White
+                    )
+                }
+            }
+        }
     }
 }
