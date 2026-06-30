@@ -17,6 +17,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.LinkAnnotation
@@ -479,9 +480,16 @@ private fun ChatBubble(
 
     // Warna nama berdasarkan role: admin = merah, moderator = ungu, lainnya = putih/abu
     val nameColor = when {
-        message.role == "admin" || message.is_admin == true -> Color(0xFFFF5555)
+        message.role == "admin" || message.is_admin == true -> Color(0xFFFF6B6B)
         message.role == "moderator" -> Color(0xFFB388FF)
         else -> MaterialTheme.colorScheme.onSurface
+    }
+    val nameGradient = when {
+        message.role == "admin" || message.is_admin == true ->
+            Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
+        message.role == "moderator" ->
+            Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
+        else -> null
     }
 
     Row(
@@ -507,7 +515,7 @@ private fun ChatBubble(
                 onClick = {},
                 onLongClick = { if (onDelete != null) showDeleteDialog = true }
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 3.dp),
         horizontalArrangement = Arrangement.Start
     ) {
         // Avatar selalu di kiri (flat layout, gaya AniKme)
@@ -516,7 +524,7 @@ private fun ChatBubble(
                 model = message.avatar_url,
                 contentDescription = message.username,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(30.dp)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop,
                 error = null,
@@ -525,7 +533,7 @@ private fun ChatBubble(
         } else {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(30.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
@@ -533,7 +541,7 @@ private fun ChatBubble(
                 Text(
                     text = message.username.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -545,12 +553,21 @@ private fun ChatBubble(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Text(
-                    text = message.username,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = nameColor
-                )
+                if (nameGradient != null) {
+                    Text(
+                        text = message.username,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        style = LocalTextStyle.current.copy(brush = nameGradient)
+                    )
+                } else {
+                    Text(
+                        text = message.username,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = nameColor
+                    )
+                }
                 message.user_number?.let { num ->
                     Text(
                         text = "#$num",
@@ -561,59 +578,78 @@ private fun ChatBubble(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (message.role == "admin" || message.is_admin == true) {
-                    Text(
-                        text = "ADMIN",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFC107),
-                        letterSpacing = 0.5.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "ADMIN",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                 } else if (message.role == "moderator") {
-                    Text(
-                        text = "MODERATOR",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFB388FF),
-                        letterSpacing = 0.5.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "MOD",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(1.dp))
 
             // Quoted reply preview
             if (!message.reply_to_message.isNullOrEmpty()) {
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .width(2.dp)
-                            .height(32.dp)
+                            .height(22.dp)
                             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
                     Column {
                         Text(
                             text = message.reply_to_username ?: "",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
                             text = message.reply_to_message ?: "",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
             }
 
             // Gambar jika ada
