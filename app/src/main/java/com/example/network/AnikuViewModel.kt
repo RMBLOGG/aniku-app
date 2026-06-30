@@ -1146,9 +1146,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 settingsStore.saveSession(activeSession)
                 _authLoading.value = false
                 onSuccess()
+            } catch (e: retrofit2.HttpException) {
+                _authLoading.value = false
+                val errBody = e.response()?.errorBody()?.string() ?: "no body"
+                _authError.value = "Daftar gagal (HTTP ${e.code()}): $errBody"
+                Log.e("AnikuVM", "Register HttpException: ${e.code()} - $errBody")
             } catch (e: Exception) {
                 _authLoading.value = false
-                _authError.value = "Daftar gagal. Sandi minimal 6 karakter atau email sudah terdafar."
+                _authError.value = "Daftar gagal: ${e.javaClass.simpleName} - ${e.message}"
                 Log.e("AnikuVM", "Register Exception", e)
             }
         }
