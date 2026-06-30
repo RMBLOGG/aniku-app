@@ -745,14 +745,77 @@ private fun OwnChatBubble(
     var showFullImage by remember { mutableStateOf(false) }
     val bubbleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
 
+    val nameColor = when {
+        message.role == "admin" || message.is_admin == true -> Color(0xFFFF6B6B)
+        message.role == "moderator" -> Color(0xFFB388FF)
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val nameGradient = when {
+        message.role == "admin" || message.is_admin == true ->
+            Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
+        message.role == "moderator" ->
+            Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
+        else -> null
+    }
+
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.End
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Top
     ) {
         Column(
             modifier = Modifier.widthIn(max = 280.dp),
             horizontalAlignment = Alignment.End
         ) {
+            // Nama, id, role - rata kanan
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                if (message.role == "admin" || message.is_admin == true) {
+                    Text(
+                        text = "ADMIN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFC107),
+                        letterSpacing = 0.4.sp
+                    )
+                } else if (message.role == "moderator") {
+                    Text(
+                        text = "MODERATOR",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFB388FF),
+                        letterSpacing = 0.4.sp
+                    )
+                }
+                message.user_number?.let { num ->
+                    Text(
+                        text = "#$num",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+                if (nameGradient != null) {
+                    Text(
+                        text = message.username,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        style = LocalTextStyle.current.copy(brush = nameGradient)
+                    )
+                } else {
+                    Text(
+                        text = message.username,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = nameColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(1.dp))
+
             Column(
                 modifier = Modifier
                     .clip(
@@ -835,6 +898,36 @@ private fun OwnChatBubble(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                 modifier = Modifier.padding(top = 2.dp, end = 2.dp)
             )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        if (!message.avatar_url.isNullOrEmpty()) {
+            AsyncImage(
+                model = message.avatar_url,
+                contentDescription = message.username,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = null,
+                fallback = null,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = message.username.take(1).uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 
