@@ -5301,6 +5301,11 @@ fun AuthScreen(
     var password by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
 
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotEmail by remember { mutableStateOf("") }
+    var forgotLoading by remember { mutableStateOf(false) }
+    var forgotResultMessage by remember { mutableStateOf<String?>(null) }
+
     val authLoading by viewModel.authLoading.collectAsState()
     val authError by viewModel.authError.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
@@ -5438,6 +5443,20 @@ fun AuthScreen(
                         singleLine = true
                     )
 
+                    if (isLoginTab) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(
+                            onClick = {
+                                forgotEmail = email.trim()
+                                forgotResultMessage = null
+                                showForgotPasswordDialog = true
+                            },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Lupa Password?", color = accentColor, fontSize = 13.sp)
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Submission action
@@ -5475,6 +5494,79 @@ fun AuthScreen(
                 )
             }
         }
+    }
+
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showForgotPasswordDialog = false
+                forgotResultMessage = null
+            },
+            title = { Text("Lupa Password") },
+            text = {
+                Column {
+                    Text(
+                        "Masukkan email akun kamu, link reset password akan dikirim ke email tersebut.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = forgotEmail,
+                        onValueChange = { forgotEmail = it },
+                        label = { Text("Email") },
+                        singleLine = true,
+                        enabled = !forgotLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    forgotResultMessage?.let { msg ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = msg,
+                            fontSize = 12.sp,
+                            color = if (msg.startsWith("Gagal")) Color(0xFFFF5252) else Color(0xFF4CAF50)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val targetEmail = forgotEmail.trim()
+                        if (targetEmail.isEmpty()) {
+                            forgotResultMessage = "Gagal: Email tidak boleh kosong"
+                        } else {
+                            forgotLoading = true
+                            forgotResultMessage = null
+                            viewModel.sendAuthRecovery(targetEmail) { success ->
+                                forgotLoading = false
+                                forgotResultMessage = if (success) {
+                                    "Link reset password sudah dikirim, cek email kamu ya"
+                                } else {
+                                    "Gagal: Gagal mengirim email, coba lagi nanti"
+                                }
+                            }
+                        }
+                    },
+                    enabled = !forgotLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    if (forgotLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Kirim")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showForgotPasswordDialog = false
+                    forgotResultMessage = null
+                }) {
+                    Text("Tutup")
+                }
+            }
+        )
     }
 }
 
