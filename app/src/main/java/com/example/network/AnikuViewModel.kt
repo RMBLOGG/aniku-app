@@ -255,6 +255,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
+    // Pesan info (bukan error) khusus buat hasil daftar, misal "cek email kamu"
+    private val _registerInfoMessage = MutableStateFlow<String?>(null)
+    val registerInfoMessage: StateFlow<String?> = _registerInfoMessage.asStateFlow()
+
     private val _isUploadingAvatar = MutableStateFlow(false)
     val isUploadingAvatar: StateFlow<Boolean> = _isUploadingAvatar.asStateFlow()
 
@@ -1159,6 +1163,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     fun register(email: String, password: String, username: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
+        _registerInfoMessage.value = null
         viewModelScope.launch {
             try {
                 val res = NetworkClient.supabaseAuthApi.signUp(
@@ -1167,8 +1172,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 )
                 val token = res.access_token
                 if (token == null) {
-                    _authError.value = "Daftar gagal: Token sesi tidak valid."
+                    // Email confirmation aktif di Supabase: akun udah kebuat,
+                    // tapi belum bisa login sampe user klik link konfirmasi di email.
+                    // Ini BUKAN error, jadi jangan ditaruh di _authError (yang warnanya merah).
                     _authLoading.value = false
+                    _registerInfoMessage.value = "Akun berhasil dibuat! Cek email kamu ($email) buat konfirmasi sebelum login."
                     return@launch
                 }
                 val uId = res.user?.id ?: ""

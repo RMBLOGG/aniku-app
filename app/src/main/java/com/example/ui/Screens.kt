@@ -5310,6 +5310,7 @@ fun AuthScreen(
 
     val authLoading by viewModel.authLoading.collectAsState()
     val authError by viewModel.authError.collectAsState()
+    val registerInfoMessage by viewModel.registerInfoMessage.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     Box(
@@ -5383,6 +5384,9 @@ fun AuthScreen(
 
                     authError?.let { err ->
                         Text(text = err, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
+                    }
+                    registerInfoMessage?.let { info ->
+                        Text(text = info, color = Color(0xFF4CAF50), fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
                     }
 
                     // Email Field
