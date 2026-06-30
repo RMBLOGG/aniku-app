@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -94,6 +95,78 @@ private fun linkifyMessage(
         }
     }
 }
+
+/**
+ * Animasi posisi kilau (shimmer) yang bergerak loop dari kiri ke kanan terus-menerus.
+ * Dipakai untuk efek glossy di teks nama/id/role chat.
+ */
+@Composable
+private fun rememberGlossyShimmer(durationMillis: Int = 2200): Float {
+    val infiniteTransition = rememberInfiniteTransition(label = "glossyShimmer")
+    val progress by infiniteTransition.animateFloat(
+        initialValue = -0.5f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerProgress"
+    )
+    return progress
+}
+
+/**
+ * Brush gradient dasar [baseColors] yang dikasih highlight putih bergerak
+ * sesuai [progress], jadi keliatan kayak kilau kaca/glossy yang lewat terus.
+ */
+private fun glossyBrush(baseColors: List<Color>, progress: Float): Brush {
+    val c0 = baseColors.first()
+    val c1 = baseColors.last()
+    val band = 0.22f
+    val p0 = (progress - band).coerceIn(0f, 1f)
+    val p1 = progress.coerceIn(0f, 1f)
+    val p2 = (progress + band).coerceIn(0f, 1f)
+    val highlight = Color.White.copy(alpha = 0.95f)
+    return Brush.linearGradient(
+        colorStops = arrayOf(
+            0f to c0,
+            p0 to c0,
+            p1 to highlight,
+            p2 to c1,
+            1f to c1
+        )
+    )
+}
+
+/**
+ * Teks dengan warna gradient + animasi glossy/kilau bergerak.
+ * Dipakai buat nama pengirim, id (#angka), dan badge role di chat.
+ */
+@Composable
+private fun GlossyGradientText(
+    text: String,
+    colors: List<Color>,
+    fontSize: TextUnit,
+    fontWeight: FontWeight = FontWeight.Bold,
+    letterSpacing: TextUnit = TextUnit.Unspecified,
+    modifier: Modifier = Modifier
+) {
+    val progress = rememberGlossyShimmer()
+    Text(
+        text = text,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        letterSpacing = letterSpacing,
+        modifier = modifier,
+        style = LocalTextStyle.current.copy(brush = glossyBrush(colors, progress))
+    )
+}
+
+// Set warna gradient khusus per role, dipakai bareng GlossyGradientText
+private val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), Color(0xFFFF8E53))
+private val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
+private val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
+private val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -563,44 +636,36 @@ private fun ChatBubble(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                if (nameGradient != null) {
-                    Text(
-                        text = message.username,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        style = LocalTextStyle.current.copy(brush = nameGradient)
-                    )
-                } else {
-                    Text(
-                        text = message.username,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = nameColor
-                    )
-                }
+                GlossyGradientText(
+                    text = message.username,
+                    colors = when {
+                        message.role == "admin" || message.is_admin == true -> adminGradientColors
+                        message.role == "moderator" -> moderatorGradientColors
+                        else -> defaultNameGradientColors
+                    },
+                    fontSize = 13.sp
+                )
                 message.user_number?.let { num ->
-                    Text(
+                    GlossyGradientText(
                         text = "#$num",
+                        colors = idGradientColors,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        fontWeight = FontWeight.Medium
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (message.role == "admin" || message.is_admin == true) {
-                    Text(
+                    GlossyGradientText(
                         text = "ADMIN",
+                        colors = adminGradientColors,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFC107),
                         letterSpacing = 0.4.sp
                     )
                 } else if (message.role == "moderator") {
-                    Text(
+                    GlossyGradientText(
                         text = "MODERATOR",
+                        colors = moderatorGradientColors,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFB388FF),
                         letterSpacing = 0.4.sp
                     )
                 }
@@ -773,45 +838,37 @@ private fun OwnChatBubble(
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 if (message.role == "admin" || message.is_admin == true) {
-                    Text(
+                    GlossyGradientText(
                         text = "ADMIN",
+                        colors = adminGradientColors,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFC107),
                         letterSpacing = 0.4.sp
                     )
                 } else if (message.role == "moderator") {
-                    Text(
+                    GlossyGradientText(
                         text = "MODERATOR",
+                        colors = moderatorGradientColors,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFB388FF),
                         letterSpacing = 0.4.sp
                     )
                 }
                 message.user_number?.let { num ->
-                    Text(
+                    GlossyGradientText(
                         text = "#$num",
+                        colors = idGradientColors,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        fontWeight = FontWeight.Medium
                     )
                 }
-                if (nameGradient != null) {
-                    Text(
-                        text = message.username,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        style = LocalTextStyle.current.copy(brush = nameGradient)
-                    )
-                } else {
-                    Text(
-                        text = message.username,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = nameColor
-                    )
-                }
+                GlossyGradientText(
+                    text = message.username,
+                    colors = when {
+                        message.role == "admin" || message.is_admin == true -> adminGradientColors
+                        message.role == "moderator" -> moderatorGradientColors
+                        else -> defaultNameGradientColors
+                    },
+                    fontSize = 13.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(1.dp))
