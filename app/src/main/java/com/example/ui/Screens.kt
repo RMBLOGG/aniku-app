@@ -5167,6 +5167,126 @@ fun WatchScreen(
 }
 
 // ================================================================
+// 7b. RESET PASSWORD SCREEN (dari deep link email)
+// ================================================================
+
+@Composable
+fun ResetPasswordScreen(
+    accessToken: String?,
+    viewModel: AnikuViewModel,
+    onDone: () -> Unit
+) {
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+    var successMsg by remember { mutableStateOf<String?>(null) }
+    val accentColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "Buat Password Baru",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (accessToken.isNullOrBlank()) {
+                Text(
+                    "Link reset password tidak valid atau sudah kedaluwarsa. Coba kirim ulang dari halaman login.",
+                    fontSize = 13.sp,
+                    color = Color(0xFFFF5252),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onDone) {
+                    Text("Kembali")
+                }
+                return@Column
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = newPassword,
+                onValueChange = { newPassword = it; errorMsg = null },
+                label = { Text("Password baru") },
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it; errorMsg = null },
+                label = { Text("Konfirmasi password") },
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            errorMsg?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, fontSize = 12.sp, color = Color(0xFFFF5252))
+            }
+            successMsg?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(it, fontSize = 12.sp, color = Color(0xFF4CAF50))
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Button(
+                onClick = {
+                    when {
+                        newPassword.length < 6 -> errorMsg = "Password minimal 6 karakter"
+                        newPassword != confirmPassword -> errorMsg = "Konfirmasi password tidak cocok"
+                        else -> {
+                            loading = true
+                            errorMsg = null
+                            viewModel.updatePasswordWithToken(accessToken, newPassword) { success, err ->
+                                loading = false
+                                if (success) {
+                                    successMsg = "Password berhasil diubah, silakan login ulang"
+                                } else {
+                                    errorMsg = err ?: "Gagal mengubah password"
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !loading && successMsg == null,
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text(if (successMsg != null) "Selesai" else "Simpan Password")
+                }
+            }
+
+            if (successMsg != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                TextButton(onClick = onDone) {
+                    Text("Kembali ke Login")
+                }
+            }
+        }
+    }
+}
+
+// ================================================================
 // 8. AUTH SCREENS (LOGIN / REGISTER)
 // ================================================================
 

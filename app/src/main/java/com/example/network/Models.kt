@@ -152,6 +152,11 @@ data class RecoverRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class UpdatePasswordRequest(
+    val password: String
+)
+
+@JsonClass(generateAdapter = true)
 data class RefreshTokenRequest(
     val refresh_token: String
 )

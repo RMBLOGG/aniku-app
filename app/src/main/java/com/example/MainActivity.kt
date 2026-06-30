@@ -155,8 +155,19 @@ class MainActivity : ComponentActivity() {
         val deepLinkRoute = when {
             intent?.data?.scheme == "aniku" && intent.data?.host == "feed" -> "feed"
             intent?.data?.scheme == "aniku" && intent.data?.host == "chat" -> "chat"
+            intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password" -> "reset_password"
             else -> null
         }
+
+        // Supabase taro token di URL fragment (#access_token=...&type=recovery),
+        // bukan query param biasa, jadi harus diparse manual dari fragment-nya
+        val resetAccessToken: String? = if (deepLinkRoute == "reset_password") {
+            val fragment = intent?.data?.fragment ?: intent?.data?.encodedQuery
+            fragment?.split("&")
+                ?.map { it.split("=", limit = 2) }
+                ?.firstOrNull { it.size == 2 && it[0] == "access_token" }
+                ?.get(1)
+        } else null
 
         setContent {
             val isDark by viewModel.isDark.collectAsState()
@@ -200,10 +211,14 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                // Navigate ke deep link kalau ada (dari notifikasi)
+                // Navigate ke deep link kalau ada (dari notifikasi / reset password)
                 LaunchedEffect(deepLinkRoute) {
                     deepLinkRoute?.let {
-                        navController.navigate(it) {
+                        val target = if (it == "reset_password") {
+                            val encodedToken = java.net.URLEncoder.encode(resetAccessToken ?: "", "UTF-8")
+                            "reset_password?token=$encodedToken"
+                        } else it
+                        navController.navigate(target) {
                             popUpTo("home") { saveState = true }
                             launchSingleTop = true
                         }
@@ -619,6 +634,27 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 onAuthSuccess = { navController.popBackStack() },
                                 onGuestMode = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "reset_password?token={token}",
+                            arguments = listOf(
+                                navArgument("token") { type = NavType.StringType; defaultValue = "" }
+                            )
+                        ) { backStackEntry ->
+                            val encodedToken = backStackEntry.arguments?.getString("token") ?: ""
+                            val token = if (encodedToken.isNotBlank())
+                                java.net.URLDecoder.decode(encodedToken, "UTF-8")
+                            else null
+                            ResetPasswordScreen(
+                                accessToken = token,
+                                viewModel = viewModel,
+                                onDone = {
+                                    navController.navigate("auth") {
+                                        popUpTo("home") { saveState = true }
+                                        launchSingleTop = true
+                                    }
+                                }
                             )
                         }
                         composable("profile") {

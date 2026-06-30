@@ -159,7 +159,15 @@ interface SupabaseAuthApi {
     @POST("auth/v1/recover")
     suspend fun recoverPassword(
         @Body request: RecoverRequest,
-        @Header("apikey") apiKey: String
+        @Header("apikey") apiKey: String,
+        @Query("redirect_to") redirectTo: String = "aniku://reset-password"
+    ): retrofit2.Response<Unit>
+
+    @PUT("auth/v1/user")
+    suspend fun updateUserPassword(
+        @Body request: UpdatePasswordRequest,
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authHeader: String
     ): retrofit2.Response<Unit>
 }
 

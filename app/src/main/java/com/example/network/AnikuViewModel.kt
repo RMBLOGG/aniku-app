@@ -1372,6 +1372,28 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun updatePasswordWithToken(accessToken: String, newPassword: String, onComplete: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseAuthApi.updateUserPassword(
+                    UpdatePasswordRequest(newPassword),
+                    SUPABASE_ANON_KEY,
+                    "Bearer $accessToken"
+                )
+                if (response.isSuccessful) {
+                    onComplete(true, null)
+                } else {
+                    val errBody = response.errorBody()?.string()
+                    Log.e("AnikuVM", "Update password failed: ${response.code()} - $errBody")
+                    onComplete(false, "Gagal update password (${response.code()})")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Update password exception", e)
+                onComplete(false, e.message)
+            }
+        }
+    }
+
     // Announcements management
     fun saveAnnouncement(annId: String?, title: String, message: String, active: Boolean, downloadUrl: String? = null) {
         val authHeader = getAuthHeader()
