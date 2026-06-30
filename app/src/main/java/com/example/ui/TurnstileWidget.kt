@@ -72,11 +72,12 @@ fun TurnstileWidget(
     }
 
     AndroidView(
-        modifier = modifier.height(72.dp),
+        modifier = modifier.height(1.dp),
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 webViewClient = WebViewClient()
                 addJavascriptInterface(object {
                     @JavascriptInterface
