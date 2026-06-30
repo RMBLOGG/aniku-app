@@ -671,7 +671,21 @@ private fun ChatBubble(
                 }
             }
 
-            Spacer(modifier = Modifier.height(1.dp))
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Bubble bulat buat isi pesan (reply preview, gambar, teks) - gaya kayak own bubble tapi neutral
+            val otherBubbleShape = RoundedCornerShape(
+                topStart = 6.dp,
+                topEnd = 16.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp
+            )
+            Column(
+                modifier = Modifier
+                    .clip(otherBubbleShape)
+                    .background(Color(0xFF2A2A2E).copy(alpha = 0.75f))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
 
             // Quoted reply preview
             if (!message.reply_to_message.isNullOrEmpty()) {
@@ -767,6 +781,7 @@ private fun ChatBubble(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
                 )
             }
+            } // tutup Column bubble bulat
 
             Text(
                 text = timeStr,
@@ -817,19 +832,18 @@ private fun OwnChatBubble(
         bottomEnd = 4.dp
     )
 
-    // Latar bubble: glass gradient (diagonal, tembus pandang)
+    // Latar bubble: glass transparan netral (bukan warna merah/primary)
     val bubbleBrush = Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
-            Color(0xFF7C4DFF).copy(alpha = 0.24f),
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            Color.White.copy(alpha = 0.10f),
+            Color.White.copy(alpha = 0.03f)
         )
     )
 
-    // Outline neon yang gerak (pakai shimmer yang udah ada)
+    // Outline tipis yang gerak, pakai netral (putih/abu) bukan warna merah
     val borderShimmer = rememberGlossyShimmer(durationMillis = 3000)
     val borderBrush = glossyBrush(
-        baseColors = listOf(MaterialTheme.colorScheme.primary, Color(0xFF7C4DFF)),
+        baseColors = listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.12f)),
         progress = borderShimmer
     )
 
@@ -886,10 +900,10 @@ private fun OwnChatBubble(
             Column(
                 modifier = Modifier
                     .shadow(
-                        elevation = 10.dp,
+                        elevation = 8.dp,
                         shape = bubbleShape,
-                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
+                        ambientColor = Color.Black.copy(alpha = 0.4f),
+                        spotColor = Color.White.copy(alpha = 0.18f)
                     )
                     .clip(bubbleShape)
                     .background(bubbleBrush)
