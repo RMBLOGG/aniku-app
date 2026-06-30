@@ -248,6 +248,44 @@ data class ChatMessage(
 )
 
 @JsonClass(generateAdapter = true)
+data class ProfileNumberDto(
+    val user_number: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ChatMessageWithProfile(
+    val id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val role: String? = "user",
+    val is_admin: Boolean? = false,
+    val message: String,
+    val created_at: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val reply_to_message: String? = null,
+    val image_url: String? = null,
+    val profiles: ProfileNumberDto? = null
+) {
+    fun toChatMessage() = ChatMessage(
+        id = id,
+        user_id = user_id,
+        username = username,
+        avatar_url = avatar_url,
+        role = role,
+        is_admin = is_admin,
+        user_number = profiles?.user_number,
+        message = message,
+        created_at = created_at,
+        reply_to_id = reply_to_id,
+        reply_to_username = reply_to_username,
+        reply_to_message = reply_to_message,
+        image_url = image_url
+    )
+}
+
+@JsonClass(generateAdapter = true)
 data class ChatMessageRequest(
     val user_id: String,
     val username: String,

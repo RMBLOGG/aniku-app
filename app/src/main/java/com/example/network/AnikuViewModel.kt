@@ -1688,7 +1688,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // API mengembalikan urutan terbaru dulu (desc) agar limit menangkap
                 // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
                 // supaya tampilan chat tetap normal dari atas ke bawah.
-                _chatMessages.value = messages.reversed()
+                _chatMessages.value = messages.map { it.toChatMessage() }.reversed()
             } catch (e: Exception) {
                 _chatError.value = "Gagal memuat pesan: ${e.message}"
             } finally {
