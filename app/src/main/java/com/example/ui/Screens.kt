@@ -5874,25 +5874,84 @@ fun AdminPanelScreen(
                                             Icon(Icons.Default.SwapHoriz, contentDescription = "Swap ID", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                                         }
                                         if (showSwapDialog) {
+                                            var swapSearchQuery by remember { mutableStateOf("") }
+                                            val swapTargets = remember(users, usr.id, swapSearchQuery) {
+                                                val base = users.filter { it.id != usr.id && it.user_number != null }
+                                                if (swapSearchQuery.isBlank()) base
+                                                else {
+                                                    val q = swapSearchQuery.trim().removePrefix("#")
+                                                    base.filter { t ->
+                                                        (t.username?.contains(q, ignoreCase = true) == true) ||
+                                                            (t.user_number?.toString()?.contains(q, ignoreCase = true) == true)
+                                                    }
+                                                }
+                                            }
                                             AlertDialog(
                                                 onDismissRequest = { showSwapDialog = false },
                                                 title = { Text("Tukar ID #${usr.user_number}") },
                                                 text = {
-                                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                                         Text("Pilih user untuk tukar ID dengan ${usr.username}:", fontSize = 13.sp)
-                                                        users.filter { it.id != usr.id && it.user_number != null }.forEach { target ->
-                                                            Button(
-                                                                onClick = {
-                                                                    viewModel.swapUserNumber(usr, target)
-                                                                    showSwapDialog = false
-                                                                },
-                                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                                                modifier = Modifier.fillMaxWidth()
+
+                                                        OutlinedTextField(
+                                                            value = swapSearchQuery,
+                                                            onValueChange = { swapSearchQuery = it },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            placeholder = { Text("Cari username atau #id...", fontSize = 12.sp) },
+                                                            leadingIcon = {
+                                                                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                            },
+                                                            trailingIcon = {
+                                                                if (swapSearchQuery.isNotEmpty()) {
+                                                                    IconButton(onClick = { swapSearchQuery = "" }) {
+                                                                        Icon(Icons.Default.Close, contentDescription = "Hapus", modifier = Modifier.size(14.dp))
+                                                                    }
+                                                                }
+                                                            },
+                                                            singleLine = true,
+                                                            shape = RoundedCornerShape(50),
+                                                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp),
+                                                            colors = OutlinedTextFieldDefaults.colors(
+                                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                                                            )
+                                                        )
+
+                                                        if (swapTargets.isEmpty()) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(vertical = 16.dp),
+                                                                contentAlignment = Alignment.Center
                                                             ) {
                                                                 Text(
-                                                                    "${target.username} (#${target.user_number})",
-                                                                    color = MaterialTheme.colorScheme.onSurface
+                                                                    "User tidak ditemukan",
+                                                                    fontSize = 12.sp,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                                                 )
+                                                            }
+                                                        } else {
+                                                            LazyColumn(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .heightIn(max = 320.dp),
+                                                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                                            ) {
+                                                                items(swapTargets, key = { it.id }) { target ->
+                                                                    Button(
+                                                                        onClick = {
+                                                                            viewModel.swapUserNumber(usr, target)
+                                                                            showSwapDialog = false
+                                                                        },
+                                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                                        modifier = Modifier.fillMaxWidth()
+                                                                    ) {
+                                                                        Text(
+                                                                            "${target.username} (#${target.user_number})",
+                                                                            color = MaterialTheme.colorScheme.onSurface
+                                                                        )
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     }
