@@ -399,40 +399,68 @@ fun AvatarCircle(avatarUrl: String?, username: String, size: Dp) {
 }
 
 @Composable
-fun ChipBadge(label: String, dotColor: Color) {
+fun DiamondDot(brush: Brush, size: Dp = 6.dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val s = size.toPx()
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(s / 2f, 0f)       // top
+            lineTo(s, s / 2f)         // right
+            lineTo(s / 2f, s)         // bottom
+            lineTo(0f, s / 2f)        // left
+            close()
+        }
+        drawPath(path = path, brush = brush)
+    }
+}
+
+@Composable
+fun ChipBadge(label: String, dotBrush: Brush, borderBrush: Brush, textColor: Color) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier
-            .border(0.5.dp, Color(0xFF333333), RoundedCornerShape(100.dp))
+            .border(0.5.dp, borderBrush, RoundedCornerShape(100.dp))
             .clip(RoundedCornerShape(100.dp))
-            .background(Color(0xFF1A1A1A))
-            .padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 2.dp)
+            .background(Color(0xFF111118))
+            .padding(start = 7.dp, end = 9.dp, top = 2.dp, bottom = 2.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(5.dp)
-                .clip(CircleShape)
-                .background(dotColor)
-        )
+        DiamondDot(brush = dotBrush, size = 6.dp)
         Text(
             text = label,
             fontSize = 7.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color(0xFFD4D4D8),
-            letterSpacing = 0.8.sp
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            letterSpacing = 1.sp
         )
     }
 }
 
 @Composable
 fun AdminBadge() {
-    ChipBadge(label = "ADMIN", dotColor = Color(0xFFEF4444))
+    ChipBadge(
+        label = "ADMIN",
+        dotBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFFFF4D4D), Color(0xFFFF0080))
+        ),
+        borderBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF7F1D1D), Color(0xFF9F1239))
+        ),
+        textColor = Color(0xFFFFADAD)
+    )
 }
 
 @Composable
 fun ModeratorBadge() {
-    ChipBadge(label = "MOD", dotColor = Color(0xFF7C3AED))
+    ChipBadge(
+        label = "Moderator",
+        dotBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF7C3AED), Color(0xFFDB2777))
+        ),
+        borderBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF4C1D95), Color(0xFF831843))
+        ),
+        textColor = Color(0xFFD8B4FE)
+    )
 }
 
 @Composable
