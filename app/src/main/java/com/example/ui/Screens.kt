@@ -58,6 +58,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PlayArrow
@@ -7125,7 +7127,7 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/EHKEVbk26x37GSjpLvd42B")))
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://chat.whatsapp.com/FPloru2UpCY4Os0rn5Rq03")))
                                     }
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -7883,7 +7885,6 @@ fun TopSupporterScreen(
     onBack: () -> Unit
 ) {
     val donations by viewModel.donations.collectAsState()
-    val accentColor = MaterialTheme.colorScheme.primary
 
     // Group by supporter_name dan jumlahkan total_amount
     val leaderboard = donations
@@ -7895,133 +7896,331 @@ fun TopSupporterScreen(
         viewModel.loadDonations()
     }
 
+    // Palet warna "perkamen emas" sesuai referensi redesign
+    val bg0 = Color(0xFF120F16)
+    val ivory = Color(0xFFF2EAD9)
+    val ivoryDim = Color(0xFFB9AD97)
+    val gold = Color(0xFFD8AD5F)
+    val goldSoft = Color(0xFFE9CB8E)
+    val brass = Color(0xFF8C724A)
+    val pewter = Color(0xFFABA599)
+    val copper = Color(0xFFA9633B)
+    val lineGold = gold.copy(alpha = 0.22f)
+    val lineDim = Color.White.copy(alpha = 0.06f)
+
+    val goldGradient = Brush.linearGradient(listOf(goldSoft, gold))
+    val silverGradient = Brush.linearGradient(listOf(Color(0xFFD8D2C2), pewter))
+    val bronzeGradient = Brush.linearGradient(listOf(Color(0xFFC98A5E), copper))
+
     Scaffold(
+        containerColor = bg0,
         topBar = {
             androidx.compose.material3.TopAppBar(
                 title = {
-                    Text("Top Supporter", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text("Top Supporter", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ivory)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = ivory)
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = bg0
                 )
             )
         }
     ) { padding ->
         if (leaderboard.isEmpty()) {
+            // ===== Empty state =====
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(bg0)
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("☕", fontSize = 48.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(horizontal = 40.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(62.dp)
+                            .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🏆", fontSize = 30.sp)
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         "Belum ada supporter",
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        fontSize = 15.sp
+                        color = ivory,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 17.sp
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         "Jadilah yang pertama support Aniku!",
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                        fontSize = 12.sp
+                        color = ivoryDim,
+                        fontSize = 12.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
         } else {
+            val top3 = leaderboard.take(3)
+            val rest = leaderboard.drop(3)
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                    .background(bg0)
+                    .padding(padding),
+                contentPadding = PaddingValues(bottom = 28.dp)
             ) {
-                // Header
+                // ===== Hero =====
                 item {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 10.dp, bottom = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("🏆", fontSize = 48.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(68.dp)
+                                .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🏆", fontSize = 32.sp)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             "Hall of Fame",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = Color(0xFFFFD700)
+                            fontSize = 26.sp,
+                            color = gold
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             "Terima kasih sudah support Aniku!",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            fontSize = 12.5.sp,
+                            color = ivoryDim
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-
-                itemsIndexed(leaderboard) { index, (name, total) ->
-                    val medal = when (index) {
-                        0 -> "🥇"
-                        1 -> "🥈"
-                        2 -> "🥉"
-                        else -> "${index + 1}."
-                    }
-                    val cardBg = when (index) {
-                        0 -> Color(0xFF2a2000)
-                        1 -> Color(0xFF1a1a1a)
-                        2 -> Color(0xFF1a1500)
-                        else -> MaterialTheme.colorScheme.surface
-                    }
-                    val nameColor = when (index) {
-                        0 -> Color(0xFFFFD700)
-                        1 -> Color(0xFFB0BEC5)
-                        2 -> Color(0xFFCD7F32)
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = cardBg),
-                        border = if (index == 0) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f)) else null
-                    ) {
-                        Row(
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .border(1.dp, lineGold, shape = RoundedCornerShape(50))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                medal,
-                                fontSize = if (index < 3) 24.sp else 16.sp,
-                                modifier = Modifier.width(40.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    name,
-                                    fontWeight = if (index < 3) FontWeight.Bold else FontWeight.Normal,
-                                    fontSize = 14.sp,
-                                    color = nameColor
-                                )
-                            }
-                            Text(
-                                formatRupiah(total),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = nameColor.copy(alpha = 0.8f)
+                                "TOTAL DUKUNGAN TERBESAR",
+                                fontSize = 9.5.sp,
+                                letterSpacing = 0.06.em,
+                                color = brass
                             )
                         }
                     }
                 }
+
+                // ===== Podium rank 1-3 =====
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp)
+                            .padding(top = 26.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        // Silver (kiri)
+                        if (top3.size > 1) {
+                            PodiumPlaque(
+                                modifier = Modifier.weight(1f),
+                                rank = 2,
+                                name = top3[1].first ?: "Anonim",
+                                amount = formatRupiah(top3[1].second),
+                                rankGradient = silverGradient,
+                                avatarGradient = silverGradient,
+                                borderColor = lineDim,
+                                nameColor = ivory,
+                                amountColor = ivoryDim,
+                                isGold = false
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+
+                        // Gold (tengah, lebih besar)
+                        PodiumPlaque(
+                            modifier = Modifier.weight(1.15f),
+                            rank = 1,
+                            name = top3[0].first ?: "Anonim",
+                            amount = formatRupiah(top3[0].second),
+                            rankGradient = goldGradient,
+                            avatarGradient = goldGradient,
+                            borderColor = gold.copy(alpha = 0.45f),
+                            nameColor = goldSoft,
+                            amountColor = gold,
+                            isGold = true
+                        )
+
+                        // Bronze (kanan)
+                        if (top3.size > 2) {
+                            PodiumPlaque(
+                                modifier = Modifier.weight(1f),
+                                rank = 3,
+                                name = top3[2].first ?: "Anonim",
+                                amount = formatRupiah(top3[2].second),
+                                rankGradient = bronzeGradient,
+                                avatarGradient = bronzeGradient,
+                                borderColor = lineDim,
+                                nameColor = ivory,
+                                amountColor = ivoryDim,
+                                isGold = false
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+
+                // Garis dasar podium
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 22.dp)
+                            .padding(top = 4.dp, bottom = 18.dp)
+                            .height(2.dp)
+                            .background(
+                                Brush.verticalGradient(listOf(lineGold, Color.Transparent))
+                            )
+                    )
+                }
+
+                // ===== Sisa daftar (rank 4+) =====
+                itemsIndexed(rest) { idx, (name, total) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 3.5.dp)
+                            .background(Color.White.copy(alpha = 0.025f), shape = RoundedCornerShape(13.dp))
+                            .border(1.dp, lineDim, shape = RoundedCornerShape(13.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${idx + 4}",
+                            fontSize = 12.5.sp,
+                            color = Color(0xFF736A82),
+                            modifier = Modifier.width(20.dp)
+                        )
+                        Text(
+                            name ?: "Anonim",
+                            fontSize = 12.5.sp,
+                            color = Color(0xFFCFC7DA),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            formatRupiah(total),
+                            fontSize = 12.5.sp,
+                            color = Color(0xFF9D93AB)
+                        )
+                    }
+                }
+
+                item {
+                    Text(
+                        "— akhir daftar —",
+                        fontSize = 10.5.sp,
+                        color = ivoryDim.copy(alpha = 0.45f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PodiumPlaque(
+    modifier: Modifier = Modifier,
+    rank: Int,
+    name: String,
+    amount: String,
+    rankGradient: Brush,
+    avatarGradient: Brush,
+    borderColor: Color,
+    nameColor: Color,
+    amountColor: Color,
+    isGold: Boolean
+) {
+    val avatarSize = if (isGold) 50.dp else 42.dp
+    val rankSize = if (isGold) 26.dp else 22.dp
+    Column(
+        modifier = modifier
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.045f), Color.White.copy(alpha = 0.015f))
+                ),
+                shape = RoundedCornerShape(18.dp)
+            )
+            .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
+            .padding(
+                top = if (isGold) 18.dp else 14.dp,
+                bottom = if (isGold) 16.dp else 12.dp,
+                start = 6.dp,
+                end = 6.dp
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(rankSize)
+                .background(rankGradient, shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "$rank",
+                fontSize = if (isGold) 12.sp else 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF120F16)
+            )
+        }
+        Spacer(modifier = Modifier.height(9.dp))
+        Box(
+            modifier = Modifier
+                .size(avatarSize)
+                .background(avatarGradient, shape = CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                name.trim().firstOrNull()?.uppercase() ?: "?",
+                fontSize = if (isGold) 18.sp else 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF120F16)
+            )
+        }
+        Spacer(modifier = Modifier.height(9.dp))
+        Text(
+            name,
+            fontSize = if (isGold) 13.5.sp else 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = nameColor,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            amount,
+            fontSize = if (isGold) 14.5.sp else 12.5.sp,
+            fontWeight = if (isGold) FontWeight.Bold else FontWeight.Normal,
+            color = amountColor
+        )
     }
 }
