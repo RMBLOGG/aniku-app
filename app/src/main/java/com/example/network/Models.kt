@@ -188,7 +188,9 @@ data class ProfileDto(
     val is_admin: Boolean? = false,
     val is_banned: Boolean? = false,
     val user_number: Int? = null,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val season_xp: Int? = 0,
+    val season_level: Int? = 1
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"
@@ -244,6 +246,7 @@ data class ChatMessage(
     val role: String? = "user",
     val is_admin: Boolean? = false,
     val user_number: Int? = null,
+    val season_level: Int? = null,
     val message: String,
     val created_at: String,
     val reply_to_id: String? = null,

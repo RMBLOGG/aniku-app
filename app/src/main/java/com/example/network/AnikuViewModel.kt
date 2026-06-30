@@ -1783,7 +1783,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     emptyMap()
                 }
                 val messages = messagesDeferred.map { msg ->
-                    msg.copy(user_number = profilesMap[msg.user_id]?.user_number)
+                    msg.copy(
+                        user_number = profilesMap[msg.user_id]?.user_number,
+                        season_level = profilesMap[msg.user_id]?.season_level
+                    )
                 }
                 // API mengembalikan urutan terbaru dulu (desc) agar limit menangkap
                 // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
@@ -1970,6 +1973,32 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun markDonationSeen() {
         _lastSeenDonationId.value = _donations.value.firstOrNull()?.id
+    }
+
+    // ─────────────── SEASON XP / LEVEL ───────────────
+    private val _seasonXp = MutableStateFlow(0)
+    val seasonXp: StateFlow<Int> = _seasonXp.asStateFlow()
+
+    private val _seasonLevel = MutableStateFlow(1)
+    val seasonLevel: StateFlow<Int> = _seasonLevel.asStateFlow()
+
+    // Ambil XP/level musim ini dari profile sendiri (dipanggil saat ProfileScreen dibuka)
+    fun loadSeasonProgress() {
+        viewModelScope.launch {
+            val uid = session.value.userId ?: return@launch
+            try {
+                val result = NetworkClient.supabaseDbApi.getProfileByUserId(
+                    idQuery = "eq.$uid",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val profile = result.firstOrNull()
+                _seasonXp.value = profile?.season_xp ?: 0
+                _seasonLevel.value = profile?.season_level ?: 1
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadSeasonProgress error: ${e.message}")
+            }
+        }
     }
 
     // ─────────────── SECURITY ───────────────

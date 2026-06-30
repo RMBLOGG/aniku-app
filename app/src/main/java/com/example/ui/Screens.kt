@@ -5584,9 +5584,16 @@ fun ProfileScreen(
     val sess by viewModel.session.collectAsState()
     val isDark by viewModel.isDark.collectAsState()
     val isUploading by viewModel.isUploadingAvatar.collectAsState()
+    val seasonXp by viewModel.seasonXp.collectAsState()
+    val seasonLevel by viewModel.seasonLevel.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadSeasonProgress()
+    }
+
 
     var usernameEditor by remember { mutableStateOf(sess.username ?: "") }
 
@@ -5669,6 +5676,59 @@ fun ProfileScreen(
             Text(text = "Sentuh Foto Untuk Mengubah", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 11.sp)
 
             Spacer(modifier = Modifier.height(30.dp))
+
+            // Season Level & XP progress
+            run {
+                val currentLevelBaseXp = 50 * (seasonLevel - 1) * (seasonLevel - 1)
+                val nextLevelXp = 50 * seasonLevel * seasonLevel
+                val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
+                val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
+                val progress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Level Musim Ini",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                "Lv.$seasonLevel",
+                                color = accentColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = accentColor,
+                            trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "$xpIntoLevel / $xpNeededForLevel XP ke Level ${seasonLevel + 1}",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // User Info Cards
             Card(

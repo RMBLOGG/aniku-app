@@ -167,6 +167,7 @@ private val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), C
 private val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
 private val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
 private val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
+private val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -645,6 +646,14 @@ private fun ChatBubble(
                     },
                     fontSize = 13.sp
                 )
+                message.season_level?.let { lvl ->
+                    GlossyGradientText(
+                        text = "Lv.$lvl",
+                        colors = levelGradientColors,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 message.user_number?.let { num ->
                     GlossyGradientText(
                         text = "#$num",
@@ -873,6 +882,14 @@ private fun OwnChatBubble(
                         colors = moderatorGradientColors,
                         fontSize = 10.sp,
                         letterSpacing = 0.4.sp
+                    )
+                }
+                message.season_level?.let { lvl ->
+                    GlossyGradientText(
+                        text = "Lv.$lvl",
+                        colors = levelGradientColors,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
                 message.user_number?.let { num ->
