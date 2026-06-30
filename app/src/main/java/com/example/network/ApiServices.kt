@@ -221,6 +221,13 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
+    @POST("rest/v1/rpc/toggle_user_ban")
+    suspend fun toggleUserBan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,

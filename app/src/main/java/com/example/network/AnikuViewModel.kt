@@ -1333,9 +1333,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         Log.d("AnikuVM", "Trying ban - token: ${session.value.token?.take(20)} userId: $userIdToModify")
         viewModelScope.launch {
             try {
-                val response = NetworkClient.supabaseDbApi.updateProfile(
-                    idQuery = "eq.$userIdToModify",
-                    profile = mapOf("is_banned" to newBanStatus),
+                // Pakai RPC khusus (security definer) biar moderator bisa ban
+                // tanpa punya akses UPDATE langsung ke tabel profiles (gak bisa ubah role/id).
+                val response = NetworkClient.supabaseDbApi.toggleUserBan(
+                    body = mapOf(
+                        "target_user_id" to userIdToModify,
+                        "new_ban_status" to newBanStatus
+                    ),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
