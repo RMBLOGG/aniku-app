@@ -151,32 +151,23 @@ class MainActivity : ComponentActivity() {
                 android.util.Log.d("FCM", "Subscribed to chat_updates")
             }
 
-        // Supabase taro token di URL fragment (#access_token=...&type=recovery|signup),
-        // bukan query param biasa, jadi harus diparse manual dari fragment-nya.
-        // Diparse duluan sebelum nentuin route, karena "type" yang nentuin ini
-        // link reset password atau link konfirmasi daftar (host-nya sama-sama "reset-password").
-        val authFragmentParams: Map<String, String> =
-            if (intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password") {
-                val fragment = intent.data?.fragment ?: intent.data?.encodedQuery
-                fragment?.split("&")
-                    ?.mapNotNull {
-                        val parts = it.split("=", limit = 2)
-                        if (parts.size == 2) parts[0] to parts[1] else null
-                    }
-                    ?.toMap() ?: emptyMap()
-            } else emptyMap()
-
-        val authLinkType = authFragmentParams["type"] // "recovery" atau "signup"
-        val resetAccessToken: String? = authFragmentParams["access_token"]
-
         // Handle deep link dari notifikasi
         val deepLinkRoute = when {
             intent?.data?.scheme == "aniku" && intent.data?.host == "feed" -> "feed"
             intent?.data?.scheme == "aniku" && intent.data?.host == "chat" -> "chat"
-            intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password" && authLinkType == "signup" -> "email_confirmed"
             intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password" -> "reset_password"
             else -> null
         }
+
+        // Supabase taro token di URL fragment (#access_token=...&type=recovery),
+        // bukan query param biasa, jadi harus diparse manual dari fragment-nya
+        val resetAccessToken: String? = if (deepLinkRoute == "reset_password") {
+            val fragment = intent?.data?.fragment ?: intent?.data?.encodedQuery
+            fragment?.split("&")
+                ?.map { it.split("=", limit = 2) }
+                ?.firstOrNull { it.size == 2 && it[0] == "access_token" }
+                ?.get(1)
+        } else null
 
         setContent {
             val isDark by viewModel.isDark.collectAsState()
@@ -220,30 +211,16 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                // Navigate ke deep link kalau ada (dari notifikasi / reset password / konfirmasi email)
+                // Navigate ke deep link kalau ada (dari notifikasi / reset password)
                 LaunchedEffect(deepLinkRoute) {
                     deepLinkRoute?.let {
-                        when (it) {
-                            "reset_password" -> {
-                                val encodedToken = java.net.URLEncoder.encode(resetAccessToken ?: "", "UTF-8")
-                                navController.navigate("reset_password?token=$encodedToken") {
-                                    popUpTo("home") { saveState = true }
-                                    launchSingleTop = true
-                                }
-                            }
-                            "email_confirmed" -> {
-                                viewModel.notifyEmailConfirmed()
-                                navController.navigate("auth") {
-                                    popUpTo("home") { saveState = true }
-                                    launchSingleTop = true
-                                }
-                            }
-                            else -> {
-                                navController.navigate(it) {
-                                    popUpTo("home") { saveState = true }
-                                    launchSingleTop = true
-                                }
-                            }
+                        val target = if (it == "reset_password") {
+                            val encodedToken = java.net.URLEncoder.encode(resetAccessToken ?: "", "UTF-8")
+                            "reset_password?token=$encodedToken"
+                        } else it
+                        navController.navigate(target) {
+                            popUpTo("home") { saveState = true }
+                            launchSingleTop = true
                         }
                     }
                 }

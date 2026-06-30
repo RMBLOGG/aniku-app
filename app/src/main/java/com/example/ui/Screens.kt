@@ -5310,10 +5310,7 @@ fun AuthScreen(
 
     val authLoading by viewModel.authLoading.collectAsState()
     val authError by viewModel.authError.collectAsState()
-    val registerInfoMessage by viewModel.registerInfoMessage.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
-    var captchaToken by remember { mutableStateOf<String?>(null) }
-    var registerAttempt by remember { mutableStateOf(0) }
 
     Box(
         modifier = Modifier
@@ -5386,9 +5383,6 @@ fun AuthScreen(
 
                     authError?.let { err ->
                         Text(text = err, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
-                    }
-                    registerInfoMessage?.let { info ->
-                        Text(text = info, color = Color(0xFF4CAF50), fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
                     }
 
                     // Email Field
@@ -5465,20 +5459,6 @@ fun AuthScreen(
                         }
                     }
 
-                    if (!isLoginTab) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        // key = registerAttempt biar widget reload & ambil token baru
-                        // tiap kali percobaan daftar sebelumnya gagal (token Turnstile sekali pakai).
-                        androidx.compose.runtime.key(registerAttempt) {
-                            TurnstileWidget(
-                                siteKey = com.example.network.TURNSTILE_SITE_KEY,
-                                modifier = Modifier.fillMaxWidth(),
-                                onToken = { token -> captchaToken = token },
-                                onError = { captchaToken = null }
-                            )
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Submission action
@@ -5487,18 +5467,13 @@ fun AuthScreen(
                             if (isLoginTab) {
                                 viewModel.login(email.trim(), password.trim(), onAuthSuccess)
                             } else {
-                                viewModel.register(email.trim(), password.trim(), username.trim(), captchaToken) {
-                                    onAuthSuccess()
-                                }
-                                // Token Turnstile cuma sekali pakai, reset & reload widget abis tiap submit.
-                                captchaToken = null
-                                registerAttempt++
+                                viewModel.register(email.trim(), password.trim(), username.trim(), onAuthSuccess)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(48.dp).testTag("auth_submit"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                        enabled = !authLoading && (isLoginTab || captchaToken != null)
+                        enabled = !authLoading
                     ) {
                         if (authLoading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))

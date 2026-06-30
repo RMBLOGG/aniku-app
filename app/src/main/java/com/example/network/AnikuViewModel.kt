@@ -255,10 +255,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
 
-    // Pesan info (bukan error) khusus buat hasil daftar, misal "cek email kamu"
-    private val _registerInfoMessage = MutableStateFlow<String?>(null)
-    val registerInfoMessage: StateFlow<String?> = _registerInfoMessage.asStateFlow()
-
     private val _isUploadingAvatar = MutableStateFlow(false)
     val isUploadingAvatar: StateFlow<Boolean> = _isUploadingAvatar.asStateFlow()
 
@@ -1160,39 +1156,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Dipanggil dari MainActivity pas user klik link konfirmasi email (type=signup)
-    // di luar app, baru balik lagi ke app lewat deep link.
-    fun notifyEmailConfirmed() {
-        _registerInfoMessage.value = "Email berhasil dikonfirmasi! Sekarang kamu bisa login."
-    }
-
-    fun register(email: String, password: String, username: String, captchaToken: String?, onSuccess: () -> Unit) {
+    fun register(email: String, password: String, username: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
-        _registerInfoMessage.value = null
-        if (captchaToken.isNullOrBlank()) {
-            _authLoading.value = false
-            _authError.value = "Verifikasi captcha belum selesai, tunggu sebentar lalu coba lagi."
-            return
-        }
         viewModelScope.launch {
             try {
                 val res = NetworkClient.supabaseAuthApi.signUp(
-                    request = SignUpRequest(
-                        email = email,
-                        password = password,
-                        data = SignUpData(username),
-                        gotrue_meta_security = GotrueMetaSecurity(captchaToken)
-                    ),
+                    request = SignUpRequest(email, password, SignUpData(username)),
                     apiKey = SUPABASE_ANON_KEY
                 )
                 val token = res.access_token
                 if (token == null) {
-                    // Email confirmation aktif di Supabase: akun udah kebuat,
-                    // tapi belum bisa login sampe user klik link konfirmasi di email.
-                    // Ini BUKAN error, jadi jangan ditaruh di _authError (yang warnanya merah).
+                    _authError.value = "Daftar gagal: Token sesi tidak valid."
                     _authLoading.value = false
-                    _registerInfoMessage.value = "Akun berhasil dibuat! Cek email kamu ($email) buat konfirmasi sebelum login."
                     return@launch
                 }
                 val uId = res.user?.id ?: ""
