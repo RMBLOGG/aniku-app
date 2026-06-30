@@ -515,7 +515,7 @@ private fun ChatBubble(
                 onClick = {},
                 onLongClick = { if (onDelete != null) showDeleteDialog = true }
             )
-            .padding(horizontal = 12.dp, vertical = 3.dp),
+            .padding(horizontal = 12.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.Start
     ) {
         // Avatar selalu di kiri (flat layout, gaya AniKme)
@@ -578,39 +578,21 @@ private fun ChatBubble(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (message.role == "admin" || message.is_admin == true) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "ADMIN",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                    Text(
+                        text = "ADMIN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFC107),
+                        letterSpacing = 0.4.sp
+                    )
                 } else if (message.role == "moderator") {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "MOD",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
+                    Text(
+                        text = "MODERATOR",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFB388FF),
+                        letterSpacing = 0.4.sp
+                    )
                 }
             }
 
@@ -713,9 +695,9 @@ private fun ChatBubble(
 
             Text(
                 text = timeStr,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = 1.dp)
             )
         }
     }
