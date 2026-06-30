@@ -1160,6 +1160,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Dipanggil dari MainActivity pas user klik link konfirmasi email (type=signup)
+    // di luar app, baru balik lagi ke app lewat deep link.
+    fun notifyEmailConfirmed() {
+        _registerInfoMessage.value = "Email berhasil dikonfirmasi! Sekarang kamu bisa login."
+    }
+
     fun register(email: String, password: String, username: String, captchaToken: String?, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
