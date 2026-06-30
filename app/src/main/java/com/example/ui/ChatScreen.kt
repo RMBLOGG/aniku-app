@@ -808,20 +808,30 @@ private fun OwnChatBubble(
     modifier: Modifier = Modifier
 ) {
     var showFullImage by remember { mutableStateOf(false) }
-    val bubbleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
 
-    val nameColor = when {
-        message.role == "admin" || message.is_admin == true -> Color(0xFFFF6B6B)
-        message.role == "moderator" -> Color(0xFFB388FF)
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    val nameGradient = when {
-        message.role == "admin" || message.is_admin == true ->
-            Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
-        message.role == "moderator" ->
-            Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
-        else -> null
-    }
+    // Shape khas futuristik: sudut tajam di tiga sisi, satu sudut "ekor" kecil
+    val bubbleShape = RoundedCornerShape(
+        topStart = 18.dp,
+        topEnd = 18.dp,
+        bottomStart = 18.dp,
+        bottomEnd = 4.dp
+    )
+
+    // Latar bubble: glass gradient (diagonal, tembus pandang)
+    val bubbleBrush = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.38f),
+            Color(0xFF7C4DFF).copy(alpha = 0.24f),
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        )
+    )
+
+    // Outline neon yang gerak (pakai shimmer yang udah ada)
+    val borderShimmer = rememberGlossyShimmer(durationMillis = 3000)
+    val borderBrush = glossyBrush(
+        baseColors = listOf(MaterialTheme.colorScheme.primary, Color(0xFF7C4DFF)),
+        progress = borderShimmer
+    )
 
     Row(
         modifier = modifier,
@@ -875,18 +885,31 @@ private fun OwnChatBubble(
 
             Column(
                 modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 14.dp,
-                            topEnd = 14.dp,
-                            bottomStart = 14.dp,
-                            bottomEnd = 4.dp
-                        )
+                    .shadow(
+                        elevation = 10.dp,
+                        shape = bubbleShape,
+                        ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                        spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
                     )
-                    .background(bubbleColor)
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                    .clip(bubbleShape)
+                    .background(bubbleBrush)
+                    .border(1.2.dp, borderBrush, bubbleShape)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.End
             ) {
+                // Strip kilau halus di atas bubble (kesan kaca)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color.White.copy(alpha = 0.5f), Color.Transparent)
+                            )
+                        )
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+
                 // Quoted reply preview
                 if (!message.reply_to_message.isNullOrEmpty()) {
                     Row(
