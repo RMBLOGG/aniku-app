@@ -5732,6 +5732,15 @@ fun AdminPanelScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 15.sp
                                                 )
+                                                usr.user_number?.let { num ->
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "#$num",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                                    )
+                                                }
                                                 if (usr.isAdmin()) {
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     AdminBadge()
@@ -5795,6 +5804,46 @@ fun AdminPanelScreen(
                                                 color = if (isBanned) Color(0xFF4CAF50) else Color(0xFFFF5252),
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
+                                            )
+                                        }
+
+                                        // Swap ID button - hanya admin
+                                        var showSwapDialog by remember { mutableStateOf(false) }
+                                        if (sess.isAdmin) IconButton(
+                                            onClick = { showSwapDialog = true },
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        ) {
+                                            Icon(Icons.Default.SwapHoriz, contentDescription = "Swap ID", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                        }
+                                        if (showSwapDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showSwapDialog = false },
+                                                title = { Text("Tukar ID #${usr.user_number}") },
+                                                text = {
+                                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        Text("Pilih user untuk tukar ID dengan ${usr.username}:", fontSize = 13.sp)
+                                                        users.filter { it.id != usr.id && it.user_number != null }.forEach { target ->
+                                                            Button(
+                                                                onClick = {
+                                                                    viewModel.swapUserNumber(usr, target)
+                                                                    showSwapDialog = false
+                                                                },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Text(
+                                                                    "${target.username} (#${target.user_number})",
+                                                                    color = MaterialTheme.colorScheme.onSurface
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                confirmButton = {},
+                                                dismissButton = { TextButton(onClick = { showSwapDialog = false }) { Text("Batal") } }
                                             )
                                         }
 
@@ -6381,12 +6430,25 @@ fun SettingsScreen(
                                     }
                                     Spacer(modifier = Modifier.width(14.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = sess.username ?: sess.email ?: "Pengguna",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = sess.username ?: sess.email ?: "Pengguna",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            sess.userNumber?.let { num ->
+                                                Text(
+                                                    text = "#$num",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             when {
                                                 sess.isAdmin -> AdminBadge()

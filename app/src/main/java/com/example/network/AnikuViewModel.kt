@@ -1086,7 +1086,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
-                    isBanned = profile?.is_banned ?: false
+                    isBanned = profile?.is_banned ?: false,
+                    userNumber = profile?.user_number
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -1138,7 +1139,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
-                    isBanned = profile?.is_banned ?: false
+                    isBanned = profile?.is_banned ?: false,
+                    userNumber = profile?.user_number
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -1288,6 +1290,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
             } catch (e: java.lang.Exception) {
                 _banStatusMessage.value = "Error: ${e.message}"
                 Log.e("AnikuVM", "Failed updating ban for $userIdToModify", e)
+            }
+        }
+    }
+
+    fun swapUserNumber(profileA: ProfileDto, profileB: ProfileDto) {
+        if (!session.value.isAdmin) return
+        val authHeader = getAuthHeader()
+        val numA = profileA.user_number ?: return
+        val numB = profileB.user_number ?: return
+        viewModelScope.launch {
+            try {
+                // Temp set A to -1 to avoid unique conflict
+                NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.${profileA.id}",
+                    profile = mapOf("user_number" to -1),
+                    authHeader = authHeader, apiKey = SUPABASE_ANON_KEY
+                )
+                // Set B to A's number
+                NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.${profileB.id}",
+                    profile = mapOf("user_number" to numA),
+                    authHeader = authHeader, apiKey = SUPABASE_ANON_KEY
+                )
+                // Set A to B's number
+                NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.${profileA.id}",
+                    profile = mapOf("user_number" to numB),
+                    authHeader = authHeader, apiKey = SUPABASE_ANON_KEY
+                )
+                _banStatusMessage.value = "ID #$numA ↔ #$numB berhasil ditukar"
+                loadAdminDetails()
+            } catch (e: Exception) {
+                _banStatusMessage.value = "Gagal tukar ID: ${e.message}"
             }
         }
     }
@@ -1695,6 +1730,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             avatar_url = currentSession.avatarUrl,
                             role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                             is_admin = currentSession.isAdmin,
+                            user_number = currentSession.userNumber,
                             message = trimmed,
                             reply_to_id = replyToId,
                             reply_to_username = replyToUsername,

@@ -545,6 +545,14 @@ private fun ChatBubble(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    message.user_number?.let { num ->
+                        Text(
+                            text = "#$num",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                    }
                     if (message.role == "admin" || message.is_admin == true) {
                         AdminBadge()
                     } else if (message.role == "moderator") {

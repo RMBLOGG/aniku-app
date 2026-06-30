@@ -28,6 +28,7 @@ class SettingsStore(private val context: Context) {
         val USERNAME = stringPreferencesKey("username")
         val AVATAR_URL = stringPreferencesKey("avatar_url")
         val IS_ADMIN = booleanPreferencesKey("is_admin")
+        val USER_NUMBER = intPreferencesKey("user_number")
         val IS_MODERATOR = booleanPreferencesKey("is_moderator")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
@@ -79,7 +80,8 @@ class SettingsStore(private val context: Context) {
             avatarUrl = preferences[AVATAR_URL],
             isAdmin = preferences[IS_ADMIN] ?: false,
             isModerator = preferences[IS_MODERATOR] ?: false,
-            isBanned = preferences[IS_BANNED] ?: false
+            isBanned = preferences[IS_BANNED] ?: false,
+            userNumber = preferences[USER_NUMBER]
         )
     }
 
@@ -142,6 +144,7 @@ class SettingsStore(private val context: Context) {
             preferences[IS_ADMIN] = session.isAdmin
             preferences[IS_MODERATOR] = session.isModerator
             preferences[IS_BANNED] = session.isBanned
+            session.userNumber?.let { preferences[USER_NUMBER] = it }
         }
     }
 
@@ -156,6 +159,7 @@ class SettingsStore(private val context: Context) {
             preferences.remove(IS_ADMIN)
             preferences.remove(IS_MODERATOR)
             preferences.remove(IS_BANNED)
+            preferences.remove(USER_NUMBER)
         }
     }
 
@@ -191,7 +195,8 @@ data class UserSession(
     val avatarUrl: String?,
     val isAdmin: Boolean,
     val isModerator: Boolean = false,
-    val isBanned: Boolean
+    val isBanned: Boolean,
+    val userNumber: Int? = null
 ) {
     fun canModerate() = isAdmin || isModerator
 }
