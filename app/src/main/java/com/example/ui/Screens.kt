@@ -7949,7 +7949,12 @@ fun TopSupporterScreen(
                             .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🏆", fontSize = 30.sp)
+                        Icon(
+                            Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFF120F16),
+                            modifier = Modifier.size(30.dp)
+                        )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -7987,13 +7992,29 @@ fun TopSupporterScreen(
                             .padding(top = 10.dp, bottom = 4.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        val trophyFloat = rememberInfiniteTransition(label = "trophy_float")
+                        val trophyOffsetY by trophyFloat.animateFloat(
+                            initialValue = 0f,
+                            targetValue = -5f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(durationMillis = 2250, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "trophy_offset"
+                        )
                         Box(
                             modifier = Modifier
                                 .size(68.dp)
+                                .offset(y = trophyOffsetY.dp)
                                 .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("🏆", fontSize = 32.sp)
+                            Icon(
+                            Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = Color(0xFF120F16),
+                            modifier = Modifier.size(32.dp)
+                        )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -8046,7 +8067,8 @@ fun TopSupporterScreen(
                                 borderColor = lineDim,
                                 nameColor = ivory,
                                 amountColor = ivoryDim,
-                                isGold = false
+                                isGold = false,
+                                delayMillis = 300
                             )
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
@@ -8063,7 +8085,8 @@ fun TopSupporterScreen(
                             borderColor = gold.copy(alpha = 0.45f),
                             nameColor = goldSoft,
                             amountColor = gold,
-                            isGold = true
+                            isGold = true,
+                            delayMillis = 150
                         )
 
                         // Bronze (kanan)
@@ -8078,7 +8101,8 @@ fun TopSupporterScreen(
                                 borderColor = lineDim,
                                 nameColor = ivory,
                                 amountColor = ivoryDim,
-                                isGold = false
+                                isGold = false,
+                                delayMillis = 450
                             )
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
@@ -8102,6 +8126,19 @@ fun TopSupporterScreen(
 
                 // ===== Sisa daftar (rank 4+) =====
                 itemsIndexed(rest) { idx, (name, total) ->
+                    var rowVisible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(550L + idx * 60L)
+                        rowVisible = true
+                    }
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = rowVisible,
+                        enter = androidx.compose.animation.fadeIn(animationSpec = tween(450)) +
+                            androidx.compose.animation.slideInVertically(
+                                animationSpec = tween(450),
+                                initialOffsetY = { it / 4 }
+                            )
+                    ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -8128,6 +8165,7 @@ fun TopSupporterScreen(
                             fontSize = 12.5.sp,
                             color = Color(0xFF9D93AB)
                         )
+                    }
                     }
                 }
 
@@ -8158,10 +8196,26 @@ private fun PodiumPlaque(
     borderColor: Color,
     nameColor: Color,
     amountColor: Color,
-    isGold: Boolean
+    isGold: Boolean,
+    delayMillis: Int = 0
 ) {
     val avatarSize = if (isGold) 50.dp else 42.dp
     val rankSize = if (isGold) 26.dp else 22.dp
+
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(delayMillis.toLong())
+        visible = true
+    }
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.fadeIn(animationSpec = tween(600)) +
+            androidx.compose.animation.slideInVertically(
+                animationSpec = tween(600),
+                initialOffsetY = { it / 6 }
+            )
+    ) {
     Column(
         modifier = modifier
             .background(
@@ -8185,11 +8239,16 @@ private fun PodiumPlaque(
                 .background(rankGradient, shape = CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                "$rank",
-                fontSize = if (isGold) 12.sp else 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF120F16)
+            val rankIcon = when (rank) {
+                1 -> Icons.Default.EmojiEvents
+                2 -> Icons.Default.MilitaryTech
+                else -> Icons.Default.WorkspacePremium
+            }
+            Icon(
+                rankIcon,
+                contentDescription = "Peringkat $rank",
+                tint = Color(0xFF120F16),
+                modifier = Modifier.size(if (isGold) 14.dp else 12.dp)
             )
         }
         Spacer(modifier = Modifier.height(9.dp))
@@ -8222,5 +8281,6 @@ private fun PodiumPlaque(
             fontWeight = if (isGold) FontWeight.Bold else FontWeight.Normal,
             color = amountColor
         )
+    }
     }
 }
