@@ -513,6 +513,7 @@ fun ChatScreen(
                             ChatBubble(
                                 message = message,
                                 isOwnMessage = isOwn,
+                                navController = navController,
                                 onReply = if (isLoggedIn) { { replyTarget = message } } else null,
                                 onDelete = if (isOwn || session.canModerate()) {
                                     { viewModel.deleteChatMessage(message.id) }
@@ -532,6 +533,7 @@ fun ChatScreen(
 private fun ChatBubble(
     message: ChatMessage,
     isOwnMessage: Boolean,
+    navController: NavController,
     onReply: (() -> Unit)?,
     onDelete: (() -> Unit)?
 ) {
@@ -595,6 +597,7 @@ private fun ChatBubble(
         OwnChatBubble(
             message = message,
             timeStr = timeStr,
+            navController = navController,
             modifier = dragModifier
         )
     } else {
@@ -830,6 +833,7 @@ private fun ChatBubble(
 private fun OwnChatBubble(
     message: ChatMessage,
     timeStr: String,
+    navController: NavController,
     modifier: Modifier = Modifier
 ) {
     var showFullImage by remember { mutableStateOf(false) }
