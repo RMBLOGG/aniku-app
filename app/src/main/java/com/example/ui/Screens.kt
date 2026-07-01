@@ -3814,6 +3814,40 @@ fun WatchScreen(
         }
     }
 
+    // XP nonton untuk sumber WebView (Mega/Filedon/Wibufile/dll) — pendekatan wall-clock,
+    // karena WebView gak expose durasi/posisi video asli seperti ExoPlayer.
+    // Dihitung sekali per episode, jalan hanya kalau bukan direct stream dan user udah tap play.
+    // Timer pause otomatis saat app di background (lifecycle ON_PAUSE), biar gak bisa "curang"
+    // cuma buka lalu tinggal — walau tetap gak 100% akurat, ini cukup untuk anti-abuse dasar.
+    if (!isDirectStream) {
+        var webviewWatchXpReported by remember(currentEpisodeSlug) { mutableStateOf(false) }
+        val wvLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        var isScreenActive by remember { mutableStateOf(true) }
+        DisposableEffect(wvLifecycleOwner) {
+            val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_RESUME -> isScreenActive = true
+                    androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> isScreenActive = false
+                    else -> {}
+                }
+            }
+            wvLifecycleOwner.lifecycle.addObserver(obs)
+            onDispose { wvLifecycleOwner.lifecycle.removeObserver(obs) }
+        }
+
+        LaunchedEffect(currentEpisodeSlug, userStartedPlayback) {
+            if (!userStartedPlayback || webviewWatchXpReported) return@LaunchedEffect
+            var watchedSeconds = 0
+            val targetSeconds = 5 * 60 // 5 menit
+            while (watchedSeconds < targetSeconds) {
+                kotlinx.coroutines.delay(1_000)
+                if (isScreenActive) watchedSeconds++
+            }
+            webviewWatchXpReported = true
+            viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
+        }
+    }
+
     val activity = LocalContext.current as? android.app.Activity
     var isFullscreen by remember { mutableStateOf(false) }
 
