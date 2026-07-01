@@ -184,6 +184,7 @@ data class ProfileDto(
     val id: String,
     val username: String? = null,
     val avatar_url: String? = null,
+    val banner_url: String? = null,
     val role: String? = "user",
     val is_admin: Boolean? = false,
     val is_banned: Boolean? = false,

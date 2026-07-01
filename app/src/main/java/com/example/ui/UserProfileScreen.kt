@@ -102,8 +102,20 @@ fun UserProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(20.dp)
         ) {
+            // Banner (read-only)
+            if (!p.banner_url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = p.banner_url,
+                    contentDescription = "Banner",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(3f)
+                )
+            }
+
+            Column(modifier = Modifier.padding(20.dp)) {
             // Avatar & identitas
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 if (!p.avatar_url.isNullOrBlank()) {
@@ -281,6 +293,7 @@ fun UserProfileScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(if (isBanned) "Aktifkan Kembali User" else "Banned User")
                 }
+            }
             }
         }
     }

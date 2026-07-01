@@ -1292,6 +1292,63 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun uploadBanner(uri: Uri, onProgress: (Boolean) -> Unit) {
+        val sess = session.value
+        val token = sess.token ?: return
+        val uId = sess.userId ?: return
+        _isUploadingBanner.value = true
+        onProgress(true)
+        viewModelScope.launch {
+            try {
+                // 1. Baca bytes dari URI (bisa jpg/png/gif, semua ditangani sama sebagai bytes mentah)
+                val contentResolver = appContext.contentResolver
+                val inputStream = contentResolver.openInputStream(uri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(1024)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+
+                // 2. Siapkan multipart request, deteksi GIF dari signature file biar Cloudinary
+                // tidak strip animasinya (nama file & content-type disesuaikan)
+                val isGif = fileBytes.size > 3 &&
+                    fileBytes[0] == 'G'.code.toByte() &&
+                    fileBytes[1] == 'I'.code.toByte() &&
+                    fileBytes[2] == 'F'.code.toByte()
+                val mimeType = if (isGif) "image/gif" else "image/*"
+                val fileName = if (isGif) "banner.gif" else "banner.jpg"
+                val requestFile = fileBytes.toRequestBody(mimeType.toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", fileName, requestFile)
+                val presetBody = "aniku_banner".toRequestBody("text/plain".toMediaTypeOrNull())
+
+                // 3. Upload ke Cloudinary preset khusus banner (unsigned)
+                val cloudinaryRes = NetworkClient.cloudinaryApi.uploadAvatar(body, presetBody)
+                val secureUrl = cloudinaryRes.secure_url
+
+                // 4. Simpan url ke kolom banner_url di Supabase
+                NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.$uId",
+                    profile = mapOf("banner_url" to secureUrl),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+
+                _ownBannerUrl.value = secureUrl
+                _isUploadingBanner.value = false
+                onProgress(false)
+            } catch (e: java.lang.Exception) {
+                _isUploadingBanner.value = false
+                onProgress(false)
+                Log.e("AnikuVM", "Cloudinary banner upload failed", e)
+            }
+        }
+    }
+
     fun logout(onComplete: () -> Unit) {
         viewModelScope.launch {
             settingsStore.clearSession()
@@ -1982,7 +2039,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _seasonLevel = MutableStateFlow(1)
     val seasonLevel: StateFlow<Int> = _seasonLevel.asStateFlow()
 
-    // Ambil XP/level musim ini dari profile sendiri (dipanggil saat ProfileScreen dibuka)
+    private val _ownBannerUrl = MutableStateFlow<String?>(null)
+    val ownBannerUrl: StateFlow<String?> = _ownBannerUrl.asStateFlow()
+
+    private val _isUploadingBanner = MutableStateFlow(false)
+    val isUploadingBanner: StateFlow<Boolean> = _isUploadingBanner.asStateFlow()
+
+    // Ambil XP/level/banner musim ini dari profile sendiri (dipanggil saat ProfileScreen dibuka)
     fun loadSeasonProgress() {
         viewModelScope.launch {
             val uid = session.value.userId ?: return@launch
@@ -1997,6 +2060,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val profile = result.firstOrNull()
                 _seasonXp.value = profile?.season_xp ?: 0
                 _seasonLevel.value = profile?.season_level ?: 1
+                _ownBannerUrl.value = profile?.banner_url
             } catch (e: Exception) {
                 Log.e("AnikuVM", "loadSeasonProgress error: ${e.message}")
             }

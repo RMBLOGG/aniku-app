@@ -1,9 +1,12 @@
 package com.example
 
 import android.app.Application
+import android.os.Build
 import androidx.work.*
 import coil.Coil
 import coil.ImageLoader
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import okhttp3.OkHttpClient
@@ -29,6 +32,15 @@ class AnikuApp : Application() {
                     .directory(File(cacheDir, "image_cache"))
                     .maxSizeBytes(150L * 1024 * 1024) // 150 MB
                     .build()
+            }
+            .components {
+                // GIF animasi (misal banner profil): ImageDecoderDecoder lebih baru & performa
+                // lebih baik di Android 9+ (API 28), GifDecoder buat versi di bawahnya.
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
             }
             .crossfade(true) // animasi fade saat gambar muncul
             .build()

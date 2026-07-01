@@ -5626,6 +5626,8 @@ fun ProfileScreen(
     val isUploading by viewModel.isUploadingAvatar.collectAsState()
     val seasonXp by viewModel.seasonXp.collectAsState()
     val seasonLevel by viewModel.seasonLevel.collectAsState()
+    val ownBannerUrl by viewModel.ownBannerUrl.collectAsState()
+    val isUploadingBanner by viewModel.isUploadingBanner.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -5644,6 +5646,18 @@ fun ProfileScreen(
             viewModel.uploadAvatar(uri) { processing ->
                 if (!processing) {
                     Toast.makeText(context, "Avatar berhasil diunggah!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val bannerPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.uploadBanner(uri) { processing ->
+                if (!processing) {
+                    Toast.makeText(context, "Banner berhasil diunggah!", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -5670,6 +5684,56 @@ fun ProfileScreen(
                 text = "Profil Pengguna",
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        // Banner profil (rasio 3:1, tap buat ganti)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(3f)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { bannerPickerLauncher.launch("image/*") }
+        ) {
+            if (!ownBannerUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = ownBannerUrl,
+                    contentDescription = "Banner",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "Tap untuk tambah banner",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            if (isUploadingBanner) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+            Icon(
+                Icons.Default.Edit,
+                contentDescription = "Ganti banner",
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(20.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    .padding(4.dp)
             )
         }
 
