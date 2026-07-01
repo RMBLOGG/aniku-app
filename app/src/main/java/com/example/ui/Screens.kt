@@ -5617,9 +5617,61 @@ fun AuthScreen(
 // ================================================================
 
 @Composable
+private fun ProfileInfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    iconBg: Color,
+    label: String,
+    sub: String? = null,
+    trailingText: String? = null,
+    onClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(15.dp))
+            }
+            Spacer(modifier = Modifier.width(11.dp))
+            Column {
+                Text(label, color = MaterialTheme.colorScheme.onBackground, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+                if (sub != null) {
+                    Text(sub, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f), fontSize = 11.sp)
+                }
+            }
+        }
+        if (trailingText != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(trailingText, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f), fontSize = 12.5.sp)
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun ProfileScreen(
     viewModel: AnikuViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToSecurity: () -> Unit = {}
 ) {
     val sess by viewModel.session.collectAsState()
     val isDark by viewModel.isDark.collectAsState()
@@ -5629,13 +5681,13 @@ fun ProfileScreen(
     val ownBannerUrl by viewModel.ownBannerUrl.collectAsState()
     val isUploadingBanner by viewModel.isUploadingBanner.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    // Aksen kedua khusus buat gradient (ring avatar, progress bar, role pill) — bukan warna baru buat elemen lain
+    val goldAccent = Color(0xFFFFC24B)
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.loadSeasonProgress()
     }
-
 
     var usernameEditor by remember { mutableStateOf(sess.username ?: "") }
 
@@ -5663,12 +5715,30 @@ fun ProfileScreen(
         }
     }
 
+    // Progress level musim ini — dianimasikan dari 0 ke target setiap kali screen muncul / datanya berubah
+    val currentLevelBaseXp = 20 * (seasonLevel - 1) * (seasonLevel - 1)
+    val nextLevelXp = 20 * seasonLevel * seasonLevel
+    val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
+    val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
+    val targetProgress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
+
+    var progressAnimStarted by remember { mutableStateOf(false) }
+    val animatedProgress by animateFloatAsState(
+        targetValue = if (progressAnimStarted) targetProgress else 0f,
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "level_progress_anim"
+    )
+    LaunchedEffect(targetProgress) {
+        progressAnimStarted = true
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
     ) {
-        // Toolbar header elevation
+        // Toolbar header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -5687,17 +5757,20 @@ fun ProfileScreen(
             )
         }
 
-        // Banner profil (rasio 3:1, tap buat ganti)
+        // ── Banner profil (tap buat ganti) dengan fade gradient ke background ──
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(3f)
+                .aspectRatio(2.6f)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { bannerPickerLauncher.launch("image/*") }
         ) {
             if (!ownBannerUrl.isNullOrEmpty()) {
                 AsyncImage(
-                    model = ownBannerUrl,
+                    model = ImageRequest.Builder(context)
+                        .data(ownBannerUrl)
+                        .crossfade(true)
+                        .build(),
                     contentDescription = "Banner",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -5714,6 +5787,20 @@ fun ProfileScreen(
                     )
                 }
             }
+
+            // Fade dari transparan (atas) ke warna background (bawah) supaya transisi ke konten halus
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.35f to Color.Transparent,
+                            0.78f to MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
+                            1f to MaterialTheme.colorScheme.background
+                        )
+                    )
+            )
+
             if (isUploadingBanner) {
                 Box(
                     modifier = Modifier
@@ -5724,178 +5811,304 @@ fun ProfileScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp))
                 }
             }
+
             Icon(
                 Icons.Default.Edit,
                 contentDescription = "Ganti banner",
                 tint = Color.White,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(8.dp)
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
                     .size(20.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                    .padding(4.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(11.dp))
+                    .padding(6.dp)
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Interactive user Avatar
-            Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable { photoPickerLauncher.launch("image/*") },
-                contentAlignment = Alignment.Center
-            ) {
-                if (sess.avatarUrl.isNullOrEmpty()) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(48.dp))
-                } else {
-                    AsyncImage(
-                        model = sess.avatarUrl,
-                        contentDescription = "Avatar",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                // Loader overlay during Cloudinary uploads
-                if (isUploading) {
+        // ── Blok identitas: avatar overlap banner + username/role/email jadi satu blok ──
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                // Avatar dengan ring gradient, ditarik naik nutupin bagian bawah banner
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .offset(y = (-48).dp)
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.6f)),
+                            .clip(CircleShape)
+                            .background(Brush.sweepGradient(listOf(accentColor, goldAccent, accentColor)))
+                            .padding(2.5.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(3.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { photoPickerLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = accentColor, modifier = Modifier.size(24.dp))
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = "Sentuh Foto Untuk Mengubah", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), fontSize = 11.sp)
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            // Season Level & XP progress
-            run {
-                val currentLevelBaseXp = 20 * (seasonLevel - 1) * (seasonLevel - 1)
-                val nextLevelXp = 20 * seasonLevel * seasonLevel
-                val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
-                val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
-                val progress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
-
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Level Musim Ini",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                fontSize = 12.sp
+                        if (sess.avatarUrl.isNullOrEmpty()) {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(38.dp)
                             )
-                            Text(
-                                "Lv.$seasonLevel",
-                                color = accentColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                        } else {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(sess.avatarUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                            color = accentColor,
-                            trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        if (isUploading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                            }
+                        }
+                    }
+
+                    // Badge kecil buat ganti avatar
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(accentColor)
+                            .border(2.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                            .clickable { photoPickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Ganti avatar", tint = Color.White, modifier = Modifier.size(12.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Username + UID + role pill jadi satu blok identitas
+                Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            "$xpIntoLevel / $xpNeededForLevel XP ke Level ${seasonLevel + 1}",
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            fontSize = 11.sp
+                            text = sess.username ?: "-",
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        sess.userNumber?.let { num ->
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "#$num",
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    if (sess.isAdmin || sess.isModerator) {
+                        Spacer(modifier = Modifier.height(7.dp))
+                        val roleColor = if (sess.isAdmin) accentColor else Color(0xFF7C4DFF)
+                        val roleText = if (sess.isAdmin) "ADMINISTRATOR" else "MODERATOR"
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Brush.linearGradient(listOf(roleColor.copy(alpha = 0.16f), goldAccent.copy(alpha = 0.10f))))
+                                .border(1.dp, roleColor.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 11.dp, vertical = 5.dp)
+                        ) {
+                            Icon(Icons.Default.Star, contentDescription = null, tint = goldAccent, modifier = Modifier.size(11.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(text = roleText, color = roleColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(9.dp))
+            Text(
+                text = sess.email ?: "-",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
 
-            // User Info Cards
+        // ── Konten: level card, edit profil, akun, logout ──
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 18.dp, bottom = 26.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+
+            // Card level musim ini — progress bar gradient teranimasi
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Email", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Text(text = sess.email ?: "-", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Level Musim Ini",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(accentColor.copy(alpha = 0.12f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accentColor))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Lv.$seasonLevel", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction = animatedProgress.coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(Brush.horizontalGradient(listOf(accentColor, goldAccent)))
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(9.dp))
+                    Text(
+                        "$xpIntoLevel / $xpNeededForLevel XP ke Level ${seasonLevel + 1}",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                        fontSize = 11.sp
+                    )
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+            // Section: Edit Profil
+            Text(
+                "EDIT PROFIL",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                modifier = Modifier.padding(start = 2.dp)
+            )
 
-                    Text("Nama Pengguna (Username)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        "NAMA PENGGUNA",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(9.dp))
                     TextField(
                         value = usernameEditor,
                         onValueChange = { usernameEditor = it },
                         modifier = Modifier.fillMaxWidth().testTag("profile_username_input"),
+                        shape = RoundedCornerShape(13.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedIndicatorColor = Color.Transparent,
+                            focusedIndicatorColor = accentColor,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Button(
-                        onClick = {
-                            viewModel.updateProfileUsername(usernameEditor) {
-                                Toast.makeText(context, "Username berhasil diubah!", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth().testTag("profile_save_btn")
-                    ) {
-                        Text("Simpan Perubahan", fontWeight = FontWeight.Bold)
+            Button(
+                onClick = {
+                    viewModel.updateProfileUsername(usernameEditor) {
+                        Toast.makeText(context, "Username berhasil diubah!", Toast.LENGTH_SHORT).show()
                     }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("profile_save_btn")
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Simpan Perubahan", fontWeight = FontWeight.Bold)
+            }
+
+            // Section: Akun
+            Text(
+                "AKUN",
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp,
+                modifier = Modifier.padding(start = 2.dp, top = 2.dp)
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    if (sess.userNumber != null) {
+                        ProfileInfoRow(
+                            icon = Icons.Default.Badge,
+                            iconTint = goldAccent,
+                            iconBg = goldAccent.copy(alpha = 0.1f),
+                            label = "ID Pengguna",
+                            sub = "#${sess.userNumber}"
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f))
+                    }
+                    ProfileInfoRow(
+                        icon = Icons.Default.Security,
+                        iconTint = Color(0xFF4ADE80),
+                        iconBg = Color(0xFF4ADE80).copy(alpha = 0.1f),
+                        label = "Keamanan Akun",
+                        trailingText = "Kelola",
+                        onClick = onNavigateToSecurity
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // User role notice badge
-            if (sess.isAdmin || sess.isModerator) {
-                val roleColor = if (sess.isAdmin) Color.Red else Color(0xFF7C4DFF)
-                val roleText = if (sess.isAdmin) "Tingkatan Pengguna: Administrator (ADMIN)" else "Tingkatan Pengguna: Moderator (MOD)"
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isDark) Color(0xFF1E1A2E) else Color(0xFFF3F0FF))
-                        .border(1.dp, roleColor, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Text(text = roleText, color = roleColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
+            // Role notice lama tetap dipertahankan sebagai info tambahan (opsional, ringkas)
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Logout Button
             Button(
@@ -5904,14 +6117,15 @@ fun ProfileScreen(
                         onBack()
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = if (isDark) Color(0x33FF0000) else Color(0xFFFFEBEE)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("profile_logout_btn")
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isDark) Color(0x1AFF4B3E) else Color(0xFFFFEBEE)
+                ),
+                border = BorderStroke(1.dp, Color(0xFFFF4B3E).copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("profile_logout_btn")
             ) {
-                Text("Keluar (Logout)", color = Color.Red, fontWeight = FontWeight.Bold)
+                Text("Keluar (Logout)", color = Color(0xFFFF6B5E), fontWeight = FontWeight.Bold)
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

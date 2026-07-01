@@ -681,7 +681,8 @@ class MainActivity : ComponentActivity() {
                         composable("profile") {
                             ProfileScreen(
                                 viewModel = viewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onNavigateToSecurity = { navController.navigate("keamanan") }
                             )
                         }
                         composable(
