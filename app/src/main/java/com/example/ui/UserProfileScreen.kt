@@ -42,13 +42,15 @@ fun UserProfileScreen(
     val canModerate = session.canModerate()
 
     val banStatusMessage by viewModel.banStatusMessage.collectAsState()
+    var hasMounted by remember { mutableStateOf(false) }
 
     LaunchedEffect(userId) {
         viewModel.loadPublicUserProfile(userId)
+        hasMounted = true
     }
 
     LaunchedEffect(banStatusMessage) {
-        if (banStatusMessage != null) {
+        if (hasMounted && banStatusMessage != null) {
             viewModel.loadPublicUserProfile(userId)
         }
     }

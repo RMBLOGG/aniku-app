@@ -2046,26 +2046,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
             _viewedProfile.value = null
             _viewedProfileDonationTotal.value = 0
             _viewedProfileChatCount.value = 0
+            val authHeader = getAuthHeader() // fallback anon key kalau belum login (guest tetap bisa liat)
             try {
-                val profileList = withValidToken { token ->
-                    NetworkClient.supabaseDbApi.getProfileByUserId(
-                        idQuery = "eq.$userId",
-                        authHeader = "Bearer $token",
-                        apiKey = SUPABASE_ANON_KEY
-                    )
-                }
+                val profileList = NetworkClient.supabaseDbApi.getProfileByUserId(
+                    idQuery = "eq.$userId",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
                 val profile = profileList.firstOrNull()
                 _viewedProfile.value = profile
 
                 if (profile?.username != null) {
                     try {
-                        val donations = withValidToken { token ->
-                            NetworkClient.supabaseDbApi.getDonationsBySupporter(
-                                supporterNameQuery = "eq.${profile.username}",
-                                authHeader = "Bearer $token",
-                                apiKey = SUPABASE_ANON_KEY
-                            )
-                        }
+                        val donations = NetworkClient.supabaseDbApi.getDonationsBySupporter(
+                            supporterNameQuery = "eq.${profile.username}",
+                            authHeader = authHeader,
+                            apiKey = SUPABASE_ANON_KEY
+                        )
                         _viewedProfileDonationTotal.value = donations.sumOf { it.total_amount ?: 0 }
                     } catch (e: Exception) {
                         Log.e("AnikuVM", "loadPublicUserProfile donations error: ${e.message}")
@@ -2073,13 +2070,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
 
                 try {
-                    val ids = withValidToken { token ->
-                        NetworkClient.supabaseDbApi.getChatMessageIds(
-                            userIdQuery = "eq.$userId",
-                            authHeader = "Bearer $token",
-                            apiKey = SUPABASE_ANON_KEY
-                        )
-                    }
+                    val ids = NetworkClient.supabaseDbApi.getChatMessageIds(
+                        userIdQuery = "eq.$userId",
+                        authHeader = authHeader,
+                        apiKey = SUPABASE_ANON_KEY
+                    )
                     _viewedProfileChatCount.value = ids.size
                 } catch (e: Exception) {
                     Log.e("AnikuVM", "loadPublicUserProfile chat count error: ${e.message}")
