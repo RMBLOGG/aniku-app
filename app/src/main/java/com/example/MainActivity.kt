@@ -684,6 +684,22 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                        composable(
+                            route = "user_profile/{userId}",
+                            arguments = listOf(
+                                navArgument("userId") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                            UserProfileScreen(
+                                viewModel = viewModel,
+                                userId = userId,
+                                onBack = { navController.popBackStack() },
+                                onEditOwnProfile = {
+                                    navController.navigate("profile")
+                                }
+                            )
+                        }
                         composable("admin") {
                             AdminPanelScreen(
                                 viewModel = viewModel,

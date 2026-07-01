@@ -609,7 +609,8 @@ private fun ChatBubble(
                 contentDescription = message.username,
                 modifier = Modifier
                     .size(30.dp)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable { navController.navigate("user_profile/${message.user_id}") },
                 contentScale = ContentScale.Crop,
                 error = null,
                 fallback = null,
@@ -619,7 +620,8 @@ private fun ChatBubble(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    .clickable { navController.navigate("user_profile/${message.user_id}") },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1019,7 +1021,8 @@ private fun OwnChatBubble(
                 contentDescription = message.username,
                 modifier = Modifier
                     .size(30.dp)
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clickable { navController.navigate("user_profile/${message.user_id}") },
                 contentScale = ContentScale.Crop,
                 error = null,
                 fallback = null,
@@ -1029,7 +1032,8 @@ private fun OwnChatBubble(
                 modifier = Modifier
                     .size(30.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    .clickable { navController.navigate("user_profile/${message.user_id}") },
                 contentAlignment = Alignment.Center
             ) {
                 Text(

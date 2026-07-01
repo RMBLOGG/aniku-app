@@ -408,6 +408,23 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<Donation>
 
+    @GET("rest/v1/donations")
+    suspend fun getDonationsBySupporter(
+        @Query("supporter_name") supporterNameQuery: String,
+        @Query("limit") limit: Int = 1000,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<Donation>
+
+    @GET("rest/v1/chat_messages")
+    suspend fun getChatMessageIds(
+        @Query("user_id") userIdQuery: String,
+        @Query("select") select: String = "id",
+        @Query("limit") limit: Int = 5000,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<IdOnlyDto>
+
     @GET("rest/v1/active_viewers")
     suspend fun getViewerCount(
         @Query("anime_slug") animeSlug: String,

@@ -2027,6 +2027,71 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ─────────────── PUBLIC USER PROFILE (lihat profil orang lain) ───────────────
+    private val _viewedProfile = MutableStateFlow<ProfileDto?>(null)
+    val viewedProfile: StateFlow<ProfileDto?> = _viewedProfile.asStateFlow()
+
+    private val _viewedProfileDonationTotal = MutableStateFlow(0)
+    val viewedProfileDonationTotal: StateFlow<Int> = _viewedProfileDonationTotal.asStateFlow()
+
+    private val _viewedProfileChatCount = MutableStateFlow(0)
+    val viewedProfileChatCount: StateFlow<Int> = _viewedProfileChatCount.asStateFlow()
+
+    private val _isViewedProfileLoading = MutableStateFlow(false)
+    val isViewedProfileLoading: StateFlow<Boolean> = _isViewedProfileLoading.asStateFlow()
+
+    fun loadPublicUserProfile(userId: String) {
+        viewModelScope.launch {
+            _isViewedProfileLoading.value = true
+            _viewedProfile.value = null
+            _viewedProfileDonationTotal.value = 0
+            _viewedProfileChatCount.value = 0
+            try {
+                val profileList = withValidToken { token ->
+                    NetworkClient.supabaseDbApi.getProfileByUserId(
+                        idQuery = "eq.$userId",
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+                val profile = profileList.firstOrNull()
+                _viewedProfile.value = profile
+
+                if (profile?.username != null) {
+                    try {
+                        val donations = withValidToken { token ->
+                            NetworkClient.supabaseDbApi.getDonationsBySupporter(
+                                supporterNameQuery = "eq.${profile.username}",
+                                authHeader = "Bearer $token",
+                                apiKey = SUPABASE_ANON_KEY
+                            )
+                        }
+                        _viewedProfileDonationTotal.value = donations.sumOf { it.total_amount ?: 0 }
+                    } catch (e: Exception) {
+                        Log.e("AnikuVM", "loadPublicUserProfile donations error: ${e.message}")
+                    }
+                }
+
+                try {
+                    val ids = withValidToken { token ->
+                        NetworkClient.supabaseDbApi.getChatMessageIds(
+                            userIdQuery = "eq.$userId",
+                            authHeader = "Bearer $token",
+                            apiKey = SUPABASE_ANON_KEY
+                        )
+                    }
+                    _viewedProfileChatCount.value = ids.size
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "loadPublicUserProfile chat count error: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadPublicUserProfile error: ${e.message}")
+            } finally {
+                _isViewedProfileLoading.value = false
+            }
+        }
+    }
+
     // ─────────────── SECURITY ───────────────
     val appLockEnabled: StateFlow<Boolean> = settingsStore.appLockEnabledFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
