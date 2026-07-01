@@ -1987,11 +1987,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             val uid = session.value.userId ?: return@launch
             try {
-                val result = NetworkClient.supabaseDbApi.getProfileByUserId(
-                    idQuery = "eq.$uid",
-                    authHeader = "Bearer $SUPABASE_ANON_KEY",
-                    apiKey = SUPABASE_ANON_KEY
-                )
+                val result = withValidToken { token ->
+                    NetworkClient.supabaseDbApi.getProfileByUserId(
+                        idQuery = "eq.$uid",
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
                 val profile = result.firstOrNull()
                 _seasonXp.value = profile?.season_xp ?: 0
                 _seasonLevel.value = profile?.season_level ?: 1
