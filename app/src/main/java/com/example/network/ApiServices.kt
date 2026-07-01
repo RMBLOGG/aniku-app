@@ -299,6 +299,15 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=representation"
     ): List<WatchChatMessage>
 
+    @POST("rest/v1/watch_events")
+    suspend fun insertWatchEvent(
+        @Body data: WatchEventRequest,
+        @Query("on_conflict") onConflict: String = "user_id,episode_slug",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=ignore-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
         @Query("order") order: String = "created_at.desc",

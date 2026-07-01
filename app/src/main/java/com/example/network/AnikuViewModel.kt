@@ -2001,6 +2001,30 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Dipanggil saat user udah nonton episode min 80% durasi.
+    // Dedup di-handle server-side (unique constraint + ignore-duplicates),
+    // jadi aman dipanggil berkali-kali untuk episode yang sama.
+    fun reportWatchEvent(animeSlug: String, episodeSlug: String) {
+        val uid = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                withValidToken { token ->
+                    NetworkClient.supabaseDbApi.insertWatchEvent(
+                        data = WatchEventRequest(
+                            user_id = uid,
+                            anime_slug = animeSlug,
+                            episode_slug = episodeSlug
+                        ),
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "reportWatchEvent error: ${e.message}")
+            }
+        }
+    }
+
     // ─────────────── SECURITY ───────────────
     val appLockEnabled: StateFlow<Boolean> = settingsStore.appLockEnabledFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

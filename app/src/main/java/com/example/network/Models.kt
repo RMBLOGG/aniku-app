@@ -294,6 +294,13 @@ data class ChatMessageWithProfile(
 }
 
 @JsonClass(generateAdapter = true)
+data class WatchEventRequest(
+    val user_id: String,
+    val anime_slug: String?,
+    val episode_slug: String
+)
+
+@JsonClass(generateAdapter = true)
 data class ChatMessageRequest(
     val user_id: String,
     val username: String,

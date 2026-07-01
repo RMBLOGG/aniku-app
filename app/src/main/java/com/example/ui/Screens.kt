@@ -4115,6 +4115,7 @@ fun WatchScreen(
                     var isBuffering by remember { mutableStateOf(true) }
                     var currentPosition by remember { mutableStateOf(0L) }
                     var duration by remember { mutableStateOf(0L) }
+                    var watchXpReported by remember(currentEpisodeSlug) { mutableStateOf(false) }
                     var playbackSpeed by remember { mutableStateOf(1f) }
                     var showSpeedMenu by remember { mutableStateOf(false) }
                     var isLocked by remember { mutableStateOf(false) }
@@ -4171,6 +4172,11 @@ fun WatchScreen(
                         while (true) {
                             currentPosition = exoPlayer.currentPosition
                             duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+                            // XP nonton: sekali per episode, begitu udah nonton ≥80% durasi
+                            if (!watchXpReported && duration > 0 && currentPosition.toFloat() / duration >= 0.8f) {
+                                watchXpReported = true
+                                viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
+                            }
                             // Host: broadcast posisi berkala (menangkap perubahan dari seek
                             // manual lewat slider/tap -10s/+10s, yang tidak memicu onIsPlayingChanged).
                             if (nobarRoom != null && viewModel.isNobarHost) {
