@@ -5719,8 +5719,8 @@ fun ProfileScreen(
 
             // Season Level & XP progress
             run {
-                val currentLevelBaseXp = 50 * (seasonLevel - 1) * (seasonLevel - 1)
-                val nextLevelXp = 50 * seasonLevel * seasonLevel
+                val currentLevelBaseXp = 20 * (seasonLevel - 1) * (seasonLevel - 1)
+                val nextLevelXp = 20 * seasonLevel * seasonLevel
                 val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
                 val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
                 val progress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
