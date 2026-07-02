@@ -192,6 +192,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    var isInitialLoad by remember { mutableStateOf(true) }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -213,7 +214,13 @@ fun ChatScreen(
     // Auto-scroll ke bawah saat ada pesan baru
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            if (isInitialLoad) {
+                // Load pertama: langsung snap ke bawah, tanpa animasi
+                listState.scrollToItem(messages.size - 1)
+                isInitialLoad = false
+            } else {
+                listState.animateScrollToItem(messages.size - 1)
+            }
         }
     }
 
