@@ -370,6 +370,7 @@ class MainActivity : ComponentActivity() {
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                     Triple("user_list", "Pengguna", Icons.Default.People),
+                    Triple("request_anime", "Anime Request", Icons.Default.VideoLibrary),
                 ).filter { (route, _, _) ->
                     when (route) {
                         "feed" -> feedEnabled
@@ -411,6 +412,7 @@ class MainActivity : ComponentActivity() {
                             "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
                             "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
                             "user_list" to Triple(0xFF241a2e, 0xFFba68c8, "Cari & lihat profil pengguna"),
+                            "request_anime" to Triple(0xFF1a2620, 0xFF26c281, "Anime hasil request user"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
                             val meta = sheetItemColors[route]
@@ -672,6 +674,36 @@ class MainActivity : ComponentActivity() {
                                     val encodedTitle = java.net.URLEncoder.encode(title, "UTF-8")
                                     navController.navigate("watch/$slug/$encodedTitle?joinRoom=$roomCode")
                                 }
+                            )
+                        }
+                        composable("request_anime") {
+                            RequestedAnimeListScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onItemClick = { id -> navController.navigate("request_anime_detail/$id") }
+                            )
+                        }
+                        composable(
+                            route = "request_anime_detail/{id}",
+                            arguments = listOf(navArgument("id") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            RequestedAnimeDetailScreen(
+                                id = id,
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onWatch = { animeId -> navController.navigate("request_anime_watch/$animeId") }
+                            )
+                        }
+                        composable(
+                            route = "request_anime_watch/{id}",
+                            arguments = listOf(navArgument("id") { type = NavType.StringType })
+                        ) { backStackEntry ->
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            RequestedAnimeWatchScreen(
+                                id = id,
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("chat") {

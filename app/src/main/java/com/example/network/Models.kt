@@ -243,6 +243,60 @@ data class CloudinaryResponse(
     val secure_url: String
 )
 
+// Requested Anime models (anime request khusus, video di-upload manual ke Cloudinary,
+// metadata poster/sinopsis/genre diambil dari Jikan API)
+@JsonClass(generateAdapter = true)
+data class RequestedAnimeDto(
+    val id: String,
+    val mal_id: Int? = null,
+    val title: String,
+    val poster_url: String? = null,
+    val synopsis: String? = null,
+    val genres: String? = null, // disimpan dipisah koma, mis. "Comedy,Romance"
+    val studio: String? = null,
+    val rating: String? = null, // skor MAL, mis. "6.88"
+    val anime_status: String? = null, // Ongoing/Completed, beda kolom dari `status` request
+    val episode: String? = null,
+    val video_url: String,
+    val status: String? = "pending", // status moderasi request: pending/approved/rejected
+    val created_at: String? = null
+)
+
+// Jikan API (MyAnimeList) models — dipakai buat autofill metadata anime requestan
+@JsonClass(generateAdapter = true)
+data class JikanSearchResponse(
+    val data: List<JikanAnimeData>?
+)
+
+@JsonClass(generateAdapter = true)
+data class JikanAnimeData(
+    val mal_id: Int,
+    val title: String,
+    val synopsis: String? = null,
+    val score: Double? = null,
+    val status: String? = null,
+    val images: JikanImages? = null,
+    val genres: List<JikanGenre>? = null,
+    val studios: List<JikanGenre>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class JikanImages(
+    val jpg: JikanImageUrl? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class JikanImageUrl(
+    val image_url: String? = null,
+    val large_image_url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class JikanGenre(
+    val mal_id: Int? = null,
+    val name: String? = null
+)
+
 // Chat Room models
 @JsonClass(generateAdapter = true)
 data class ChatMessage(

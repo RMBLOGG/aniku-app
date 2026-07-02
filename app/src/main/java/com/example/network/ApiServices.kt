@@ -470,6 +470,45 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
+
+    // ─── Requested Anime (anime yang di-request user, video di-upload manual) ───
+    @GET("rest/v1/requested_anime")
+    suspend fun getRequestedAnime(
+        @Query("order") order: String = "created_at.desc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<RequestedAnimeDto>
+
+    @GET("rest/v1/requested_anime")
+    suspend fun getRequestedAnimeById(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<RequestedAnimeDto>
+
+    @POST("rest/v1/requested_anime")
+    suspend fun insertRequestedAnime(
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<RequestedAnimeDto>
+
+    @PATCH("rest/v1/requested_anime")
+    suspend fun updateRequestedAnime(
+        @Query("id") idQuery: String,
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<RequestedAnimeDto>
+
+    @DELETE("rest/v1/requested_anime")
+    suspend fun deleteRequestedAnime(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
 }
 
 interface CloudinaryApi {
@@ -479,6 +518,25 @@ interface CloudinaryApi {
         @Part file: MultipartBody.Part,
         @Part("upload_preset") uploadPreset: RequestBody
     ): CloudinaryResponse
+
+    // Upload video anime requestan, pakai preset khusus "anime_request_video"
+    // (folder anime_requests, terpisah dari avatar/banner)
+    @Multipart
+    @POST("v1_1/dzfkklsza/video/upload")
+    suspend fun uploadRequestedVideo(
+        @Part file: MultipartBody.Part,
+        @Part("upload_preset") uploadPreset: RequestBody
+    ): CloudinaryResponse
+}
+
+// Jikan API (MyAnimeList, publik & gratis) — buat autofill poster/sinopsis/genre
+// dari anime yang di-request user, tanpa perlu apikey.
+interface JikanApi {
+    @GET("v4/anime")
+    suspend fun searchAnime(
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 5
+    ): JikanSearchResponse
 }
 
 // ─── Cache Interceptor untuk Anime API (Sanka) ───────────────────────────────
@@ -604,6 +662,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(CloudinaryApi::class.java)
+    }
+
+    val jikanApi: JikanApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://api.jikan.moe/")
+            .client(defaultOkHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(JikanApi::class.java)
     }
 }
 

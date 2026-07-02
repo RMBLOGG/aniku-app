@@ -264,6 +264,22 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isUploadingAvatar = MutableStateFlow(false)
     val isUploadingAvatar: StateFlow<Boolean> = _isUploadingAvatar.asStateFlow()
 
+    // ─── Requested Anime (search MAL utk autofill + upload video ke Cloudinary) ───
+    private val _jikanSearchResults = MutableStateFlow<List<JikanAnimeData>>(emptyList())
+    val jikanSearchResults: StateFlow<List<JikanAnimeData>> = _jikanSearchResults.asStateFlow()
+
+    private val _isSearchingJikan = MutableStateFlow(false)
+    val isSearchingJikan: StateFlow<Boolean> = _isSearchingJikan.asStateFlow()
+
+    private val _isUploadingRequestedAnime = MutableStateFlow(false)
+    val isUploadingRequestedAnime: StateFlow<Boolean> = _isUploadingRequestedAnime.asStateFlow()
+
+    private val _requestedAnimeList = MutableStateFlow<List<RequestedAnimeDto>>(emptyList())
+    val requestedAnimeList: StateFlow<List<RequestedAnimeDto>> = _requestedAnimeList.asStateFlow()
+
+    private val _requestedAnimeError = MutableStateFlow<String?>(null)
+    val requestedAnimeError: StateFlow<String?> = _requestedAnimeError.asStateFlow()
+
     // Admin management state
     private val _adminUsers = MutableStateFlow<List<ProfileDto>>(emptyList())
     val adminUsers: StateFlow<List<ProfileDto>> = _adminUsers.asStateFlow()
@@ -1516,6 +1532,164 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _isUploadingBanner.value = false
                 onProgress(false)
                 Log.e("AnikuVM", "Cloudinary banner upload failed", e)
+            }
+        }
+    }
+
+    // Cari anime di MyAnimeList (Jikan) buat autofill poster/sinopsis/genre/studio.
+    // Dipanggil pas admin ngetik judul anime yang direquest user.
+    fun searchJikanAnime(query: String) {
+        if (query.isBlank()) {
+            _jikanSearchResults.value = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            _isSearchingJikan.value = true
+            try {
+                val res = NetworkClient.jikanApi.searchAnime(query)
+                _jikanSearchResults.value = res.data ?: emptyList()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Jikan search failed", e)
+                _jikanSearchResults.value = emptyList()
+            } finally {
+                _isSearchingJikan.value = false
+            }
+        }
+    }
+
+    fun clearJikanSearch() {
+        _jikanSearchResults.value = emptyList()
+    }
+
+    // Upload video anime requestan ke Cloudinary (preset anime_request_video),
+    // lalu simpan hasilnya + metadata dari Jikan (yang udah dipilih admin) ke Supabase.
+    fun uploadRequestedAnimeVideo(
+        videoUri: Uri,
+        selectedAnime: JikanAnimeData,
+        episode: String?,
+        onProgress: (Boolean) -> Unit
+    ) {
+        val sess = session.value
+        val token = sess.token ?: return
+        _isUploadingRequestedAnime.value = true
+        _requestedAnimeError.value = null
+        onProgress(true)
+        viewModelScope.launch {
+            try {
+                // 1. Baca bytes video dari URI
+                val contentResolver = appContext.contentResolver
+                val inputStream = contentResolver.openInputStream(videoUri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+
+                // 2. Siapkan multipart request buat Cloudinary
+                val requestFile = fileBytes.toRequestBody("video/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", "requested_video.mp4", requestFile)
+                val presetBody = "anime_request_video".toRequestBody("text/plain".toMediaTypeOrNull())
+
+                // 3. Upload ke Cloudinary (preset unsigned khusus video requestan)
+                val cloudinaryRes = NetworkClient.cloudinaryApi.uploadRequestedVideo(body, presetBody)
+                val videoUrl = cloudinaryRes.secure_url
+
+                // 4. Susun metadata dari hasil Jikan yang udah dipilih
+                val genresStr = selectedAnime.genres?.mapNotNull { it.name }?.joinToString(",")
+                val studioStr = selectedAnime.studios?.mapNotNull { it.name }?.joinToString(",")
+                val posterUrl = selectedAnime.images?.jpg?.large_image_url
+                    ?: selectedAnime.images?.jpg?.image_url
+
+                val payload = mapOf(
+                    "mal_id" to selectedAnime.mal_id,
+                    "title" to selectedAnime.title,
+                    "poster_url" to posterUrl,
+                    "synopsis" to selectedAnime.synopsis,
+                    "genres" to genresStr,
+                    "studio" to studioStr,
+                    "rating" to selectedAnime.score?.toString(),
+                    "anime_status" to selectedAnime.status,
+                    "episode" to episode,
+                    "video_url" to videoUrl,
+                    "status" to "pending"
+                )
+
+                // 5. Simpan ke tabel requested_anime di Supabase
+                val inserted = NetworkClient.supabaseDbApi.insertRequestedAnime(
+                    data = payload,
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _requestedAnimeList.value = inserted + _requestedAnimeList.value
+
+                _isUploadingRequestedAnime.value = false
+                onProgress(false)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Upload requested anime failed", e)
+                _requestedAnimeError.value = e.message ?: "Upload gagal"
+                _isUploadingRequestedAnime.value = false
+                onProgress(false)
+            }
+        }
+    }
+
+    fun fetchRequestedAnimeList() {
+        val sess = session.value
+        val token = sess.token ?: return
+        viewModelScope.launch {
+            try {
+                val res = NetworkClient.supabaseDbApi.getRequestedAnime(
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _requestedAnimeList.value = res
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Fetch requested anime failed", e)
+            }
+        }
+    }
+
+    // Admin approve/reject anime request
+    fun setRequestedAnimeStatus(id: String, status: String) {
+        val sess = session.value
+        val token = sess.token ?: return
+        if (!sess.isAdmin) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.updateRequestedAnime(
+                    idQuery = "eq.$id",
+                    data = mapOf("status" to status),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _requestedAnimeList.value = _requestedAnimeList.value.map {
+                    if (it.id == id) it.copy(status = status) else it
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Update requested anime status failed", e)
+            }
+        }
+    }
+
+    fun deleteRequestedAnime(id: String) {
+        val sess = session.value
+        val token = sess.token ?: return
+        if (!sess.isAdmin) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteRequestedAnime(
+                    idQuery = "eq.$id",
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _requestedAnimeList.value = _requestedAnimeList.value.filter { it.id != id }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Delete requested anime failed", e)
             }
         }
     }

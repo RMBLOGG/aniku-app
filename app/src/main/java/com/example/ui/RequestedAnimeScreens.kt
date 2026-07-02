@@ -1,0 +1,495 @@
+package com.example.ui
+
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.network.AnikuViewModel
+import com.example.network.JikanAnimeData
+import com.example.network.RequestedAnimeDto
+
+// ─────────────────────────────────────────────────────────────────────────
+// 1. LIST — daftar semua anime hasil request, diakses dari menu "Lainnya"
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun RequestedAnimeListScreen(
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit,
+    onItemClick: (String) -> Unit
+) {
+    val list by viewModel.requestedAnimeList.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) { viewModel.fetchRequestedAnimeList() }
+
+    // User biasa cuma lihat yang udah di-approve admin
+    val approved = list.filter { it.status == "approved" }
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Text("Anime Request", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.onBackground)
+                Text("Anime hasil request user", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+
+        if (approved.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Belum ada anime request", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(approved, key = { it.id }) { anime ->
+                    RequestedAnimeCard(anime = anime, onClick = { onItemClick(anime.id) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RequestedAnimeCard(anime: RequestedAnimeDto, onClick: () -> Unit) {
+    val context = LocalContext.current
+    Column(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(anime.poster_url).crossfade(300).build(),
+                contentDescription = anime.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            anime.rating?.let {
+                Row(
+                    modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(10.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(it, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            anime.title, color = MaterialTheme.colorScheme.onBackground, fontSize = 11.sp,
+            fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2. DETAIL — poster besar, sinopsis, genre, tombol "Mulai Tonton"
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun RequestedAnimeDetailScreen(
+    id: String,
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit,
+    onWatch: (String) -> Unit
+) {
+    val list by viewModel.requestedAnimeList.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(id) {
+        if (list.none { it.id == id }) viewModel.fetchRequestedAnimeList()
+    }
+
+    val anime = list.find { it.id == id }
+
+    if (anime == null) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState())) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f)) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(anime.poster_url).crossfade(300).build(),
+                contentDescription = anime.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background),
+                        startY = 0.3f
+                    )
+                )
+            )
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.statusBarsPadding().padding(12.dp).size(40.dp)
+                    .clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)).align(Alignment.TopStart)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Text(anime.title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.onBackground)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                anime.rating?.let {
+                    Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(it, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
+                anime.anime_status?.let {
+                    Box(modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                        Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+                onClick = { onWatch(anime.id) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Mulai Tonton", fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!anime.synopsis.isNullOrBlank()) {
+                Text("Sinopsis", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(anime.synopsis, fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            if (!anime.genres.isNullOrBlank()) {
+                Text("Genre", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    anime.genres.split(",").filter { it.isNotBlank() }.forEach { g ->
+                        Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                            Text(g.trim(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            anime.studio?.let {
+                Text("Studio: $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 3. WATCH — player sederhana, video_url langsung dari Cloudinary ke ExoPlayer
+//    (gak lewat VideoExtractor, karena udah direct link, bukan embed page)
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun RequestedAnimeWatchScreen(
+    id: String,
+    viewModel: AnikuViewModel,
+    onBack: () -> Unit
+) {
+    val list by viewModel.requestedAnimeList.collectAsState()
+
+    LaunchedEffect(id) {
+        if (list.none { it.id == id }) viewModel.fetchRequestedAnimeList()
+    }
+
+    val anime = list.find { it.id == id }
+
+    if (anime == null) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color.White)
+        }
+        return
+    }
+
+    val context = LocalContext.current
+    val exoPlayer = remember(anime.video_url) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(anime.video_url))
+            prepare()
+            playWhenReady = true
+        }
+    }
+
+    BackHandler { onBack() }
+
+    DisposableEffect(Unit) {
+        onDispose { exoPlayer.release() }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = true
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.statusBarsPadding().padding(12.dp).size(40.dp)
+                .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+        ) {
+            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 4. ADMIN SECTION — dipanggil dari tab baru di AdminPanelScreen (Screens.kt)
+//    Alur: cari judul di Jikan -> pilih hasil -> pilih file video -> upload.
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun AdminRequestAnimeSection(viewModel: AnikuViewModel) {
+    val context = LocalContext.current
+    val searchResults by viewModel.jikanSearchResults.collectAsState()
+    val isSearching by viewModel.isSearchingJikan.collectAsState()
+    val isUploading by viewModel.isUploadingRequestedAnime.collectAsState()
+    val requestedList by viewModel.requestedAnimeList.collectAsState()
+    val uploadError by viewModel.requestedAnimeError.collectAsState()
+
+    var query by remember { mutableStateOf("") }
+    var selectedAnime by remember { mutableStateOf<JikanAnimeData?>(null) }
+    var episode by remember { mutableStateOf("") }
+    var selectedVideoUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
+    LaunchedEffect(Unit) { viewModel.fetchRequestedAnimeList() }
+
+    LaunchedEffect(uploadError) {
+        uploadError?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+    }
+
+    val videoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) selectedVideoUri = uri }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Tambah Anime Request", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = {
+                query = it
+                if (selectedAnime?.title != it) selectedAnime = null
+                viewModel.searchJikanAnime(it)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Ketik judul anime, mis. Oshi no Ko", fontSize = 13.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            singleLine = true
+        )
+
+        if (isSearching) {
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        if (searchResults.isNotEmpty() && selectedAnime == null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                searchResults.forEach { result ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clickable {
+                                selectedAnime = result
+                                query = result.title
+                                viewModel.clearJikanSearch()
+                            }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(result.images?.jpg?.image_url).crossfade(true).build(),
+                            contentDescription = result.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp))
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(result.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(result.status ?: "-", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        }
+
+        selectedAnime?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Dipilih: ${it.title}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+            value = episode,
+            onValueChange = { episode = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Episode (opsional), mis. Episode 1", fontSize = 13.sp) },
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedButton(
+            onClick = { videoPickerLauncher.launch("video/*") },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Default.VideoFile, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(if (selectedVideoUri == null) "Pilih File Video" else "Video dipilih ✓")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(
+            onClick = {
+                val uri = selectedVideoUri
+                val anime = selectedAnime
+                if (uri == null || anime == null) {
+                    Toast.makeText(context, "Pilih anime dari hasil pencarian & file video dulu", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                viewModel.uploadRequestedAnimeVideo(uri, anime, episode.ifBlank { null }) { uploading ->
+                    if (!uploading) {
+                        Toast.makeText(context, "Upload selesai!", Toast.LENGTH_SHORT).show()
+                        selectedAnime = null
+                        query = ""
+                        episode = ""
+                        selectedVideoUri = null
+                    }
+                }
+            },
+            enabled = !isUploading,
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            if (isUploading) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Mengunggah...")
+            } else {
+                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Upload Anime Request")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text("Daftar Request (${requestedList.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(modifier = Modifier.height(10.dp))
+
+        requestedList.forEach { anime ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(anime.poster_url).crossfade(true).build(),
+                    contentDescription = anime.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp))
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(anime.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        anime.status ?: "pending",
+                        fontSize = 11.sp,
+                        color = when (anime.status) {
+                            "approved" -> Color(0xFF4CAF50)
+                            "rejected" -> Color(0xFFE53935)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+                if (anime.status != "approved") {
+                    IconButton(onClick = { viewModel.setRequestedAnimeStatus(anime.id, "approved") }) {
+                        Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                    }
+                }
+                IconButton(onClick = { viewModel.deleteRequestedAnime(anime.id) }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
