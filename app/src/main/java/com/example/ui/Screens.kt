@@ -3826,16 +3826,27 @@ fun WatchScreen(
         }
     }
 
-    // XP nonton untuk sumber WebView (Mega/Filedon/Wibufile/dll) — pendekatan wall-clock,
-    // karena WebView gak expose durasi/posisi video asli seperti ExoPlayer.
-    // Dihitung sekali per episode, jalan hanya kalau bukan direct stream dan user udah tap play.
-    // Timer pause otomatis saat app di background (lifecycle ON_PAUSE), biar gak bisa "curang"
-    // cuma buka lalu tinggal — walau tetap gak 100% akurat, ini cukup untuk anti-abuse dasar.
-    if (!isDirectStream) {
-        var webviewWatchXpReported by remember(currentEpisodeSlug) { mutableStateOf(false) }
-        val wvLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    // XP nonton — dihitung dari lama waktu AKTIF user stay di WatchScreen, BUKAN dari
+    // durasi/posisi video. Satu mekanisme yang sama buat direct stream (ExoPlayer) maupun
+    // WebView (Mega/Filedon/Wibufile/dll), jadi gak ada lagi logic per-jenis-sumber yang
+    // beda-beda dan gampang punya celah (durasi gak kebaca, coroutine ke-cancel duluan, dst).
+    // Playback dianggap "mulai" begitu activeStreamUrl kebaca:
+    //  - direct stream: autoplay (playWhenReady = true), jadi langsung dianggap mulai
+    //  - WebView: baru dianggap mulai setelah user tap tombol play (userStartedPlayback)
+    // Timer pause otomatis saat app di background (lifecycle ON_PAUSE), biar gak bisa
+    // "curang" cuma buka lalu tinggal — walau tetap gak 100% akurat, ini cukup untuk
+    // anti-abuse dasar.
+    // CATATAN: server insertWatchEvent pakai on_conflict = "user_id,episode_slug" +
+    // ignore-duplicates, jadi 1 episode = MAX 1 baris/XP walau di sini dicoba kirim tiap
+    // interval. Ini disengaja — bukan "makin lama nonton makin banyak XP", tapi "coba
+    // kirim ulang tiap interval sampai berhasil ke-catat", biar lebih tahan terhadap
+    // gagal-kirim sesaat (network blip dsb) dibanding cuma 1x nembak di 1 momen doang.
+    run {
+        var xpTicksSent by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
+        var activeSeconds by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
+        val watchLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         var isScreenActive by remember { mutableStateOf(true) }
-        DisposableEffect(wvLifecycleOwner) {
+        DisposableEffect(watchLifecycleOwner) {
             val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 when (event) {
                     androidx.lifecycle.Lifecycle.Event.ON_RESUME -> isScreenActive = true
@@ -3843,20 +3854,29 @@ fun WatchScreen(
                     else -> {}
                 }
             }
-            wvLifecycleOwner.lifecycle.addObserver(obs)
-            onDispose { wvLifecycleOwner.lifecycle.removeObserver(obs) }
+            watchLifecycleOwner.lifecycle.addObserver(obs)
+            onDispose { watchLifecycleOwner.lifecycle.removeObserver(obs) }
         }
 
-        LaunchedEffect(currentEpisodeSlug, userStartedPlayback) {
-            if (!userStartedPlayback || webviewWatchXpReported) return@LaunchedEffect
-            var watchedSeconds = 0
-            val targetSeconds = 5 * 60 // 5 menit
-            while (watchedSeconds < targetSeconds) {
+        // PENTING: LaunchedEffect cuma di-key ke currentEpisodeSlug (bukan ke activeStreamUrl
+        // atau status "udah mulai atau belum"). Kalau di-key ke activeStreamUrl, ganti server/
+        // kualitas (selectStreamQuality) yang sempet nge-null-in activeStreamUrl bakal
+        // nge-restart efeknya dan reset progress activeSeconds balik ke 0 tiap kali user
+        // ganti server — makanya activeStreamUrl/isDirectStream/userStartedPlayback dibaca
+        // LANGSUNG tiap tick di dalam loop (semua state Compose, selalu kebaca versi terbaru),
+        // bukan di-capture sekali di luar sebagai val.
+        LaunchedEffect(currentEpisodeSlug) {
+            val intervalSeconds = 3 * 60 // checkpoint tiap 3 menit aktif nonton
+            val maxAttempts = 4 // berhenti nyoba setelah ±12 menit (cukup buat hampir semua durasi episode)
+            while (xpTicksSent < maxAttempts) {
                 kotlinx.coroutines.delay(1_000)
-                if (isScreenActive) watchedSeconds++
+                val playbackHasStarted = !activeStreamUrl.isNullOrEmpty() && (isDirectStream || userStartedPlayback)
+                if (isScreenActive && playbackHasStarted) activeSeconds++
+                if (activeSeconds >= intervalSeconds * (xpTicksSent + 1)) {
+                    xpTicksSent++
+                    viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
+                }
             }
-            webviewWatchXpReported = true
-            viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
         }
     }
 
@@ -4161,7 +4181,6 @@ fun WatchScreen(
                     var isBuffering by remember { mutableStateOf(true) }
                     var currentPosition by remember { mutableStateOf(0L) }
                     var duration by remember { mutableStateOf(0L) }
-                    var watchXpReported by remember(currentEpisodeSlug) { mutableStateOf(false) }
                     var playbackSpeed by remember { mutableStateOf(1f) }
                     var showSpeedMenu by remember { mutableStateOf(false) }
                     var isLocked by remember { mutableStateOf(false) }
@@ -4218,11 +4237,6 @@ fun WatchScreen(
                         while (true) {
                             currentPosition = exoPlayer.currentPosition
                             duration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
-                            // XP nonton: sekali per episode, begitu udah nonton ≥80% durasi
-                            if (!watchXpReported && duration > 0 && currentPosition.toFloat() / duration >= 0.8f) {
-                                watchXpReported = true
-                                viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
-                            }
                             // Host: broadcast posisi berkala (menangkap perubahan dari seek
                             // manual lewat slider/tap -10s/+10s, yang tidak memicu onIsPlayingChanged).
                             if (nobarRoom != null && viewModel.isNobarHost) {
