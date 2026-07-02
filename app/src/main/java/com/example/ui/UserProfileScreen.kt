@@ -2,7 +2,6 @@ package com.example.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -78,14 +77,21 @@ fun UserProfileScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Profil Pengguna") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
+                    }
+                }
+            )
+        }
+    ) { padding ->
         if (isLoading || profile == null) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
@@ -94,7 +100,8 @@ fun UserProfileScreen(
                     Text("Pengguna tidak ditemukan", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
                 }
             }
-        } else {
+            return@Scaffold
+        }
 
         val p = profile!!
         val seasonLevel = p.season_level ?: 1
@@ -133,6 +140,7 @@ fun UserProfileScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
             // ── Banner (read-only) dengan fade gradient ──
@@ -161,18 +169,6 @@ fun UserProfileScreen(
                                 0.35f to Color.Transparent,
                                 0.78f to MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
                                 1f to MaterialTheme.colorScheme.background
-                            )
-                        )
-                )
-                // Scrim tipis di atas banner biar tombol back & judul tetap kebaca di atas gambar apapun
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
-                        .align(Alignment.TopStart)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)
                             )
                         )
                 )
@@ -504,41 +500,6 @@ fun UserProfileScreen(
                     }
                 }
             }
-        }
-        }
-
-        // Topbar transparan, mengambang di atas banner (edge-to-edge, tanpa background solid)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                "Profil Pengguna",
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                style = androidx.compose.ui.text.TextStyle(
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        offset = androidx.compose.ui.geometry.Offset(0f, 1f),
-                        blurRadius = 6f
-                    )
-                )
-            )
         }
     }
 }
