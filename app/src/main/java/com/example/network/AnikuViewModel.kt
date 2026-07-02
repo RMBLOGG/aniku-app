@@ -1743,6 +1743,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _myClanMembership = MutableStateFlow<ClanMemberDto?>(null)
     val myClanMembership: StateFlow<ClanMemberDto?> = _myClanMembership.asStateFlow()
 
+    private val _myClanDetail = MutableStateFlow<ClanDto?>(null)
+    val myClanDetail: StateFlow<ClanDto?> = _myClanDetail.asStateFlow()
+
     private val _selectedClanMembers = MutableStateFlow<List<ClanMemberDto>>(emptyList())
     val selectedClanMembers: StateFlow<List<ClanMemberDto>> = _selectedClanMembers.asStateFlow()
 
@@ -1789,7 +1792,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val result = NetworkClient.supabaseDbApi.getMyClanMembership("eq.$userId", getAuthHeader(), SUPABASE_ANON_KEY)
-                _myClanMembership.value = result.firstOrNull()
+                val membership = result.firstOrNull()
+                _myClanMembership.value = membership
+                if (membership != null) {
+                    val clanResult = NetworkClient.supabaseDbApi.getClanById("eq.${membership.clan_id}", getAuthHeader(), SUPABASE_ANON_KEY)
+                    _myClanDetail.value = clanResult.firstOrNull()
+                } else {
+                    _myClanDetail.value = null
+                }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal load clan membership", e)
             }

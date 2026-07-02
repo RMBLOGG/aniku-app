@@ -236,6 +236,13 @@ interface SupabaseDbApi {
 
     // --- Clan & Diamond ---
     @GET("rest/v1/clans")
+    suspend fun getClanById(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ClanDto>
+
+    @GET("rest/v1/clans")
     suspend fun getClans(
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
