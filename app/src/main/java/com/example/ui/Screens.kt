@@ -110,6 +110,19 @@ fun ShimmerCard(modifier: Modifier = Modifier) {
     )
 }
 
+// Scrim gradients dibikin SEKALI sebagai top-level constant (bukan tiap recomposition/tiap card),
+// biar gak alokasi Brush baru + overdraw ganda tiap card muncul di layar pas scroll.
+private val CardWideScrim = Brush.verticalGradient(
+    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
+)
+private val CardPosterScrim = Brush.verticalGradient(
+    colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(alpha = 0.85f))
+)
+// Gabungan dari 2 gradient yang tadinya ditumpuk (drawBehind + background) jadi 1 gradient aja
+private val CardRoundedScrim = Brush.verticalGradient(
+    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.08f), Color.Black.copy(alpha = 0.5f))
+)
+
 @Composable
 fun AnimeCard(
     anime: AnimeRaw,
@@ -165,9 +178,7 @@ fun AnimeCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.5f))
-                )))
+                Box(modifier = Modifier.fillMaxSize().background(CardWideScrim))
                 anime.type?.let {
                     Box(modifier = Modifier.padding(6.dp).clip(RoundedCornerShape(4.dp))
                         .background(Color(0xFFFF8C00)).padding(horizontal = 5.dp, vertical = 2.dp)
@@ -221,10 +232,7 @@ fun AnimeCard(
                 contentDescription = anime.title, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
-                colors = listOf(Color.Transparent, Color.Transparent, Color.Black.copy(0.85f)),
-                startY = 0f
-            )))
+            Box(modifier = Modifier.fillMaxSize().background(CardPosterScrim))
             anime.type?.let {
                 Box(modifier = Modifier.padding(6.dp).clip(RoundedCornerShape(4.dp))
                     .background(Color(0xFFFF8C00)).padding(horizontal = 5.dp, vertical = 2.dp)
@@ -278,12 +286,6 @@ fun AnimeCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .drawBehind {
-                    drawRect(brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.3f)),
-                        startY = size.height * 0.6f, endY = size.height + 12f
-                    ))
-                }
                 .clip(RoundedCornerShape(cornerRadius))
                 .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(cornerRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
@@ -293,9 +295,9 @@ fun AnimeCard(
                 contentDescription = anime.title, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(
-                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.1f), Color.Black.copy(alpha = 0.4f))
-            )))
+            // Dulu ada 2 gradient ditumpuk (drawBehind + background) → sekarang 1 gradient shared aja,
+            // efek visualnya sama (gelap ke bawah) tapi draw call & alokasi Brush jauh lebih ringan.
+            Box(modifier = Modifier.fillMaxSize().background(CardRoundedScrim))
 
             // Type Badge
             anime.type?.let { typeString ->
@@ -670,12 +672,16 @@ fun HomeScreen(
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
+    val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
     val watchHistory by viewModel.watchHistory.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     var showLoginDialog by remember { mutableStateOf(false) }
+    // Lambda stabil dishare ke semua card di screen ini, jadi gak bikin instance baru tiap card/tiap recomposition
+    val onShowLoginDialog = remember { { showLoginDialog = true } }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
 
     LaunchedEffect(ongoingList, recentList, popularList) {
@@ -1266,7 +1272,7 @@ fun HomeScreen(
                                                 Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
                                             }
 
-                                            val isHeroBookmarked = bookmarkedAnimes.any { it.slug == slide.slug }
+                                            val isHeroBookmarked = bookmarkedSlugs.contains(slide.slug)
                                             IconButton(
                                                 onClick = { viewModel.toggleBookmark(slide.slug, slide.title, slide.poster) },
                                                 modifier = Modifier
@@ -1664,11 +1670,11 @@ fun HomeScreen(
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true },
+                            onLoginRequired = onShowLoginDialog,
                             viewerCount = viewerCounts[anim.slug] ?: 0,
                         cardStyle = cardStyle
                         )
@@ -1687,11 +1693,11 @@ fun HomeScreen(
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { showLoginDialog = true },
+                            onLoginRequired = onShowLoginDialog,
                             viewerCount = viewerCounts[anim.slug] ?: 0,
                         cardStyle = cardStyle
                         )
@@ -2090,6 +2096,8 @@ fun SearchScreen(
     val popularList by viewModel.searchPopular.collectAsState()
     val isLoading by viewModel.isSearchLoading.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
+    val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val accentColor = MaterialTheme.colorScheme.primary
     val cardStyle by viewModel.cardStyle.collectAsState()
     val gridLayout by viewModel.gridLayout.collectAsState()
@@ -2153,11 +2161,11 @@ fun SearchScreen(
                         AnimeListCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = onLoginRequired
                         )
                     }
                 }
@@ -2174,12 +2182,12 @@ fun SearchScreen(
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() },
+                            onLoginRequired = onLoginRequired,
                             cardStyle = cardStyle
                         )
                     }
@@ -2207,11 +2215,11 @@ fun SearchScreen(
                         AnimeListCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() }
+                            onLoginRequired = onLoginRequired
                         )
                     }
                 }
@@ -2228,12 +2236,12 @@ fun SearchScreen(
                         AnimeCard(
                             anime = anim,
                             accentColor = accentColor,
-                            onClick = { onNavigateToDetail(anim.slug) },
-                            isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                            onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                            onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                            isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                            onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                             modifier = Modifier.fillMaxWidth(),
                             isLoggedIn = isLoggedIn,
-                            onLoginRequired = { onLoginRequired() },
+                            onLoginRequired = onLoginRequired,
                             cardStyle = cardStyle
                         )
                     }
@@ -2260,6 +2268,8 @@ fun ExploreScreen(
     val isLoading by viewModel.isExploreLoading.collectAsState()
     val hasNext by viewModel.exploreHasNext.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
+    val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
@@ -2422,11 +2432,11 @@ fun ExploreScreen(
                             AnimeListCard(
                                 anime = anim,
                                 accentColor = accentColor,
-                                onClick = { onNavigateToDetail(anim.slug) },
-                                isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                                onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                                onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                                isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                                onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                                 isLoggedIn = isLoggedIn,
-                                onLoginRequired = { onLoginRequired() }
+                                onLoginRequired = onLoginRequired
                             )
                         }
                         if (isLoading) {
@@ -2451,9 +2461,9 @@ fun ExploreScreen(
                             AnimeCard(
                                 anime = anim,
                                 accentColor = accentColor,
-                                onClick = { onNavigateToDetail(anim.slug) },
-                                isBookmarked = bookmarkedAnimes.any { it.slug == anim.slug },
-                                onBookmarkToggle = { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) },
+                                onClick = remember(anim.slug) { { onNavigateToDetail(anim.slug) } },
+                                isBookmarked = bookmarkedSlugs.contains(anim.slug),
+                                onBookmarkToggle = remember(anim.slug) { { viewModel.toggleBookmark(anim.slug, anim.title, anim.poster) } },
                                 modifier = Modifier.fillMaxWidth(),
                                 cardStyle = cardStyle
                             )
@@ -2805,10 +2815,10 @@ fun BookmarkScreen(
                     AnimeListCard(
                         anime = backingRaw,
                         accentColor = accentColor,
-                        onClick = { onNavigateToDetail(bookmarked.slug) },
+                        onClick = remember(bookmarked.slug) { { onNavigateToDetail(bookmarked.slug) } },
                         isBookmarked = true,
-                        onBookmarkToggle = {
-                            viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster)
+                        onBookmarkToggle = remember(bookmarked.slug) {
+                            { viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster) }
                         }
                     )
                 }
@@ -2833,10 +2843,10 @@ fun BookmarkScreen(
                     AnimeCard(
                         anime = backingRaw,
                         accentColor = accentColor,
-                        onClick = { onNavigateToDetail(bookmarked.slug) },
+                        onClick = remember(bookmarked.slug) { { onNavigateToDetail(bookmarked.slug) } },
                         isBookmarked = true,
-                        onBookmarkToggle = {
-                            viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster)
+                        onBookmarkToggle = remember(bookmarked.slug) {
+                            { viewModel.toggleBookmark(bookmarked.slug, bookmarked.title, bookmarked.poster) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         cardStyle = cardStyle
@@ -2863,6 +2873,8 @@ fun AnimeDetailScreen(
     val isDetailLoading by viewModel.isDetailLoading.collectAsState()
     val detailError by viewModel.detailError.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
+    // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
+    val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     val session by viewModel.session.collectAsState()
@@ -2939,7 +2951,7 @@ fun AnimeDetailScreen(
         }
     } else {
         detail?.let { d ->
-            val isBookmarked = bookmarkedAnimes.any { it.slug == slug }
+            val isBookmarked = bookmarkedSlugs.contains(slug)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
