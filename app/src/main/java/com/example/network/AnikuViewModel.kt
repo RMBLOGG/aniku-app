@@ -1388,6 +1388,28 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // --- USER LIST / DIREKTORI PENGGUNA (publik, beda dari adminUsers yang khusus admin panel) ---
+    private val _userDirectory = MutableStateFlow<List<ProfileDto>>(emptyList())
+    val userDirectory: StateFlow<List<ProfileDto>> = _userDirectory.asStateFlow()
+
+    private val _isUserDirectoryLoading = MutableStateFlow(false)
+    val isUserDirectoryLoading: StateFlow<Boolean> = _isUserDirectoryLoading.asStateFlow()
+
+    fun loadUserDirectory() {
+        val authHeader = getAuthHeader()
+        _isUserDirectoryLoading.value = true
+        viewModelScope.launch {
+            try {
+                _userDirectory.value = NetworkClient.supabaseDbApi.getProfiles(authHeader, SUPABASE_ANON_KEY)
+                    .sortedBy { it.user_number ?: Int.MAX_VALUE }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load user directory", e)
+            } finally {
+                _isUserDirectoryLoading.value = false
+            }
+        }
+    }
+
     // Admin Panel Database Operations
     fun loadAdminDetails() {
         if (!session.value.isAdmin && !session.value.isModerator) return

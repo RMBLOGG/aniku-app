@@ -350,6 +350,7 @@ class MainActivity : ComponentActivity() {
                     Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
+                    Triple("user_list", "Pengguna", Icons.Default.People),
                 ).filter { (route, _, _) ->
                     when (route) {
                         "feed" -> feedEnabled
@@ -390,6 +391,7 @@ class MainActivity : ComponentActivity() {
                             "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
                             "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
                             "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
+                            "user_list" to Triple(0xFF241a2e, 0xFFba68c8, "Cari & lihat profil pengguna"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
                             val meta = sheetItemColors[route]
@@ -709,6 +711,13 @@ class MainActivity : ComponentActivity() {
                                 onEditOwnProfile = {
                                     navController.navigate("profile")
                                 }
+                            )
+                        }
+                        composable("user_list") {
+                            UserListScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onUserClick = { userId -> navController.navigate("user_profile/$userId") }
                             )
                         }
                         composable("admin") {
