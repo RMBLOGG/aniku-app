@@ -2,9 +2,12 @@ package com.example.network
 
 import android.content.Context
 import android.util.Log
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.InetAddress
 import java.net.URI
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /**
@@ -31,10 +34,63 @@ object VideoExtractor {
     private const val DESKTOP_UA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    // Client polos khusus buat query DoH sendiri (jangan pakai `client` di bawah,
+    // supaya gak infinite-loop kalau dns.google ikut ke-resolve pakai FallbackDns).
+    private val dohClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * DNS sistem dulu (cepat & biasanya cukup). Kalau gagal resolve (UnknownHostException) —
+     * kasus umum buat shortlink (short.ink, dll) yang di-block ISP di level DNS —
+     * fallback ke DNS-over-HTTPS (Google) biar tetep bisa connect walau DNS lokal ngeblokir.
+     */
+    private object FallbackDns : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            try {
+                return Dns.SYSTEM.lookup(hostname)
+            } catch (e: UnknownHostException) {
+                Log.w("VideoExtractor", "DNS sistem gagal utk $hostname, coba DoH...")
+                return lookupViaDoH(hostname) ?: throw e
+            }
+        }
+
+        private fun lookupViaDoH(hostname: String): List<InetAddress>? {
+            return try {
+                val req = Request.Builder()
+                    .url("https://dns.google/resolve?name=$hostname&type=A")
+                    .header("Accept", "application/dns-json")
+                    .build()
+                dohClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return null
+                    val body = resp.body?.string() ?: return null
+                    val json = org.json.JSONObject(body)
+                    val answers = json.optJSONArray("Answer") ?: return null
+                    val ips = mutableListOf<InetAddress>()
+                    for (i in 0 until answers.length()) {
+                        val a = answers.getJSONObject(i)
+                        if (a.optInt("type") == 1) { // A record
+                            runCatching { InetAddress.getByName(a.getString("data")) }
+                                .getOrNull()?.let { ips.add(it) }
+                        }
+                    }
+                    ips.ifEmpty { null }.also {
+                        if (it != null) Log.d("VideoExtractor", "DoH resolve $hostname -> ${it.map { ip -> ip.hostAddress }}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("VideoExtractor", "DoH lookup gagal utk $hostname: ${e.message}")
+                null
+            }
+        }
+    }
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)
+        .dns(FallbackDns)
         .build()
 
     suspend fun resolve(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
@@ -90,8 +146,20 @@ object VideoExtractor {
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") -> extractPackedJwPlayer(embedUrl, referer)
                 else -> {
-                    Log.d("VideoExtractor", "Host '$host' belum ada extractor-nya")
-                    null
+                    // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
+                    // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
+                    // lewat OkHttp (pakai FallbackDns di atas, jadi tetep jalan walau
+                    // domain shortlink-nya di-block DNS ISP), terus resolve ulang hasil
+                    // akhirnya. Kalau ternyata gak ada redirect / hostnya emang gak
+                    // dikenal, tetap balikin null seperti biasa -> caller fallback WebView.
+                    val finalUrl = followRedirect(embedUrl, referer)
+                    if (!finalUrl.isNullOrBlank() && finalUrl != embedUrl) {
+                        Log.d("VideoExtractor", "Shortlink '$host' -> $finalUrl")
+                        resolve(finalUrl, referer, context)
+                    } else {
+                        Log.d("VideoExtractor", "Host '$host' belum ada extractor-nya")
+                        null
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -113,6 +181,23 @@ object VideoExtractor {
 
     private fun originOf(url: String): String =
         runCatching { URI(url).let { "${it.scheme}://${it.host}" } }.getOrDefault(url)
+
+    // ---------------------------------------------------------------------
+    // Follow redirect chain (buat shortlink kayak short.ink) pakai OkHttp
+    // (yang udah pasang FallbackDns), terus balikin URL final-nya.
+    // ---------------------------------------------------------------------
+    private fun followRedirect(url: String, referer: String?): String? {
+        val builder = Request.Builder().url(url).header("User-Agent", DESKTOP_UA)
+        if (referer != null) builder.header("Referer", referer)
+        return try {
+            client.newCall(builder.build()).execute().use { resp ->
+                resp.request.url.toString()
+            }
+        } catch (e: Exception) {
+            Log.e("VideoExtractor", "Gagal follow redirect $url: ${e.message}")
+            null
+        }
+    }
 
     // ---------------------------------------------------------------------
     // Mp4upload — link mp4 langsung ditaruh di player.src({...}) pada <script>.
