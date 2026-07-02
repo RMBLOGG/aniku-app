@@ -801,37 +801,105 @@ fun AdminRequestAnimeSection(viewModel: AnikuViewModel) {
         Text("Daftar Request (${requestedList.size})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         Spacer(modifier = Modifier.height(10.dp))
 
-        requestedList.forEach { anime ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context).data(anime.poster_url).crossfade(true).build(),
-                    contentDescription = anime.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp))
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(anime.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(
-                        anime.status ?: "pending",
-                        fontSize = 11.sp,
-                        color = when (anime.status) {
-                            "approved" -> Color(0xFF4CAF50)
-                            "rejected" -> Color(0xFFE53935)
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        // Kelompokkan per anime (mal_id/title) biar 1 anime dengan banyak episode gak jadi
+        // banyak baris identik — baris grup bisa di-expand buat kelola tiap episode satuan.
+        val groupedRequests = remember(requestedList) {
+            requestedList.groupBy { it.groupKey() }
+                .toList()
+                .map { (key, group) -> key to group.sortedByEpisode() }
+                .sortedByDescending { (_, group) -> group.maxOf { it.created_at ?: "" } }
+        }
+        var expandedGroups by remember { mutableStateOf(setOf<String>()) }
+
+        groupedRequests.forEach { (groupKey, items) ->
+            val cover = items.first()
+            val isMulti = items.size > 1
+            val isExpanded = groupKey in expandedGroups
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clickable(enabled = isMulti) {
+                            expandedGroups = if (isExpanded) expandedGroups - groupKey else expandedGroups + groupKey
                         }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(cover.poster_url).crossfade(true).build(),
+                        contentDescription = cover.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp))
                     )
-                }
-                if (anime.status != "approved") {
-                    IconButton(onClick = { viewModel.setRequestedAnimeStatus(anime.id, "approved") }) {
-                        Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(cover.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (isMulti) {
+                            Text("${items.size} Episode", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            Text(
+                                cover.status ?: "pending",
+                                fontSize = 11.sp,
+                                color = when (cover.status) {
+                                    "approved" -> Color(0xFF4CAF50)
+                                    "rejected" -> Color(0xFFE53935)
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                    }
+
+                    if (isMulti) {
+                        Icon(
+                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Tutup" else "Buka",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    } else {
+                        if (cover.status != "approved") {
+                            IconButton(onClick = { viewModel.setRequestedAnimeStatus(cover.id, "approved") }) {
+                                Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        IconButton(onClick = { viewModel.deleteRequestedAnime(cover.id) }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
-                IconButton(onClick = { viewModel.deleteRequestedAnime(anime.id) }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE53935), modifier = Modifier.size(20.dp))
+
+                if (isMulti && isExpanded) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(start = 54.dp, bottom = 6.dp)
+                    ) {
+                        items.forEach { ep ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(episodeLabel(ep), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                                    Text(
+                                        ep.status ?: "pending",
+                                        fontSize = 10.sp,
+                                        color = when (ep.status) {
+                                            "approved" -> Color(0xFF4CAF50)
+                                            "rejected" -> Color(0xFFE53935)
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                                if (ep.status != "approved") {
+                                    IconButton(onClick = { viewModel.setRequestedAnimeStatus(ep.id, "approved") }, modifier = Modifier.size(34.dp)) {
+                                        Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color(0xFF4CAF50), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                                IconButton(onClick = { viewModel.deleteRequestedAnime(ep.id) }, modifier = Modifier.size(34.dp)) {
+                                    Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE53935), modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
