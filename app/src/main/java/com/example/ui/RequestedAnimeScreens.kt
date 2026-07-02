@@ -7,9 +7,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,6 +41,31 @@ import com.example.network.JikanAnimeData
 import com.example.network.RequestedAnimeDto
 
 // ─────────────────────────────────────────────────────────────────────────
+// 0. HELPERS — grouping banyak video jadi 1 anime dengan banyak episode.
+//    Key grouping pakai mal_id kalau ada (paling akurat), fallback ke title.
+// ─────────────────────────────────────────────────────────────────────────
+private fun RequestedAnimeDto.groupKey(): String =
+    mal_id?.toString() ?: title.trim().lowercase()
+
+private fun parseEpisodeNumber(raw: String?): Int? =
+    raw?.let { Regex("""\d+""").find(it)?.value?.toIntOrNull() }
+
+private fun episodeLabel(anime: RequestedAnimeDto): String {
+    val num = parseEpisodeNumber(anime.episode)
+    return if (num != null) "E$num" else anime.episode?.takeIf { it.isNotBlank() } ?: "E1"
+}
+
+/** Urutkan episode: yang punya nomor duluan (ascending), sisanya di belakang berdasar created_at. */
+private fun List<RequestedAnimeDto>.sortedByEpisode(): List<RequestedAnimeDto> =
+    sortedWith(compareBy({ parseEpisodeNumber(it.episode) == null }, { parseEpisodeNumber(it.episode) ?: 0 }, { it.created_at ?: "" }))
+
+/** Representative card per grup: episode dengan nomor terkecil (biasanya E1). */
+private fun List<RequestedAnimeDto>.groupedForList(): List<Pair<RequestedAnimeDto, Int>> =
+    groupBy { it.groupKey() }
+        .map { (_, group) -> group.sortedByEpisode().first() to group.size }
+        .sortedByDescending { (anime, _) -> anime.created_at ?: "" }
+
+// ─────────────────────────────────────────────────────────────────────────
 // 1. LIST — daftar semua anime hasil request, diakses dari menu "Lainnya"
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
@@ -52,8 +79,9 @@ fun RequestedAnimeListScreen(
 
     LaunchedEffect(Unit) { viewModel.fetchRequestedAnimeList() }
 
-    // User biasa cuma lihat yang udah di-approve admin
-    val approved = list.filter { it.status == "approved" }
+    // User biasa cuma lihat yang udah di-approve admin, dikelompokkan per judul
+    // (1 anime bisa punya banyak episode/video, jangan sampai tiap video jadi card sendiri)
+    val approved = list.filter { it.status == "approved" }.groupedForList()
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
@@ -90,8 +118,8 @@ fun RequestedAnimeListScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(approved, key = { it.id }) { anime ->
-                    RequestedAnimeCard(anime = anime, onClick = { onItemClick(anime.id) })
+                gridItems(approved, key = { (anime, _) -> anime.groupKey() }) { (anime, episodeCount) ->
+                    RequestedAnimeCard(anime = anime, episodeCount = episodeCount, onClick = { onItemClick(anime.id) })
                 }
             }
         }
@@ -99,7 +127,7 @@ fun RequestedAnimeListScreen(
 }
 
 @Composable
-private fun RequestedAnimeCard(anime: RequestedAnimeDto, onClick: () -> Unit) {
+private fun RequestedAnimeCard(anime: RequestedAnimeDto, episodeCount: Int, onClick: () -> Unit) {
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
         Box(
@@ -125,6 +153,15 @@ private fun RequestedAnimeCard(anime: RequestedAnimeDto, onClick: () -> Unit) {
                     Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.size(10.dp))
                     Spacer(modifier = Modifier.width(2.dp))
                     Text(it, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            if (episodeCount > 1) {
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.7f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text("$episodeCount Eps", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -160,6 +197,11 @@ fun RequestedAnimeDetailScreen(
             CircularProgressIndicator()
         }
         return
+    }
+
+    // Semua video dengan judul/mal_id yang sama dianggap 1 anime dengan banyak episode
+    val episodes = remember(list, anime.groupKey()) {
+        list.filter { it.status == "approved" && it.groupKey() == anime.groupKey() }.sortedByEpisode()
     }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState())) {
@@ -207,7 +249,7 @@ fun RequestedAnimeDetailScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             Button(
-                onClick = { onWatch(anime.id) },
+                onClick = { onWatch((episodes.firstOrNull() ?: anime).id) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -238,6 +280,29 @@ fun RequestedAnimeDetailScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            if (episodes.size > 1) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Daftar Episode", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onBackground)
+                    Text("${episodes.size} Episode", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                episodes.chunked(5).forEach { rowItems ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowItems.forEach { ep ->
+                            EpisodeChip(
+                                label = episodeLabel(ep),
+                                selected = ep.id == anime.id,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onWatch(ep.id) }
+                            )
+                        }
+                        repeat(5 - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             anime.studio?.let {
                 Text("Studio: $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(24.dp))
@@ -249,6 +314,7 @@ fun RequestedAnimeDetailScreen(
 // ─────────────────────────────────────────────────────────────────────────
 // 3. WATCH — player sederhana, video_url langsung dari Cloudinary ke ExoPlayer
 //    (gak lewat VideoExtractor, karena udah direct link, bukan embed page)
+//    + strip episode di bawah player biar bisa ganti episode tanpa balik.
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
 fun RequestedAnimeWatchScreen(
@@ -262,13 +328,19 @@ fun RequestedAnimeWatchScreen(
         if (list.none { it.id == id }) viewModel.fetchRequestedAnimeList()
     }
 
-    val anime = list.find { it.id == id }
+    // activeId dipisah dari `id` (argumen nav) supaya tap episode lain gak perlu re-navigate
+    var activeId by remember(id) { mutableStateOf(id) }
+    val anime = list.find { it.id == activeId } ?: list.find { it.id == id }
 
     if (anime == null) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
         }
         return
+    }
+
+    val episodes = remember(list, anime.groupKey()) {
+        list.filter { it.status == "approved" && it.groupKey() == anime.groupKey() }.sortedByEpisode()
     }
 
     val context = LocalContext.current
@@ -286,23 +358,67 @@ fun RequestedAnimeWatchScreen(
         onDispose { exoPlayer.release() }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = true
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.statusBarsPadding().padding(12.dp).size(40.dp)
-                .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
-        ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.statusBarsPadding().padding(12.dp).size(40.dp)
+                    .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+            }
         }
+
+        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+            Text(anime.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(episodeLabel(anime), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        }
+
+        if (episodes.size > 1) {
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text("Semua Episode", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(episodes, key = { it.id }) { ep ->
+                        EpisodeChip(
+                            label = episodeLabel(ep),
+                            selected = ep.id == anime.id,
+                            modifier = Modifier.width(64.dp),
+                            onClick = { activeId = ep.id }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.08f))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.White else Color.White.copy(alpha = 0.8f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -316,6 +432,7 @@ fun AdminRequestAnimeSection(viewModel: AnikuViewModel) {
     val searchResults by viewModel.jikanSearchResults.collectAsState()
     val isSearching by viewModel.isSearchingJikan.collectAsState()
     val isUploading by viewModel.isUploadingRequestedAnime.collectAsState()
+    val uploadProgress by viewModel.uploadRequestedAnimeProgress.collectAsState()
     val requestedList by viewModel.requestedAnimeList.collectAsState()
     val uploadError by viewModel.requestedAnimeError.collectAsState()
 
@@ -440,14 +557,20 @@ fun AdminRequestAnimeSection(viewModel: AnikuViewModel) {
             shape = RoundedCornerShape(10.dp)
         ) {
             if (isUploading) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Mengunggah...")
+                Text("Mengunggah... $uploadProgress%")
             } else {
                 Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Upload Anime Request")
             }
+        }
+
+        if (isUploading) {
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { uploadProgress / 100f },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

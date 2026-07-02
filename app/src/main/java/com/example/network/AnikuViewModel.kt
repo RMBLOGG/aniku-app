@@ -274,6 +274,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isUploadingRequestedAnime = MutableStateFlow(false)
     val isUploadingRequestedAnime: StateFlow<Boolean> = _isUploadingRequestedAnime.asStateFlow()
 
+    private val _uploadRequestedAnimeProgress = MutableStateFlow(0)
+    val uploadRequestedAnimeProgress: StateFlow<Int> = _uploadRequestedAnimeProgress.asStateFlow()
+
     private val _requestedAnimeList = MutableStateFlow<List<RequestedAnimeDto>>(emptyList())
     val requestedAnimeList: StateFlow<List<RequestedAnimeDto>> = _requestedAnimeList.asStateFlow()
 
@@ -1590,8 +1593,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
                 val fileBytes = byteBuffer.toByteArray()
 
-                // 2. Siapkan multipart request buat Cloudinary
-                val requestFile = fileBytes.toRequestBody("video/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                // 2. Siapkan multipart request buat Cloudinary, dibungkus ProgressRequestBody
+                //    biar progress upload-nya (0-100%) bisa dipantau real-time dari UI
+                _uploadRequestedAnimeProgress.value = 0
+                val plainRequestFile = fileBytes.toRequestBody("video/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val requestFile = ProgressRequestBody(plainRequestFile) { written, total ->
+                    if (total > 0) {
+                        val percent = ((written * 100) / total).toInt()
+                        _uploadRequestedAnimeProgress.value = percent
+                    }
+                }
                 val body = MultipartBody.Part.createFormData("file", "requested_video.mp4", requestFile)
                 val presetBody = "anime_request_video".toRequestBody("text/plain".toMediaTypeOrNull())
 
@@ -1628,11 +1639,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _requestedAnimeList.value = inserted + _requestedAnimeList.value
 
                 _isUploadingRequestedAnime.value = false
+                _uploadRequestedAnimeProgress.value = 0
                 onProgress(false)
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Upload requested anime failed", e)
                 _requestedAnimeError.value = e.message ?: "Upload gagal"
                 _isUploadingRequestedAnime.value = false
+                _uploadRequestedAnimeProgress.value = 0
                 onProgress(false)
             }
         }
