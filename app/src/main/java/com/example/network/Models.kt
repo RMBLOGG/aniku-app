@@ -161,6 +161,12 @@ data class RefreshTokenRequest(
     val refresh_token: String
 )
 
+@JsonClass(generateAdapter = true)
+data class IdTokenSignInRequest(
+    val provider: String = "google",
+    val id_token: String
+)
+
 // Use Map in AuthResponse since metadata is dynamic
 @JsonClass(generateAdapter = true)
 data class AuthResponse(

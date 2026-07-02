@@ -1188,6 +1188,78 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Login pakai Google ID Token (dipanggil setelah Credential Manager berhasil ambil idToken)
+    fun loginWithGoogle(idToken: String, onSuccess: () -> Unit) {
+        _authLoading.value = true
+        _authError.value = null
+        viewModelScope.launch {
+            try {
+                val res = NetworkClient.supabaseAuthApi.signInWithIdToken(
+                    request = IdTokenSignInRequest(id_token = idToken),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val token = res.access_token
+                if (token == null) {
+                    _authError.value = "Login Google gagal: Sesi tidak ditemukan."
+                    _authLoading.value = false
+                    return@launch
+                }
+                val uId = res.user?.id ?: ""
+                val emailFromRes = res.user?.email ?: ""
+
+                // Kasih waktu trigger handle_new_user jalan kalau ini user baru
+                kotlinx.coroutines.delay(800)
+
+                val profileList = try {
+                    NetworkClient.supabaseDbApi.getProfileByUserId(
+                        idQuery = "eq.$uId",
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                } catch (e: Exception) {
+                    emptyList()
+                }
+
+                val profile = profileList.firstOrNull()
+                if (profile?.is_banned == true) {
+                    _authError.value = "Akun Anda ditangguhkan (Banned) oleh Admin."
+                    _authLoading.value = false
+                    return@launch
+                }
+
+                val activeSession = UserSession(
+                    token = token,
+                    refreshToken = res.refresh_token,
+                    userId = uId,
+                    email = emailFromRes,
+                    username = profile?.username
+                        ?: (res.user?.user_metadata?.get("full_name")?.toString()
+                            ?: res.user?.user_metadata?.get("name")?.toString()
+                            ?: emailFromRes.substringBefore("@")),
+                    avatarUrl = profile?.avatar_url
+                        ?: res.user?.user_metadata?.get("avatar_url")?.toString(),
+                    isAdmin = profile?.isAdmin() ?: false,
+                    isModerator = profile?.isModerator() ?: false,
+                    isBanned = profile?.is_banned ?: false,
+                    userNumber = profile?.user_number
+                )
+
+                settingsStore.saveSession(activeSession)
+                _authLoading.value = false
+                onSuccess()
+            } catch (e: retrofit2.HttpException) {
+                _authLoading.value = false
+                val errBody = e.response()?.errorBody()?.string() ?: "no body"
+                _authError.value = "Login Google gagal (HTTP ${e.code()}): $errBody"
+                Log.e("AnikuVM", "Google Login HttpException: ${e.code()} - $errBody")
+            } catch (e: Exception) {
+                _authLoading.value = false
+                _authError.value = "Login Google gagal: ${e.javaClass.simpleName} - ${e.message}"
+                Log.e("AnikuVM", "Google Login Exception", e)
+            }
+        }
+    }
+
     fun register(email: String, password: String, username: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null

@@ -75,6 +75,12 @@ import com.example.ui.theme.getAccentColor
 import com.example.BuildConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.util.Log
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
 // ================================================================
 // REUSABLE COMPONENTS
@@ -5378,6 +5384,50 @@ fun AuthScreen(
     val authError by viewModel.authError.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var googleLoading by remember { mutableStateOf(false) }
+
+    // GANTI dengan Web Client ID (bukan Android Client ID) dari Google Cloud Console
+    val googleWebClientId = "1050856790349-re2egjtpjg28b6aiojt2lab56vs1u3ei.apps.googleusercontent.com"
+
+    fun launchGoogleSignIn() {
+        coroutineScope.launch {
+            googleLoading = true
+            try {
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(googleWebClientId)
+                    .build()
+
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+
+                val credentialManager = CredentialManager.create(context)
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = context
+                )
+
+                val googleIdTokenCredential = GoogleIdTokenCredential
+                    .createFrom(result.credential.data)
+                val idToken = googleIdTokenCredential.idToken
+
+                viewModel.loginWithGoogle(idToken) {
+                    googleLoading = false
+                    onAuthSuccess()
+                }
+            } catch (e: GetCredentialException) {
+                googleLoading = false
+                Log.e("AnikuVM", "Google Sign-In dibatalkan/gagal: ${e.message}")
+            } catch (e: Exception) {
+                googleLoading = false
+                Log.e("AnikuVM", "Google Sign-In Exception", e)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -5545,6 +5595,44 @@ fun AuthScreen(
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                         } else {
                             Text(if (isLoginTab) "Masuk" else "Daftar", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Divider "atau"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                        Text(
+                            text = "  atau  ",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            fontSize = 12.sp
+                        )
+                        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Tombol Login dengan Google
+                    OutlinedButton(
+                        onClick = { launchGoogleSignIn() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = !authLoading && !googleLoading
+                    ) {
+                        if (googleLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Text(
+                                "G",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                color = accentColor
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Lanjutkan dengan Google", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

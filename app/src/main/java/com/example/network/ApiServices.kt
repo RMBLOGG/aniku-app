@@ -156,6 +156,12 @@ interface SupabaseAuthApi {
         @Header("apikey") apiKey: String
     ): AuthResponse
 
+    @POST("auth/v1/token?grant_type=id_token")
+    suspend fun signInWithIdToken(
+        @Body request: IdTokenSignInRequest,
+        @Header("apikey") apiKey: String
+    ): AuthResponse
+
     @POST("auth/v1/recover")
     suspend fun recoverPassword(
         @Body request: RecoverRequest,
