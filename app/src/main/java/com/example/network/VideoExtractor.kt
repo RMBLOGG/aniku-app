@@ -2,6 +2,8 @@ package com.example.network
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -167,6 +169,26 @@ object VideoExtractor {
             null
         }
     }
+
+    /**
+     * Dipakai SETIAP KALI resolve() gagal (return null) dan caller mau fallback ke WebView.
+     * Jangan langsung pakai embedUrl mentah buat WebView.loadUrl() — kalau embedUrl itu
+     * shortlink (short.ink, short.icu, atau apapun besok) yang domainnya di-block ISP di
+     * level DNS, WebView bakal langsung dapet net::ERR_NAME_NOT_RESOLVED karena WebView
+     * pakai DNS sistem biasa, BUKAN FallbackDns (DoH) yang dipasang di client OkHttp atas.
+     *
+     * Fungsi ini follow redirect-nya dulu lewat OkHttp (yang udah pasang FallbackDns),
+     * jadi walau domain shortlink-nya di-block ISP, kita tetap bisa nyampe ke URL akhirnya
+     * (host video/iframe asli) — baru itu yang dikasih ke WebView. Aman dipanggil untuk
+     * URL apapun; kalau bukan shortlink / gak ada redirect / gagal, balikin url aslinya.
+     */
+    suspend fun resolveForWebViewFallback(url: String, referer: String? = null): String =
+        withContext(Dispatchers.IO) {
+            runCatching { followRedirect(url, referer) }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?: url
+        }
 
     private fun fetchHtml(url: String, referer: String? = null): String {
         val builder = Request.Builder()

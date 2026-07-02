@@ -951,7 +951,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _resolvedHeaders.value = extracted.headers
                                         _isDirectStream.value = true
                                     } else {
-                                        _activeStreamUrl.value = resolvedUrl
+                                        // Ekstraksi gagal — jangan pakai resolvedUrl mentah kalau itu
+                                        // shortlink (short.ink/short.icu/dll) yang DNS-nya di-block ISP,
+                                        // WebView bisa ERR_NAME_NOT_RESOLVED. Follow redirect-nya dulu.
+                                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(
+                                            resolvedUrl, "https://v2.samehadaku.how/"
+                                        )
                                         _resolvedHeaders.value = emptyMap()
                                         _isDirectStream.value = false
                                     }
@@ -984,7 +989,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                         } else {
-                            _activeStreamUrl.value = firstUrl
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
                         }
@@ -1032,7 +1037,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                     _resolvedHeaders.value = extracted.headers
                                     _isDirectStream.value = true
                                 } else {
-                                    _activeStreamUrl.value = resolvedUrl
+                                    _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(
+                                        resolvedUrl, "https://v2.samehadaku.how/"
+                                    )
                                     _resolvedHeaders.value = emptyMap()
                                     _isDirectStream.value = false
                                 }
@@ -1071,7 +1078,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _resolvedHeaders.value = resolved.headers
                         _isDirectStream.value = true
                     } else {
-                        _activeStreamUrl.value = rawUrl
+                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
                         _resolvedHeaders.value = emptyMap()
                         _isDirectStream.value = isDirectUrl(rawUrl)
                     }

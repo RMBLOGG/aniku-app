@@ -4686,7 +4686,9 @@ fun WatchScreen(
                                                 "nakamaxyz.com", "nakama.to",
                                                 "premium.to",
                                                 "pucuk.eu.org",
-                                                "cdn.jsdelivr.net", "unpkg.com"
+                                                "cdn.jsdelivr.net", "unpkg.com",
+                                                // Shortlink Animasu (kadang ganti-ganti provider)
+                                                "short.icu", "short.ink"
                                             )
 
                                             override fun shouldInterceptRequest(
