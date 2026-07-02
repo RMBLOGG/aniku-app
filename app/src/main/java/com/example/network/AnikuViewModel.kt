@@ -1736,6 +1736,177 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // --- Clan & Diamond ---
+    private val _topClans = MutableStateFlow<List<ClanDto>>(emptyList())
+    val topClans: StateFlow<List<ClanDto>> = _topClans.asStateFlow()
+
+    private val _myClanMembership = MutableStateFlow<ClanMemberDto?>(null)
+    val myClanMembership: StateFlow<ClanMemberDto?> = _myClanMembership.asStateFlow()
+
+    private val _selectedClanMembers = MutableStateFlow<List<ClanMemberDto>>(emptyList())
+    val selectedClanMembers: StateFlow<List<ClanMemberDto>> = _selectedClanMembers.asStateFlow()
+
+    private val _clanActionError = MutableStateFlow<String?>(null)
+    val clanActionError: StateFlow<String?> = _clanActionError.asStateFlow()
+
+    private val _isClanLoading = MutableStateFlow(false)
+    val isClanLoading: StateFlow<Boolean> = _isClanLoading.asStateFlow()
+
+    private val _diamondBalance = MutableStateFlow(0)
+    val diamondBalance: StateFlow<Int> = _diamondBalance.asStateFlow()
+
+    // Refresh saldo Diamond dari profile sendiri (dipanggil setelah create/join/contribute clan)
+    fun refreshProfile() {
+        val uid = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                val result = withValidToken { token ->
+                    NetworkClient.supabaseDbApi.getProfileByUserId(
+                        idQuery = "eq.$uid",
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+                _diamondBalance.value = result.firstOrNull()?.diamond_balance ?: 0
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "refreshProfile (diamond) error: ${e.message}")
+            }
+        }
+    }
+
+    fun loadClans() {
+        viewModelScope.launch {
+            try {
+                _topClans.value = NetworkClient.supabaseDbApi.getClans(getAuthHeader(), SUPABASE_ANON_KEY)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load clans", e)
+            }
+        }
+    }
+
+    fun loadMyClanMembership() {
+        val userId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getMyClanMembership("eq.$userId", getAuthHeader(), SUPABASE_ANON_KEY)
+                _myClanMembership.value = result.firstOrNull()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load clan membership", e)
+            }
+        }
+    }
+
+    fun loadClanMembers(clanId: String) {
+        viewModelScope.launch {
+            try {
+                val raw = NetworkClient.supabaseDbApi.getClanMembers("eq.$clanId", getAuthHeader(), SUPABASE_ANON_KEY)
+                _selectedClanMembers.value = raw.map { row ->
+                    @Suppress("UNCHECKED_CAST")
+                    val profileMap = row["profiles"] as? Map<String, Any?>
+                    ClanMemberDto(
+                        id = row["id"] as? String ?: "",
+                        clan_id = row["clan_id"] as? String ?: "",
+                        user_id = row["user_id"] as? String ?: "",
+                        role = row["role"] as? String,
+                        contributed_xp = (row["contributed_xp"] as? Double)?.toInt(),
+                        username = profileMap?.get("username") as? String,
+                        avatar_url = profileMap?.get("avatar_url") as? String
+                    )
+                }.sortedByDescending { it.contributed_xp ?: 0 }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load clan members", e)
+            }
+        }
+    }
+
+    fun createClan(name: String, tag: String) {
+        _clanActionError.value = null
+        _isClanLoading.value = true
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.createClan(
+                    mapOf("p_name" to name, "p_tag" to tag),
+                    getAuthHeader(), SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                    refreshProfile()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal membuat clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal membuat clan"
+            } finally {
+                _isClanLoading.value = false
+            }
+        }
+    }
+
+    fun joinClan(clanId: String) {
+        _clanActionError.value = null
+        _isClanLoading.value = true
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.joinClan(
+                    mapOf("p_clan_id" to clanId),
+                    getAuthHeader(), SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal join clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal join clan"
+            } finally {
+                _isClanLoading.value = false
+            }
+        }
+    }
+
+    fun contributeToClan(amount: Int) {
+        _clanActionError.value = null
+        _isClanLoading.value = true
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.contributeToClan(
+                    mapOf("p_amount" to amount),
+                    getAuthHeader(), SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                    refreshProfile()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal kontribusi"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal kontribusi"
+            } finally {
+                _isClanLoading.value = false
+            }
+        }
+    }
+
+    // Admin only: kredit DM manual (dipanggil dari Admin Panel setelah verifikasi bukti transfer)
+    fun adminAddDiamond(userId: String, amount: Int, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.adminAddDiamond(
+                    mapOf("p_user_id" to userId, "p_amount" to amount),
+                    getAuthHeader(), SUPABASE_ANON_KEY
+                )
+                onDone(response.isSuccessful)
+                if (response.isSuccessful) loadAdminDetails()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal tambah diamond", e)
+                onDone(false)
+            }
+        }
+    }
+
     // Admin Panel Database Operations
     fun loadAdminDetails() {
         if (!session.value.isAdmin && !session.value.isModerator) return

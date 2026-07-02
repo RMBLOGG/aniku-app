@@ -6670,6 +6670,46 @@ fun AdminPanelScreen(
                                             )
                                         }
 
+                                        // +DM button (kredit Diamond manual) - hanya admin
+                                        var showAddDmDialog by remember { mutableStateOf(false) }
+                                        if (sess.isAdmin) IconButton(
+                                            onClick = { showAddDmDialog = true },
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(Color(0xFF4FD8E8).copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(Icons.Default.Diamond, contentDescription = "Tambah DM", tint = Color(0xFF4FD8E8), modifier = Modifier.size(18.dp))
+                                        }
+                                        if (showAddDmDialog) {
+                                            var dmAmount by remember { mutableStateOf("") }
+                                            AlertDialog(
+                                                onDismissRequest = { showAddDmDialog = false },
+                                                title = { Text("Tambah Diamond \u2014 ${usr.username ?: "User"}") },
+                                                text = {
+                                                    Column {
+                                                        Text("Saldo saat ini: ${usr.diamond_balance ?: 0} DM", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        OutlinedTextField(
+                                                            value = dmAmount,
+                                                            onValueChange = { dmAmount = it.filter { c -> c.isDigit() } },
+                                                            label = { Text("Jumlah DM ditambahkan") },
+                                                            singleLine = true,
+                                                            modifier = Modifier.fillMaxWidth()
+                                                        )
+                                                    }
+                                                },
+                                                confirmButton = {
+                                                    TextButton(onClick = {
+                                                        dmAmount.toIntOrNull()?.let { viewModel.adminAddDiamond(usr.id, it) }
+                                                        showAddDmDialog = false
+                                                        dmAmount = ""
+                                                    }) { Text("Tambah") }
+                                                },
+                                                dismissButton = { TextButton(onClick = { showAddDmDialog = false }) { Text("Batal") } }
+                                            )
+                                        }
+
                                         // Set Role button - hanya admin
                                         var showRoleDialog by remember { mutableStateOf(false) }
                                         if (sess.isAdmin) IconButton(

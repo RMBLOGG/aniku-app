@@ -197,7 +197,8 @@ data class ProfileDto(
     val user_number: Int? = null,
     val created_at: String? = null,
     val season_xp: Int? = 0,
-    val season_level: Int? = 1
+    val season_level: Int? = 1,
+    val diamond_balance: Int? = 0
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"
@@ -207,6 +208,30 @@ data class ProfileDto(
         else -> "Pengguna"
     }
 }
+
+@JsonClass(generateAdapter = true)
+data class ClanDto(
+    val id: String,
+    val name: String,
+    val tag: String,
+    val level: Int? = 1,
+    val total_xp: Int? = 0,
+    val leader_id: String? = null,
+    val created_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ClanMemberDto(
+    val id: String,
+    val clan_id: String,
+    val user_id: String,
+    val role: String? = "member",
+    val contributed_xp: Int? = 0,
+    val joined_at: String? = null,
+    // Join manual dari profiles pas ditampilkan di UI, bukan dari kolom DB
+    val username: String? = null,
+    val avatar_url: String? = null
+)
 
 @JsonClass(generateAdapter = true)
 data class AnnouncementDto(

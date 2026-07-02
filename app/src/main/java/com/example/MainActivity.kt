@@ -370,6 +370,7 @@ class MainActivity : ComponentActivity() {
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                     Triple("user_list", "Pengguna", Icons.Default.People),
+                    Triple("clans", "Clan", Icons.Default.Diamond),
                     Triple("request_anime", "Anime Request", Icons.Default.VideoLibrary),
                 ).filter { (route, _, _) ->
                     when (route) {
@@ -412,6 +413,7 @@ class MainActivity : ComponentActivity() {
                             "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
                             "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
                             "user_list" to Triple(0xFF241a2e, 0xFFba68c8, "Cari & lihat profil pengguna"),
+                            "clans" to Triple(0xFF0D3B4F, 0xFF4FD8E8, "Buat clan & kumpulin Diamond"),
                             "request_anime" to Triple(0xFF1a2620, 0xFF26c281, "Anime hasil request user"),
                         )
                         sheetNavItems.forEach { (route, label, icon) ->
@@ -769,6 +771,19 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
                                 onUserClick = { userId -> navController.navigate("user_profile/$userId") }
+                            )
+                        }
+                        composable("clans") {
+                            ClanScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onTopUpClick = { navController.navigate("diamond_topup") }
+                            )
+                        }
+                        composable("diamond_topup") {
+                            DiamondTopUpScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("admin") {

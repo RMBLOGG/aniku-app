@@ -234,6 +234,63 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // --- Clan & Diamond ---
+    @GET("rest/v1/clans")
+    suspend fun getClans(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("order") order: String = "total_xp.desc"
+    ): List<ClanDto>
+
+    @GET("rest/v1/clan_members")
+    suspend fun getClanMembers(
+        @Query("clan_id") clanIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "*,profiles(username,avatar_url)"
+    ): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @GET("rest/v1/clan_members")
+    suspend fun getMyClanMembership(
+        @Query("user_id") userIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ClanMemberDto>
+
+    @POST("rest/v1/rpc/create_clan")
+    suspend fun createClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<ClanDto>
+
+    @POST("rest/v1/rpc/join_clan")
+    suspend fun joinClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/leave_clan")
+    suspend fun leaveClan(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/contribute_to_clan")
+    suspend fun contributeToClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/admin_add_diamond")
+    suspend fun adminAddDiamond(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
