@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -312,9 +314,9 @@ fun RequestedAnimeDetailScreen(
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// 3. WATCH — player sederhana, video_url langsung dari Cloudinary ke ExoPlayer
-//    (gak lewat VideoExtractor, karena udah direct link, bukan embed page)
-//    + strip episode di bawah player biar bisa ganti episode tanpa balik.
+// 3. WATCH — custom player controls (bukan default ExoPlayer UI) biar matching
+//    tema app: play/pause bulat warna primary, seekbar custom, fullscreen landscape,
+//    double-tap ±10s. Strip episode di bawah player buat ganti episode tanpa balik.
 // ─────────────────────────────────────────────────────────────────────────
 @Composable
 fun RequestedAnimeWatchScreen(
@@ -344,6 +346,7 @@ fun RequestedAnimeWatchScreen(
     }
 
     val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val exoPlayer = remember(anime.video_url) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(anime.video_url))
@@ -352,50 +355,268 @@ fun RequestedAnimeWatchScreen(
         }
     }
 
-    BackHandler { onBack() }
+    var isFullscreen by remember { mutableStateOf(false) }
+    var showControls by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var isBuffering by remember { mutableStateOf(true) }
+    var positionMs by remember { mutableStateOf(0L) }
+    var durationMs by remember { mutableStateOf(0L) }
+    var seekTarget by remember { mutableStateOf<Float?>(null) }
+    var doubleTapSide by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Poll posisi/durasi player tiap 500ms — ExoPlayer gak punya Flow bawaan buat ini
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            positionMs = exoPlayer.currentPosition.coerceAtLeast(0)
+            durationMs = exoPlayer.duration.coerceAtLeast(0)
+            isPlaying = exoPlayer.isPlaying
+            isBuffering = exoPlayer.playbackState == androidx.media3.common.Player.STATE_BUFFERING
+            kotlinx.coroutines.delay(500)
+        }
+    }
+
+    // Auto-hide kontrol setelah 3 detik kalau lagi main
+    LaunchedEffect(showControls, isPlaying) {
+        if (showControls && isPlaying) {
+            kotlinx.coroutines.delay(3000)
+            showControls = false
+        }
+    }
+
+    fun formatTime(ms: Long): String {
+        val totalSec = ms / 1000
+        val h = totalSec / 3600; val m = (totalSec % 3600) / 60; val s = totalSec % 60
+        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+    }
+
+    BackHandler(enabled = isFullscreen) {
+        isFullscreen = false
+    }
+    BackHandler(enabled = !isFullscreen) { onBack() }
+
+    LaunchedEffect(isFullscreen) {
+        if (isFullscreen) {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            activity?.window?.decorView?.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        } else {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
 
     DisposableEffect(Unit) {
-        onDispose { exoPlayer.release() }
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+            exoPlayer.release()
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+        Box(
+            modifier = if (isFullscreen) Modifier.fillMaxSize()
+            else Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+        ) {
             AndroidView(
                 factory = { ctx ->
                     PlayerView(ctx).apply {
                         player = exoPlayer
-                        useController = true
+                        useController = false
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.statusBarsPadding().padding(12.dp).size(40.dp)
-                    .clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+
+            if (isBuffering) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp,
+                    modifier = Modifier.align(Alignment.Center).size(36.dp)
+                )
+            }
+
+            // Efek kilat pas double-tap seek
+            if (doubleTapSide != null) {
+                LaunchedEffect(doubleTapSide) {
+                    kotlinx.coroutines.delay(500)
+                    doubleTapSide = null
+                }
+                Box(
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(0.4f)
+                        .align(if (doubleTapSide == "left") Alignment.CenterStart else Alignment.CenterEnd)
+                        .background(Color.White.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (doubleTapSide == "left") "« 10s" else "10s »", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+
+            // Area tap: single tap toggle kontrol, double tap seek ±10s
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { showControls = !showControls },
+                        onDoubleTap = { offset ->
+                            val side = if (offset.x < size.width / 2f) "left" else "right"
+                            val newPos = if (side == "left") exoPlayer.currentPosition - 10_000 else exoPlayer.currentPosition + 10_000
+                            exoPlayer.seekTo(newPos.coerceIn(0, exoPlayer.duration.coerceAtLeast(0)))
+                            doubleTapSide = side
+                            showControls = false
+                        }
+                    )
+                }
+            )
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showControls,
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.fillMaxSize()
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.45f),
+                            0.35f to Color.Transparent,
+                            0.7f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.55f)
+                        )
+                    )
+                ) {
+                    // Top bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth().align(Alignment.TopStart)
+                            .statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { if (isFullscreen) isFullscreen = false else onBack() },
+                            modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        if (!isFullscreen) {
+                            Text(
+                                anime.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(horizontal = 10.dp)
+                            )
+                        } else {
+                            Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                Text(anime.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(episodeLabel(anime), color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.size(40.dp))
+                    }
+
+                    // Center play/pause + skip
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(28.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { exoPlayer.seekTo((exoPlayer.currentPosition - 10_000).coerceAtLeast(0)) },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Default.Replay10, contentDescription = "Mundur 10 detik", tint = Color.White, modifier = Modifier.size(30.dp))
+                        }
+                        IconButton(
+                            onClick = {
+                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                isPlaying = exoPlayer.isPlaying
+                                showControls = true
+                            },
+                            modifier = Modifier.size(60.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Jeda" else "Putar",
+                                tint = Color.White,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { exoPlayer.seekTo((exoPlayer.currentPosition + 10_000).coerceAtMost(exoPlayer.duration.coerceAtLeast(0))) },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(Icons.Default.Forward10, contentDescription = "Maju 10 detik", tint = Color.White, modifier = Modifier.size(30.dp))
+                        }
+                    }
+
+                    // Bottom bar: progress + waktu + fullscreen
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                            .navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        val sliderPos = seekTarget ?: if (durationMs > 0) positionMs.toFloat() / durationMs.toFloat() else 0f
+                        Slider(
+                            value = sliderPos.coerceIn(0f, 1f),
+                            onValueChange = { seekTarget = it },
+                            onValueChangeFinished = {
+                                val target = seekTarget
+                                if (target != null && durationMs > 0) {
+                                    exoPlayer.seekTo((target * durationMs).toLong())
+                                }
+                                seekTarget = null
+                            },
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(28.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "${formatTime((sliderPos * durationMs).toLong())} / ${formatTime(durationMs)}",
+                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold
+                            )
+                            IconButton(onClick = { isFullscreen = !isFullscreen }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                    contentDescription = "Layar penuh", tint = Color.White, modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Text(anime.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(episodeLabel(anime), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
-        }
+        if (!isFullscreen) {
+            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                Text(anime.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(episodeLabel(anime), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+            }
 
-        if (episodes.size > 1) {
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("Semua Episode", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(episodes, key = { it.id }) { ep ->
-                        EpisodeChip(
-                            label = episodeLabel(ep),
-                            selected = ep.id == anime.id,
-                            modifier = Modifier.width(64.dp),
-                            onClick = { activeId = ep.id }
-                        )
+            if (episodes.size > 1) {
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Semua Episode", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(episodes, key = { it.id }) { ep ->
+                            EpisodeChip(
+                                label = episodeLabel(ep),
+                                selected = ep.id == anime.id,
+                                modifier = Modifier.width(64.dp),
+                                onClick = { activeId = ep.id }
+                            )
+                        }
                     }
                 }
             }

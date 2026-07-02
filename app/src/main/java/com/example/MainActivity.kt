@@ -244,7 +244,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "feed", "user_list")
+                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "feed", "user_list", "request_anime")
                 val showBottomBar = currentRoute in bottomRoutes
                 var showMoreSheet by remember { mutableStateOf(false) }
                 val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
