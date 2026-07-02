@@ -10,6 +10,7 @@ import com.example.ui.theme.SettingsStore
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -476,7 +477,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _homeError.value = null
         viewModelScope.launch {
             try {
-                // 1. Fetch Blacklist again to maintain sync
+                // 1. Blacklist duluan (sequential) karena semua section lain butuh ini buat filter
                 val blacklistedResponse = retryIO {
                     NetworkClient.supabaseDbApi.getBlacklistedAnime(
                         authHeader = "Bearer $SUPABASE_ANON_KEY",
@@ -486,125 +487,151 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val blacklist = blacklistedResponse.map { it.anime_slug }.toSet()
                 _blacklistedSlugs.value = blacklist
 
-                // 2. Load featured slides from Supabase
-                try {
-                    val featured = retryIO {
-                        NetworkClient.supabaseDbApi.getFeaturedAnime(
-                            authHeader = "Bearer $SUPABASE_ANON_KEY",
-                            apiKey = SUPABASE_ANON_KEY
-                        )
-                    }.filterNot { blacklist.contains(it.anime_slug) }
-                    _featuredSlides.value = featured
-                } catch (fe: Exception) {
-                    Log.e("AnikuVM", "Failed to fetch featured slides", fe)
-                }
-
-                // 3. Load active announcements from Supabase
-                try {
-                    val anns = retryIO {
-                        NetworkClient.supabaseDbApi.getAnnouncements(
-                            authHeader = "Bearer $SUPABASE_ANON_KEY",
-                            apiKey = SUPABASE_ANON_KEY
-                        )
-                    }
-                    _activeAnnouncement.value = anns.firstOrNull { it.is_active == true }
-                } catch (ae: Exception) {
-                    Log.e("AnikuVM", "Failed to load announcements", ae)
-                }
-
-                // 4. Load Anime Home API
-                val isSamehadaku = dataSource.value == "Dayynime-v2"
-                if (isSamehadaku) {
-                    // Sedang Tayang → /ongoing
-                    try {
-                        val ongoingRes = retryIO { samehadakuApi.getOngoing(page = 1) }
-                        _homeOngoing.value = (ongoingRes.data?.animeList ?: emptyList())
-                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    } catch (oe: Exception) { Log.e("AnikuVM", "Failed samehadaku ongoing", oe) }
-
-                    // Terbaru → /recent
-                    try {
-                        val recentRes = retryIO { samehadakuApi.getRecent(page = 1) }
-                        _homeRecent.value = (recentRes.data?.animeList ?: emptyList())
-                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    } catch (re: Exception) { Log.e("AnikuVM", "Failed samehadaku recent", re) }
-
-                    try {
-                        val popularRes = retryIO { samehadakuApi.getPopular(page = 1) }
-                        _homePopular.value = (popularRes.data?.animeList ?: emptyList())
-                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    } catch (pe: Exception) { Log.e("AnikuVM", "Failed samehadaku home popular", pe) }
-
-                    try {
-                        val moviesRes = retryIO { samehadakuApi.getMovies(page = 1) }
-                        _homeMovies.value = (moviesRes.data?.animeList ?: emptyList())
-                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    } catch (me: Exception) { Log.e("AnikuVM", "Failed samehadaku home movies", me) }
-
-                    try {
-                        val completedRes = retryIO { samehadakuApi.getCompleted(page = 1) }
-                        _homeCompleted.value = (completedRes.data?.animeList ?: emptyList())
-                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                    } catch (ce: Exception) { Log.e("AnikuVM", "Failed samehadaku home completed", ce) }
-
-                    try {
-                        val schedRes = retryIO { samehadakuApi.getSchedule() }
-                        val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
-                        // Samehadaku pakai nama hari Inggris
-                        val engDayNames = listOf("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")
-                        val todayEngName = engDayNames[todayDay - 1]
-                        val todayList = schedRes.data?.days
-                            ?.firstOrNull { it.day.equals(todayEngName, ignoreCase = true) }
-                            ?.animeList?.map { it.toAnimeRaw() } ?: emptyList()
-                        _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
-                    } catch (se: Exception) { Log.e("AnikuVM", "Failed samehadaku home schedule", se) }
-                } else {
-                    val homeRes = retryIO { animeApi.getHome() }
-                    _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    _homeRecent.value = (homeRes.recent ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-
-                    // 5. Load Popular for Section
-                    try {
-                        val popularRes = retryIO { animeApi.getPopular(page = 1) }
-                        _homePopular.value = (popularRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    } catch (pe: Exception) {
-                        Log.e("AnikuVM", "Failed to load home popular", pe)
+                // 2. Semua section lain di-fetch PARALEL (bukan satu-satu berurutan).
+                // Dulu: total waktu = jumlah semua request. Sekarang: total waktu = request TERLAMA aja.
+                // Ini juga bikin section-section Home muncul nyaris bareng, bukan netes satu-satu
+                // sambil user udah keburu scroll (itu penyebab lag pas baru buka app).
+                coroutineScope {
+                    launch {
+                        try {
+                            val featured = retryIO {
+                                NetworkClient.supabaseDbApi.getFeaturedAnime(
+                                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                                    apiKey = SUPABASE_ANON_KEY
+                                )
+                            }.filterNot { blacklist.contains(it.anime_slug) }
+                            _featuredSlides.value = featured
+                        } catch (fe: Exception) {
+                            Log.e("AnikuVM", "Failed to fetch featured slides", fe)
+                        }
                     }
 
-                    // 6. Load Movies for Section
-                    try {
-                        val moviesRes = retryIO { animeApi.getMovies(page = 1) }
-                        _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    } catch (me: Exception) {
-                        Log.e("AnikuVM", "Failed to load home movies", me)
+                    launch {
+                        try {
+                            val anns = retryIO {
+                                NetworkClient.supabaseDbApi.getAnnouncements(
+                                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                                    apiKey = SUPABASE_ANON_KEY
+                                )
+                            }
+                            _activeAnnouncement.value = anns.firstOrNull { it.is_active == true }
+                        } catch (ae: Exception) {
+                            Log.e("AnikuVM", "Failed to load announcements", ae)
+                        }
                     }
 
-                    // 7. Load Completed for Section
-                    try {
-                        val completedRes = retryIO { animeApi.getCompleted(page = 1) }
-                        _homeCompleted.value = (completedRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
-                    } catch (ce: Exception) {
-                        Log.e("AnikuVM", "Failed to load home completed", ce)
-                    }
+                    val isSamehadaku = dataSource.value == "Dayynime-v2"
+                    if (isSamehadaku) {
+                        launch {
+                            try {
+                                val ongoingRes = retryIO { samehadakuApi.getOngoing(page = 1) }
+                                _homeOngoing.value = (ongoingRes.data?.animeList ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (oe: Exception) { Log.e("AnikuVM", "Failed samehadaku ongoing", oe) }
+                        }
+                        launch {
+                            try {
+                                val recentRes = retryIO { samehadakuApi.getRecent(page = 1) }
+                                _homeRecent.value = (recentRes.data?.animeList ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (re: Exception) { Log.e("AnikuVM", "Failed samehadaku recent", re) }
+                        }
+                        launch {
+                            try {
+                                val popularRes = retryIO { samehadakuApi.getPopular(page = 1) }
+                                _homePopular.value = (popularRes.data?.animeList ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (pe: Exception) { Log.e("AnikuVM", "Failed samehadaku home popular", pe) }
+                        }
+                        launch {
+                            try {
+                                val moviesRes = retryIO { samehadakuApi.getMovies(page = 1) }
+                                _homeMovies.value = (moviesRes.data?.animeList ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (me: Exception) { Log.e("AnikuVM", "Failed samehadaku home movies", me) }
+                        }
+                        launch {
+                            try {
+                                val completedRes = retryIO { samehadakuApi.getCompleted(page = 1) }
+                                _homeCompleted.value = (completedRes.data?.animeList ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (ce: Exception) { Log.e("AnikuVM", "Failed samehadaku home completed", ce) }
+                        }
+                        launch {
+                            try {
+                                val schedRes = retryIO { samehadakuApi.getSchedule() }
+                                val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                                // Samehadaku pakai nama hari Inggris
+                                val engDayNames = listOf("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")
+                                val todayEngName = engDayNames[todayDay - 1]
+                                val todayList = schedRes.data?.days
+                                    ?.firstOrNull { it.day.equals(todayEngName, ignoreCase = true) }
+                                    ?.animeList?.map { it.toAnimeRaw() } ?: emptyList()
+                                _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                            } catch (se: Exception) { Log.e("AnikuVM", "Failed samehadaku home schedule", se) }
+                        }
+                    } else {
+                        launch {
+                            try {
+                                val homeRes = retryIO { animeApi.getHome() }
+                                _homeOngoing.value = (homeRes.ongoing ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                                _homeRecent.value = (homeRes.recent ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            } catch (he: Exception) {
+                                Log.e("AnikuVM", "Failed to load home base (ongoing/recent)", he)
+                            }
+                        }
 
-                    // 8. Load Today Schedule
-                    try {
-                        val schedRes = retryIO { animeApi.getSchedule() }
-                        val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
-                        val sched = schedRes.schedule
-                        val todayList = when (todayDay) {
-                            1 -> sched?.minggu
-                            2 -> sched?.senin
-                            3 -> sched?.selasa
-                            4 -> sched?.rabu
-                            5 -> sched?.kamis
-                            6 -> sched?.jumat ?: sched?.jumatAlt
-                            7 -> sched?.sabtu
-                            else -> null
-                        } ?: emptyList()
-                        _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
-                    } catch (se: Exception) {
-                        Log.e("AnikuVM", "Failed to load home schedule", se)
+                        // 5. Load Popular for Section
+                        launch {
+                            try {
+                                val popularRes = retryIO { animeApi.getPopular(page = 1) }
+                                _homePopular.value = (popularRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            } catch (pe: Exception) {
+                                Log.e("AnikuVM", "Failed to load home popular", pe)
+                            }
+                        }
+
+                        // 6. Load Movies for Section
+                        launch {
+                            try {
+                                val moviesRes = retryIO { animeApi.getMovies(page = 1) }
+                                _homeMovies.value = (moviesRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            } catch (me: Exception) {
+                                Log.e("AnikuVM", "Failed to load home movies", me)
+                            }
+                        }
+
+                        // 7. Load Completed for Section
+                        launch {
+                            try {
+                                val completedRes = retryIO { animeApi.getCompleted(page = 1) }
+                                _homeCompleted.value = (completedRes.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                            } catch (ce: Exception) {
+                                Log.e("AnikuVM", "Failed to load home completed", ce)
+                            }
+                        }
+
+                        // 8. Load Today Schedule
+                        launch {
+                            try {
+                                val schedRes = retryIO { animeApi.getSchedule() }
+                                val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                                val sched = schedRes.schedule
+                                val todayList = when (todayDay) {
+                                    1 -> sched?.minggu
+                                    2 -> sched?.senin
+                                    3 -> sched?.selasa
+                                    4 -> sched?.rabu
+                                    5 -> sched?.kamis
+                                    6 -> sched?.jumat ?: sched?.jumatAlt
+                                    7 -> sched?.sabtu
+                                    else -> null
+                                } ?: emptyList()
+                                _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                            } catch (se: Exception) {
+                                Log.e("AnikuVM", "Failed to load home schedule", se)
+                            }
+                        }
                     }
                 }
 
