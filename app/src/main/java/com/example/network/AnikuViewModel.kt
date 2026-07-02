@@ -1693,6 +1693,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch { settingsStore.saveLastChatRead(latest) }
     }
 
+    // Toggle notifikasi chat (subscribe/unsubscribe topic FCM "chat_updates")
+    val chatNotifEnabled: StateFlow<Boolean> = settingsStore.chatNotifEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun toggleChatNotif() {
+        val newValue = !chatNotifEnabled.value
+        viewModelScope.launch { settingsStore.setChatNotifEnabled(newValue) }
+        val fcm = com.google.firebase.messaging.FirebaseMessaging.getInstance()
+        if (newValue) {
+            fcm.subscribeToTopic("chat_updates")
+        } else {
+            fcm.unsubscribeFromTopic("chat_updates")
+        }
+    }
+
     private val _isChatLoading = MutableStateFlow(false)
     val isChatLoading: StateFlow<Boolean> = _isChatLoading.asStateFlow()
 

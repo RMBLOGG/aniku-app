@@ -32,6 +32,7 @@ class SettingsStore(private val context: Context) {
         val IS_MODERATOR = booleanPreferencesKey("is_moderator")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
+        val CHAT_NOTIF_ENABLED = booleanPreferencesKey("chat_notif_enabled")
         val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         val APP_LOCK_TYPE = stringPreferencesKey("app_lock_type") // "pin" | "biometric"
         val APP_PIN = stringPreferencesKey("app_pin")
@@ -171,6 +172,21 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[LAST_CHAT_READ] = timestamp
         }
+    }
+
+    // Toggle notifikasi chat (on by default)
+    val chatNotifEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[CHAT_NOTIF_ENABLED] ?: true
+    }
+
+    suspend fun setChatNotifEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CHAT_NOTIF_ENABLED] = enabled
+        }
+        // Mirror ke SharedPreferences biasa, soalnya FCM service baca ini
+        // secara sinkron (DataStore butuh coroutine/Flow buat dibaca).
+        context.getSharedPreferences("aniku_settings_cache", Context.MODE_PRIVATE)
+            .edit().putBoolean("chat_notif_enabled", enabled).apply()
     }
 
     val appLockEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[APP_LOCK_ENABLED] ?: false }
