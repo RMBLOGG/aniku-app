@@ -1180,6 +1180,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 settingsStore.saveSession(activeSession)
                 _authLoading.value = false
                 onSuccess()
+            } catch (e: retrofit2.HttpException) {
+                _authLoading.value = false
+                val errBody = e.response()?.errorBody()?.string() ?: ""
+                _authError.value = if (errBody.contains("email_not_confirmed", ignoreCase = true)) {
+                    "Email kamu belum diverifikasi. Cek inbox (atau folder spam) dan klik link konfirmasinya dulu ya."
+                } else {
+                    "Login gagal (HTTP ${e.code()}): $errBody"
+                }
+                Log.e("AnikuVM", "Login HttpException: ${e.code()} - $errBody")
             } catch (e: Exception) {
                 _authLoading.value = false
                 _authError.value = "${e.javaClass.simpleName}: ${e.message}"
@@ -1271,7 +1280,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 )
                 val token = res.access_token
                 if (token == null) {
-                    _authError.value = "Daftar gagal: Token sesi tidak valid."
+                    // Email confirmation aktif: user berhasil didaftarkan tapi belum ada session
+                    // sampai mereka klik link konfirmasi di email.
+                    _authError.value = "Pendaftaran berhasil! Cek email kamu (termasuk folder spam) untuk verifikasi akun sebelum login ya."
                     _authLoading.value = false
                     return@launch
                 }
