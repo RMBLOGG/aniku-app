@@ -1,7 +1,10 @@
 package com.example.network
 
 import android.util.Log
+import com.google.firebase.remoteconfig.ConfigUpdate
+import com.google.firebase.remoteconfig.ConfigUpdateListener
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigException
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,15 +57,31 @@ class RemoteConfigManager {
 
     /** Fetch nilai terbaru dari server lalu update semua flag. Panggil pas app start. */
     fun fetchAndApply() {
+        // Ambil nilai awal pas app pertama kali dibuka
         remoteConfig.fetchAndActivate()
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    Log.d("RemoteConfig", "Fetch & activate sukses, updated: ${task.result}")
+                    Log.d("RemoteConfig", "Fetch awal sukses, updated: ${task.result}")
                 } else {
-                    Log.w("RemoteConfig", "Fetch gagal, pakai nilai default/cache lama")
+                    Log.w("RemoteConfig", "Fetch awal gagal, pakai nilai default/cache lama")
                 }
                 applyValues()
             }
+
+        // Real-time listener: begitu ada perubahan yang di-publish di console,
+        // langsung ke-apply ke app tanpa nunggu fetch interval atau buka ulang app.
+        remoteConfig.addOnConfigUpdateListener(object : ConfigUpdateListener {
+            override fun onUpdate(configUpdate: ConfigUpdate) {
+                Log.d("RemoteConfig", "Ada update real-time: ${configUpdate.updatedKeys}")
+                remoteConfig.activate().addOnCompleteListener {
+                    applyValues()
+                }
+            }
+
+            override fun onError(error: FirebaseRemoteConfigException) {
+                Log.w("RemoteConfig", "Real-time listener error", error)
+            }
+        })
     }
 
     private fun applyValues() {
