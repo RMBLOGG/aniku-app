@@ -1,27 +1,47 @@
 package com.example.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.network.AnikuViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
+
+private data class RoleBadgeStyle(
+    val label: String,
+    val color: Color,
+    val premium: Boolean
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +57,8 @@ fun UserProfileScreen(
     val chatCount by viewModel.viewedProfileChatCount.collectAsState()
     val isLoading by viewModel.isViewedProfileLoading.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
+    val goldAccent = Color(0xFFFFC24B)
+    val context = LocalContext.current
 
     val isOwnProfile = session.userId == userId
     val canModerate = session.canModerate()
@@ -88,7 +110,17 @@ fun UserProfileScreen(
         val nextLevelXp = 20 * seasonLevel * seasonLevel
         val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
         val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
-        val progress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
+        val targetProgress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
+
+        var progressAnimStarted by remember(userId) { mutableStateOf(false) }
+        val animatedProgress by animateFloatAsState(
+            targetValue = if (progressAnimStarted) targetProgress else 0f,
+            animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            label = "public_level_progress_anim"
+        )
+        LaunchedEffect(targetProgress) {
+            progressAnimStarted = true
+        }
 
         val joinedDate = try {
             val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
@@ -98,202 +130,375 @@ fun UserProfileScreen(
             "-"
         }
 
+        // Warna & gaya badge role — tiap role beda warna, admin/moderator dapet gaya "premium" (gradient + border)
+        val roleBadge = when {
+            p.isAdmin() -> RoleBadgeStyle("ADMINISTRATOR", goldAccent, premium = true)
+            p.role == "moderator" -> RoleBadgeStyle("MODERATOR", Color(0xFFB388FF), premium = true)
+            else -> RoleBadgeStyle("USER", MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), premium = false)
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
         ) {
-            // Banner (read-only)
-            if (!p.banner_url.isNullOrEmpty()) {
-                AsyncImage(
-                    model = p.banner_url,
-                    contentDescription = "Banner",
-                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            // ── Banner (read-only) dengan fade gradient ──
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2.6f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                if (!p.banner_url.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(p.banner_url)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Banner",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3f)
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0.35f to Color.Transparent,
+                                0.78f to MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
+                                1f to MaterialTheme.colorScheme.background
+                            )
+                        )
                 )
             }
 
-            Column(modifier = Modifier.padding(20.dp)) {
-            // Avatar & identitas
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                if (!p.avatar_url.isNullOrBlank()) {
-                    AsyncImage(
-                        model = p.avatar_url,
-                        contentDescription = "Avatar",
-                        modifier = Modifier
-                            .size(110.dp)
-                            .clip(CircleShape)
+            // ── Identitas: avatar ring overlap banner, username, UID, role pill — semua center ──
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(108.dp)
+                        .offset(y = (-58).dp)
+                ) {
+                    if (!p.avatar_url.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(Brush.sweepGradient(listOf(accentColor, goldAccent, accentColor)))
+                                .padding(2.5.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(3.dp)
+                                .clip(CircleShape)
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(p.avatar_url)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .background(Brush.sweepGradient(listOf(accentColor, goldAccent, accentColor)))
+                                .padding(2.5.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.background)
+                                .padding(3.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                p.username?.take(1)?.uppercase() ?: "?",
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor
+                            )
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        p.username ?: "Pengguna",
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
+                    p.user_number?.let {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "#$it",
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                if (roleBadge.premium) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Brush.linearGradient(listOf(roleBadge.color.copy(alpha = 0.16f), goldAccent.copy(alpha = 0.10f))))
+                            .border(1.dp, roleBadge.color.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 11.dp, vertical = 5.dp)
+                    ) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = goldAccent, modifier = Modifier.size(11.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(roleBadge.label, color = roleBadge.color, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                    }
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(110.dp)
-                            .clip(CircleShape)
-                            .background(accentColor.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(roleBadge.color.copy(alpha = 0.12f))
+                            .padding(horizontal = 11.dp, vertical = 5.dp)
                     ) {
-                        Text(
-                            p.username?.take(1)?.uppercase() ?: "?",
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor
-                        )
+                        Text(roleBadge.label, color = roleBadge.color, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+            // ── Konten ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 18.dp, bottom = 26.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    p.username ?: "Pengguna",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                p.user_number?.let {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("#$it", fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
-                }
-            }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val (label, color) = when {
-                    p.isAdmin() -> "ADMIN" to Color(0xFFFFD200)
-                    p.role == "moderator" -> "MODERATOR" to Color(0xFFB388FF)
-                    else -> "USER" to MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                }
-                Surface(
+                // Level card — progress bar gradient teranimasi
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(20.dp),
-                    color = color.copy(alpha = 0.15f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        label,
-                        color = color,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-                    )
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Level Musim Ini",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(accentColor.copy(alpha = 0.12f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accentColor))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Lv.$seasonLevel", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(fraction = animatedProgress.coerceIn(0f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(5.dp))
+                                    .background(Brush.horizontalGradient(listOf(accentColor, goldAccent)))
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(9.dp))
+                        Text(
+                            "$xpIntoLevel / $xpNeededForLevel XP ke Level ${seasonLevel + 1}",
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(24.dp))
+                // Section: Statistik
+                Text(
+                    "STATISTIK",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    modifier = Modifier.padding(start = 2.dp)
+                )
 
-            // Level & XP
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(goldAccent.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Favorite, contentDescription = null, tint = goldAccent, modifier = Modifier.size(15.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("TOTAL DUKUNGAN", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                if (donationTotal > 0) "Rp${"%,d".format(donationTotal).replace(",", ".")}" else "Belum ada",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp,
+                                color = if (donationTotal > 0) goldAccent else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(accentColor.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Forum, contentDescription = null, tint = accentColor, modifier = Modifier.size(15.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("PESAN CHAT", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text("$chatCount pesan", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+                }
+
+                // Section: Info Akun
+                Text(
+                    "INFO AKUN",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp,
+                    modifier = Modifier.padding(start = 2.dp, top = 2.dp)
+                )
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 15.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Level Musim Ini", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                        Text("Lv.$seasonLevel", color = accentColor, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                        color = accentColor,
-                        trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        "$xpIntoLevel / $xpNeededForLevel XP ke Level ${seasonLevel + 1}",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Statistik: Donasi & Chat
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Total Dukungan", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            if (donationTotal > 0) "Rp${"%,d".format(donationTotal).replace(",", ".")}" else "Belum ada",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color(0xFFFFD200)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.CalendarToday,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(11.dp))
+                            Text(
+                                "Bergabung Sejak",
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Text(joinedDate, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = MaterialTheme.colorScheme.onBackground)
                     }
                 }
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Total Pesan Chat", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("$chatCount pesan", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+
+                if (isOwnProfile) {
+                    OutlinedButton(
+                        onClick = onEditOwnProfile,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
+                    }
+                } else if (canModerate) {
+                    val isBanned = p.is_banned == true
+                    Button(
+                        onClick = { viewModel.toggleUserBanStatus(p) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.linearGradient(
+                                        if (isBanned) listOf(Color(0xFF1B7A3D), Color(0xFF145C2D))
+                                        else listOf(Color(0xFFB71C1C), Color(0xFF7F1414))
+                                    ),
+                                    RoundedCornerShape(14.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    if (isBanned) "Aktifkan Kembali User" else "Banned User",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Bergabung Sejak", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 11.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(joinedDate, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            if (isOwnProfile) {
-                OutlinedButton(
-                    onClick = onEditOwnProfile,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Edit Profil Saya")
-                }
-            } else if (canModerate) {
-                val isBanned = p.is_banned == true
-                Button(
-                    onClick = { viewModel.toggleUserBanStatus(p) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isBanned) Color(0xFF2E7D32) else Color(0xFFB71C1C)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isBanned) "Aktifkan Kembali User" else "Banned User")
-                }
-            }
             }
         }
     }
