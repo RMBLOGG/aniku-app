@@ -183,6 +183,8 @@ fun ChatScreen(
     val isChatLoading by viewModel.isChatLoading.collectAsState()
     val chatError by viewModel.chatError.collectAsState()
     val chatNotifEnabled by viewModel.chatNotifEnabled.collectAsState()
+    val chatRoomEnabled by viewModel.remoteConfigManager.chatRoomEnabled.collectAsState()
+    val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
 
     val isLoggedIn = !session.token.isNullOrEmpty()
     val currentUserId = session.userId
@@ -245,24 +247,12 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .background(
-                                        brush = Brush.linearGradient(
-                                            listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53))
-                                        ),
-                                        shape = RoundedCornerShape(11.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Chat,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            Icon(
+                                Icons.AutoMirrored.Filled.Chat,
+                                contentDescription = null,
+                                tint = Color(0xFFFF6B6B),
+                                modifier = Modifier.size(26.dp)
+                            )
                             Column {
                                 Text(
                                     "Chat Room",
@@ -318,6 +308,7 @@ fun ChatScreen(
             }
         },
         bottomBar = {
+            if (chatRoomEnabled) {
             Column {
                 Divider()
                 // Image preview bar
@@ -422,12 +413,13 @@ fun ChatScreen(
                         // Tombol pilih foto
                         IconButton(
                             onClick = { imagePickerLauncher.launch("image/*") },
-                            enabled = !isSendingImage
+                            enabled = !isSendingImage && chatImageUploadEnabled
                         ) {
                             Icon(
                                 Icons.Default.Image,
                                 contentDescription = "Pilih foto",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = if (chatImageUploadEnabled) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                             )
                         }
                         OutlinedTextField(
@@ -529,6 +521,7 @@ fun ChatScreen(
                     }
                 }
             }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -537,6 +530,35 @@ fun ChatScreen(
                 .padding(innerPadding)
         ) {
             when {
+                !chatRoomEnabled -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Build,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "Chat Room sedang maintenance",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Fitur ini lagi dinonaktifkan sementara. Coba lagi nanti ya!",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
                 isChatLoading && messages.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()

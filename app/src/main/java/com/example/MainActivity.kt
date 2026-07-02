@@ -229,6 +229,8 @@ class MainActivity : ComponentActivity() {
                 val showBottomBar = currentRoute in bottomRoutes
                 var showMoreSheet by remember { mutableStateOf(false) }
                 val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
+                val nobarEnabled by viewModel.remoteConfigManager.nobarEnabled.collectAsState()
+                val feedEnabled by viewModel.remoteConfigManager.feedEnabled.collectAsState()
                 val hasNewDonation by viewModel.hasNewDonation.collectAsState()
                 val latestDonation by viewModel.latestDonation.collectAsState()
                 var showDonationBanner by remember { mutableStateOf(false) }
@@ -348,7 +350,15 @@ class MainActivity : ComponentActivity() {
                     Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
-                )
+                ).filter { (route, _, _) ->
+                    when (route) {
+                        "feed" -> feedEnabled
+                        "nobar_list" -> nobarEnabled
+                        // "chat" tetap ditampilkan walau dimatikan, karena ChatScreen
+                        // sendiri sudah nampilin layar maintenance-nya.
+                        else -> true
+                    }
+                }
                 val sheetRoutes = sheetNavItems.map { it.first }
                 val isSheetRouteActive = currentRoute in sheetRoutes
 

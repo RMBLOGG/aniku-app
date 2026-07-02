@@ -24,6 +24,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
     val watchHistoryManager = WatchHistoryManager(appContext)
+    val remoteConfigManager = RemoteConfigManager()
+
+    init {
+        remoteConfigManager.fetchAndApply()
+    }
 
     // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
     private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
