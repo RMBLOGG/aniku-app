@@ -159,15 +159,24 @@ class MainActivity : ComponentActivity() {
             else -> null
         }
 
-        // Supabase taro token di URL fragment (#access_token=...&type=recovery),
-        // bukan query param biasa, jadi harus diparse manual dari fragment-nya
-        val resetAccessToken: String? = if (deepLinkRoute == "reset_password") {
+        // Supabase taro token di URL fragment (#access_token=...&type=recovery/signup),
+        // bukan query param biasa, jadi harus diparse manual dari fragment-nya.
+        // PENTING: link "konfirmasi email" (signup) dan "reset password" (recovery) sama-sama
+        // ngarah ke host "reset-password" (satu-satunya redirect URL yang kedaftar di Supabase),
+        // jadi kita bedain lewat "type" biar konfirmasi email gak nyasar ke layar ganti password.
+        val fragmentParams: Map<String, String> = if (deepLinkRoute == "reset_password") {
             val fragment = intent?.data?.fragment ?: intent?.data?.encodedQuery
             fragment?.split("&")
-                ?.map { it.split("=", limit = 2) }
-                ?.firstOrNull { it.size == 2 && it[0] == "access_token" }
-                ?.get(1)
-        } else null
+                ?.mapNotNull { val p = it.split("=", limit = 2); if (p.size == 2) p[0] to p[1] else null }
+                ?.toMap() ?: emptyMap()
+        } else emptyMap()
+
+        val linkType = fragmentParams["type"] // "signup" atau "recovery"
+        val resetAccessToken: String? = fragmentParams["access_token"]
+        val resetRefreshToken: String? = fragmentParams["refresh_token"]
+
+        // Kalau linknya dari konfirmasi email (bukan recovery), langsung auto-login
+        val isEmailConfirmLink = deepLinkRoute == "reset_password" && linkType == "signup"
 
         setContent {
             val isDark by viewModel.isDark.collectAsState()
@@ -211,16 +220,26 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
 
-                // Navigate ke deep link kalau ada (dari notifikasi / reset password)
+                // Navigate ke deep link kalau ada (dari notifikasi / reset password / konfirmasi email)
                 LaunchedEffect(deepLinkRoute) {
-                    deepLinkRoute?.let {
-                        val target = if (it == "reset_password") {
-                            val encodedToken = java.net.URLEncoder.encode(resetAccessToken ?: "", "UTF-8")
-                            "reset_password?token=$encodedToken"
-                        } else it
-                        navController.navigate(target) {
-                            popUpTo("home") { saveState = true }
-                            launchSingleTop = true
+                    if (isEmailConfirmLink && resetAccessToken != null) {
+                        // Link konfirmasi email: langsung login pakai token dari Supabase, gak usah ke halaman ganti password
+                        viewModel.confirmEmailAndLogin(resetAccessToken, resetRefreshToken) {
+                            navController.navigate("home") {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else {
+                        deepLinkRoute?.let {
+                            val target = if (it == "reset_password") {
+                                val encodedToken = java.net.URLEncoder.encode(resetAccessToken ?: "", "UTF-8")
+                                "reset_password?token=$encodedToken"
+                            } else it
+                            navController.navigate(target) {
+                                popUpTo("home") { saveState = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
                 }

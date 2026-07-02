@@ -1329,6 +1329,55 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Dipanggil pas user klik link "Konfirmasi Email". Supabase udah kasih access_token
+    // langsung di redirect link-nya (type=signup), jadi tinggal decode JWT buat ambil
+    // userId/email terus bikin session — gak perlu login manual lagi.
+    fun confirmEmailAndLogin(accessToken: String, refreshToken: String?, onSuccess: () -> Unit) {
+        _authLoading.value = true
+        _authError.value = null
+        viewModelScope.launch {
+            try {
+                val payload = accessToken.split(".").getOrNull(1)
+                    ?: throw IllegalArgumentException("Token tidak valid")
+                val decoded = String(
+                    android.util.Base64.decode(payload, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+                )
+                val json = org.json.JSONObject(decoded)
+                val uId = json.optString("sub")
+                val email = json.optString("email")
+                if (uId.isBlank()) throw IllegalArgumentException("User ID tidak ditemukan di token")
+
+                val profiles = NetworkClient.supabaseDbApi.getProfileByUserId(
+                    idQuery = "eq.$uId",
+                    authHeader = "Bearer $accessToken",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val profile = profiles.firstOrNull()
+
+                val activeSession = UserSession(
+                    token = accessToken,
+                    refreshToken = refreshToken,
+                    userId = uId,
+                    email = email,
+                    username = profile?.username ?: email.substringBefore("@"),
+                    avatarUrl = profile?.avatar_url,
+                    isAdmin = profile?.isAdmin() ?: false,
+                    isModerator = profile?.isModerator() ?: false,
+                    isBanned = profile?.is_banned ?: false,
+                    userNumber = profile?.user_number
+                )
+
+                settingsStore.saveSession(activeSession)
+                _authLoading.value = false
+                onSuccess()
+            } catch (e: Exception) {
+                _authLoading.value = false
+                _authError.value = "Konfirmasi email gagal: ${e.message}"
+                Log.e("AnikuVM", "confirmEmailAndLogin Exception", e)
+            }
+        }
+    }
+
     fun updateProfileUsername(newUsername: String, onComplete: () -> Unit) {
         val sess = session.value
         val token = sess.token ?: return
