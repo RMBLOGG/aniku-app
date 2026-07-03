@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.example.network.AnikuViewModel
 import com.example.network.ProfileDto
 
@@ -172,6 +173,7 @@ private fun UserDirectoryRow(
                 AsyncImage(
                     model = user.avatar_url,
                     contentDescription = "Avatar",
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(CircleShape)

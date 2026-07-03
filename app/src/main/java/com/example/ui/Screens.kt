@@ -1484,70 +1484,159 @@ fun HomeScreen(
         ) {
             // ── Header ──────────────────────────────────────────────
             item {
-                Box(
+                val seasonLevel by viewModel.seasonLevel.collectAsState()
+                LaunchedEffect(isLoggedIn) {
+                    if (isLoggedIn) viewModel.loadSeasonProgress()
+                }
+
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Kiri: greeting + logo
-                    Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                        // Greeting pill
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    if (isLoggedIn) {
+                        // Avatar
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = 0.25f))
+                                .clickable { navController.navigate("profile") },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(accentColor)
-                            )
-                            Text(
-                                text = if (session.username != null) "Halo, ${session.username}" else "Halo, Otaku!",
-                                color = Color.White.copy(alpha = 0.55f),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                letterSpacing = 0.3.sp
-                            )
+                            if (!session.avatarUrl.isNullOrEmpty()) {
+                                AsyncImage(
+                                    model = session.avatarUrl,
+                                    contentDescription = "Avatar",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    text = session.username?.take(1)?.uppercase() ?: "?",
+                                    color = accentColor,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 18.sp
+                                )
+                            }
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        // Logo ANIKU dengan aksen merah di huruf terakhir
-                        Row(verticalAlignment = Alignment.Bottom) {
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Username + level pill + ID pill
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "ANIK",
+                                text = session.username ?: "Otaku",
                                 color = Color.White,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 3.sp,
-                                style = LocalTextStyle.current.copy(
-                                    shadow = androidx.compose.ui.graphics.Shadow(
-                                        color = Color.Black.copy(alpha = 0.4f),
-                                        blurRadius = 4f
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(5.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .padding(horizontal = 9.dp, vertical = 4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(accentColor)
+                                    )
+                                    Text(
+                                        text = "Lvl. $seasonLevel",
+                                        color = Color.White.copy(alpha = 0.75f),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                session.userNumber?.let { num ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(Color.White.copy(alpha = 0.08f))
+                                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "#$num",
+                                            color = Color.White.copy(alpha = 0.5f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Belum login: tetep greeting + logo lama
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor)
+                                )
+                                Text(
+                                    text = "Halo, Otaku!",
+                                    color = Color.White.copy(alpha = 0.55f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    letterSpacing = 0.3.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = "ANIK",
+                                    color = Color.White,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 3.sp,
+                                    style = LocalTextStyle.current.copy(
+                                        shadow = androidx.compose.ui.graphics.Shadow(
+                                            color = Color.Black.copy(alpha = 0.4f),
+                                            blurRadius = 4f
+                                        )
                                     )
                                 )
-                            )
-                            Text(
-                                text = "U",
-                                color = accentColor,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 3.sp,
-                                style = LocalTextStyle.current.copy(
-                                    shadow = androidx.compose.ui.graphics.Shadow(
-                                        color = accentColor.copy(alpha = 0.6f),
-                                        blurRadius = 8f
+                                Text(
+                                    text = "U",
+                                    color = accentColor,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 3.sp,
+                                    style = LocalTextStyle.current.copy(
+                                        shadow = androidx.compose.ui.graphics.Shadow(
+                                            color = accentColor.copy(alpha = 0.6f),
+                                            blurRadius = 8f
+                                        )
                                     )
                                 )
-                            )
+                            }
                         }
                     }
 
-                    // Kanan: Settings button modern
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    // Settings — tetep ada, ukuran disesuaikan biar pas sejajar avatar
                     Box(
                         modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .size(46.dp)
+                            .size(42.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(
                                 Brush.linearGradient(
@@ -1574,7 +1663,7 @@ fun HomeScreen(
                             Icons.Default.Settings,
                             contentDescription = "Settings",
                             tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
