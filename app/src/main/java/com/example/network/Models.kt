@@ -217,7 +217,21 @@ data class ClanDto(
     val level: Int? = 1,
     val total_xp: Int? = 0,
     val leader_id: String? = null,
+    val icon_url: String? = null,
+    val is_private: Boolean? = false,
     val created_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ClanJoinRequestDto(
+    val id: String,
+    val clan_id: String,
+    val user_id: String,
+    val status: String? = "pending",
+    val requested_at: String? = null,
+    // Join manual dari profiles pas ditampilkan di UI
+    val username: String? = null,
+    val avatar_url: String? = null
 )
 
 @JsonClass(generateAdapter = true)

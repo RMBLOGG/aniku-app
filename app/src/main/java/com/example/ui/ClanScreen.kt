@@ -1,5 +1,8 @@
 package com.example.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
@@ -27,12 +30,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.ClanDto
+import com.example.network.ClanMemberDto
 import kotlinx.coroutines.delay
+
+private val AnimeGradient = Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF)))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,9 +52,12 @@ fun ClanScreen(
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val topClans by viewModel.topClans.collectAsState()
     val myClan by viewModel.myClanDetail.collectAsState()
+    val myMembership by viewModel.myClanMembership.collectAsState()
     val selectedClanMembers by viewModel.selectedClanMembers.collectAsState()
     val clanActionError by viewModel.clanActionError.collectAsState()
     val isClanLoading by viewModel.isClanLoading.collectAsState()
+    val isUploadingIcon by viewModel.isUploadingClanIcon.collectAsState()
+    val session by viewModel.session.collectAsState()
 
     var showCreateForm by remember { mutableStateOf(false) }
     var clanName by remember { mutableStateOf("") }
@@ -54,6 +65,20 @@ fun ClanScreen(
     var selectedClan by remember { mutableStateOf<ClanDto?>(null) }
     var contributeAmount by remember { mutableStateOf("") }
     var showContributeDialog by remember { mutableStateOf(false) }
+    var showManageDialog by remember { mutableStateOf(false) }
+    val pendingRequests by viewModel.pendingJoinRequests.collectAsState()
+
+    val isLeader = myMembership?.role == "leader" && myMembership?.user_id == session.userId
+
+    LaunchedEffect(myClan, isLeader) {
+        if (isLeader) myClan?.let { viewModel.loadPendingJoinRequests(it.id) }
+    }
+
+    val iconPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) myClan?.let { viewModel.uploadClanIcon(it.id, uri) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.refreshProfile()
@@ -69,7 +94,9 @@ fun ClanScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text("Clan", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+                    title = {
+                        Text("Clan", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
@@ -102,7 +129,15 @@ fun ClanScreen(
                     MyClanCard(
                         clan = myClan!!,
                         members = selectedClanMembers,
-                        onContribute = { showContributeDialog = true }
+                        isLeader = isLeader,
+                        isUploadingIcon = isUploadingIcon,
+                        currentUserId = session.userId,
+                        onContribute = { showContributeDialog = true },
+                        onManage = { showManageDialog = true },
+                        onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
+                        onIconClick = {
+                            if (isLeader) iconPickerLauncher.launch("image/*")
+                        }
                     )
                 }
             } else {
@@ -121,8 +156,6 @@ fun ClanScreen(
 
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text("TOP CLANS", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFFD700), letterSpacing = 1.sp)
                     }
                 }
@@ -172,6 +205,22 @@ fun ClanScreen(
         )
     }
 
+    if (showManageDialog && myClan != null) {
+        ManageClanDialog(
+            clan = myClan!!,
+            pendingRequests = pendingRequests,
+            diamondBalance = diamondBalance,
+            onDismiss = { showManageDialog = false },
+            onRename = { newName -> viewModel.renameClan(myClan!!.id, newName) },
+            onTogglePrivacy = { isPrivate -> viewModel.setClanPrivacy(myClan!!.id, isPrivate) },
+            onApproveRequest = { reqId -> viewModel.approveJoinRequest(reqId, myClan!!.id) },
+            onRejectRequest = { reqId -> viewModel.rejectJoinRequest(reqId, myClan!!.id) },
+            onDeleteClan = {
+                viewModel.deleteClan(myClan!!.id) { showManageDialog = false }
+            }
+        )
+    }
+
     selectedClan?.let { clan ->
         AlertDialog(
             onDismissRequest = { selectedClan = null },
@@ -179,6 +228,14 @@ fun ClanScreen(
             text = {
                 Column {
                     Text("Level ${clan.level} \u2022 ${clan.total_xp} XP \u2022 ${selectedClanMembers.size} member", fontSize = 13.sp)
+                    if (clan.is_private == true) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFB388FF), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Clan private \u2014 butuh persetujuan leader", fontSize = 12.sp, color = Color(0xFFB388FF))
+                        }
+                    }
                     Spacer(modifier = Modifier.height(10.dp))
                     selectedClanMembers.forEach { member ->
                         Text(
@@ -191,9 +248,9 @@ fun ClanScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.joinClan(clan.id)
+                    if (clan.is_private == true) viewModel.requestJoinClan(clan.id) else viewModel.joinClan(clan.id)
                     selectedClan = null
-                }) { Text("Gabung Clan Ini") }
+                }) { Text(if (clan.is_private == true) "Minta Gabung" else "Gabung Clan Ini") }
             },
             dismissButton = {
                 TextButton(onClick = { selectedClan = null }) { Text("Tutup") }
@@ -206,16 +263,19 @@ fun ClanScreen(
 private fun DiamondBalanceCard(balance: Int, onTopUpClick: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "diamond_glow")
     val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.55f,
+        initialValue = 0.25f, targetValue = 0.55f,
         animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "glow"
     )
     val rotation by infiniteTransition.animateFloat(
-        initialValue = -8f,
-        targetValue = 8f,
+        initialValue = -8f, targetValue = 8f,
         animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "rotate"
+    )
+    val sparkleOffset by infiniteTransition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart),
+        label = "sparkle"
     )
 
     var animatedBalance by remember { mutableStateOf(0) }
@@ -232,41 +292,30 @@ private fun DiamondBalanceCard(balance: Int, onTopUpClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(listOf(Color(0xFF0B2F3F), Color(0xFF135C73), Color(0xFF1B7A8C)))
-            )
+            .clip(RoundedCornerShape(22.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF241530), Color(0xFF16414D))))
     ) {
         Box(
-            modifier = Modifier
-                .size(140.dp)
-                .align(Alignment.CenterEnd)
-                .offset(x = 30.dp)
-                .background(Color(0xFF4FD8E8).copy(alpha = glowAlpha), CircleShape)
+            modifier = Modifier.size(140.dp).align(Alignment.CenterEnd).offset(x = 30.dp)
+                .background(Color(0xFF7B2FBF).copy(alpha = glowAlpha), CircleShape)
         )
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.Default.Diamond,
-                contentDescription = null,
-                tint = Color(0xFF6EEAFA),
-                modifier = Modifier
-                    .size(34.dp)
-                    .rotate(rotation)
+                Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF5FC9DE),
+                modifier = Modifier.size(34.dp).rotate(rotation)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("Diamond (DM)", fontSize = 12.sp, color = Color.White.copy(alpha = 0.75f), letterSpacing = 0.5.sp)
+                Text("Diamond (DM)", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f), letterSpacing = 0.5.sp)
                 Text("$animatedBalance", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
             }
             Button(
                 onClick = onTopUpClick,
                 shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBA68C8)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF)),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -277,59 +326,86 @@ private fun DiamondBalanceCard(balance: Int, onTopUpClick: () -> Unit) {
     }
 }
 
+private fun Modifier.graphicsLayerAlpha(alpha: Float): Modifier = this.then(
+    Modifier.graphicsLayer(alpha = alpha.coerceIn(0f, 1f))
+)
+
 @Composable
 private fun MyClanCard(
     clan: ClanDto,
-    members: List<com.example.network.ClanMemberDto>,
-    onContribute: () -> Unit
+    members: List<ClanMemberDto>,
+    isLeader: Boolean,
+    isUploadingIcon: Boolean,
+    currentUserId: String?,
+    onContribute: () -> Unit,
+    onManage: () -> Unit,
+    onKick: (String) -> Unit,
+    onIconClick: () -> Unit
 ) {
     val xpIntoLevel = (clan.total_xp ?: 0) % 1000
     val progress = xpIntoLevel / 1000f
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(700, easing = FastOutSlowInEasing),
-        label = "xp_progress"
-    )
+    val animatedProgress by animateFloatAsState(progress, tween(700, easing = FastOutSlowInEasing), label = "xp_progress")
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }
-    ) {
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF1F1530))))
-                .border(1.dp, Color(0xFFBA68C8).copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(22.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF3A1560), Color(0xFF241530))))
+                .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.35f), RoundedCornerShape(22.dp))
                 .padding(18.dp)
                 .animateContentSize()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(Color(0xFFBA68C8), Color(0xFF7E57C2)))),
+                        .background(AnimeGradient)
+                        .clickable(enabled = isLeader, onClick = onIconClick),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("${clan.level}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                    if (isUploadingIcon) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                    } else if (!clan.icon_url.isNullOrBlank()) {
+                        AsyncImage(
+                            model = clan.icon_url, contentDescription = "Icon Clan",
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    } else {
+                        Text("${clan.level}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    }
+                    if (isLeader) {
+                        Box(
+                            modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape)
+                                .background(Color(0xFF1F1530)).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.CameraAlt, contentDescription = "Ganti icon", tint = Color.White, modifier = Modifier.size(10.dp)) }
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                    Text(
-                        "${clan.total_xp ?: 0} XP total \u2022 ${members.size} member",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.55f)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
+                        if (clan.is_private == true) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(Icons.Default.Lock, contentDescription = "Private", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                        }
+                    }
+                    Text("${clan.total_xp ?: 0} XP total \u2022 ${members.size} member", fontSize = 12.sp, color = Color.White.copy(alpha = 0.55f))
+                }
+                if (isLeader) {
+                    IconButton(onClick = onManage, modifier = Modifier.size(34.dp)) {
+                        Icon(Icons.Default.Settings, contentDescription = "Kelola Clan", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                 }
                 Button(
-                    onClick = onContribute,
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5b9cf6))
-                ) { Text("Kontribusi", fontWeight = FontWeight.Bold) }
+                    onClick = onContribute, shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2FA8BF))
+                ) { Text("Kontribusi", fontWeight = FontWeight.Bold, color = Color(0xFF1B2A2E)) }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -338,46 +414,41 @@ private fun MyClanCard(
                 Text("$xpIntoLevel / 1000 XP", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(Color.White.copy(alpha = 0.08f))
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f))) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
-                        .clip(RoundedCornerShape(50))
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFBA68C8), Color(0xFF6EEAFA))))
+                    modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
+                        .clip(RoundedCornerShape(50)).background(AnimeGradient)
                 )
             }
 
             Spacer(modifier = Modifier.height(14.dp))
             members.forEachIndexed { i, member ->
                 if (i > 0) HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (!member.avatar_url.isNullOrBlank()) {
+                        AsyncImage(
+                            model = member.avatar_url, contentDescription = "Avatar",
+                            modifier = Modifier.size(32.dp).clip(CircleShape)
+                                .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.5f), CircleShape)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        (member.username ?: "?") + if (member.role == "leader") " \uD83D\uDC51" else "",
-                        fontSize = 13.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
+                        (member.username ?: "?") + if (member.role == "leader") " [L]" else "",
+                        fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f)
                     )
                     Text("${member.contributed_xp ?: 0} XP", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
+                    if (isLeader && member.user_id != currentUserId) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { onKick(member.user_id) }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
+                        }
+                    }
                 }
             }
         }
@@ -386,67 +457,46 @@ private fun MyClanCard(
 
 @Composable
 private fun CreateClanSection(
-    showCreateForm: Boolean,
-    onShowForm: () -> Unit,
-    clanName: String,
-    onNameChange: (String) -> Unit,
-    clanTag: String,
-    onTagChange: (String) -> Unit,
-    isLoading: Boolean,
-    onCreate: () -> Unit
+    showCreateForm: Boolean, onShowForm: () -> Unit,
+    clanName: String, onNameChange: (String) -> Unit,
+    clanTag: String, onTagChange: (String) -> Unit,
+    isLoading: Boolean, onCreate: () -> Unit
 ) {
     Column(modifier = Modifier.animateContentSize()) {
         if (!showCreateForm) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF1F1530))))
-                    .border(1.dp, Color(0xFFE53935).copy(alpha = 0.4f), RoundedCornerShape(18.dp))
-                    .clickable(onClick = onShowForm)
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF3A1560), Color(0xFF241530))))
+                    .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+                    .clickable(onClick = onShowForm).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.AddCircle, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.AddCircle, contentDescription = null, tint = Color(0xFFB388FF), modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Buat Clan Baru \u2014 2.000 DM", color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
+                Text("Buat Clan Baru \u2014 2.000 DM", color = Color(0xFFB388FF), fontWeight = FontWeight.Bold)
             }
         } else {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
-                    .padding(18.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)).padding(18.dp)
             ) {
                 Text("Buat Clan Baru", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text("Biaya 2.000 DM, kamu jadi leader otomatis", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                 Spacer(modifier = Modifier.height(14.dp))
                 OutlinedTextField(
-                    value = clanName,
-                    onValueChange = onNameChange,
-                    label = { Text("Nama Lengkap Clan") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    value = clanName, onValueChange = onNameChange, label = { Text("Nama Lengkap Clan") },
+                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedTextField(
-                    value = clanTag,
-                    onValueChange = onTagChange,
-                    label = { Text("Singkatan (2-6 huruf)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    value = clanTag, onValueChange = onTagChange, label = { Text("Singkatan (2-6 huruf)") },
+                    singleLine = true, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Button(
-                    onClick = onCreate,
-                    enabled = !isLoading && clanName.isNotBlank() && clanTag.length in 2..6,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(46.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                    onClick = onCreate, enabled = !isLoading && clanName.isNotBlank() && clanTag.length in 2..6,
+                    shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().height(46.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
                 ) {
                     if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
                     else Text("Buat Clan", fontWeight = FontWeight.Bold)
@@ -459,10 +509,7 @@ private fun CreateClanSection(
 @Composable
 private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(index * 60L)
-        visible = true
-    }
+    LaunchedEffect(Unit) { delay(index * 60L); visible = true }
 
     val rankColor = when (rank) {
         1 -> Color(0xFFFFD700)
@@ -477,37 +524,139 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: ()
         exit = fadeOut() + shrinkVertically()
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                 .background(
-                    if (rank <= 3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.12f), Color.Transparent))
+                    if (rank <= 3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.15f), Color(0xFF7B2FBF).copy(alpha = 0.06f)))
                     else Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)))
                 )
                 .border(1.dp, if (rank <= 3) rankColor.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(16.dp))
-                .clickable(onClick = onClick)
-                .padding(14.dp),
+                .clickable(onClick = onClick).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (rank <= 3) {
+            if (!clan.icon_url.isNullOrBlank()) {
+                AsyncImage(
+                    model = clan.icon_url, contentDescription = null,
+                    modifier = Modifier.size(34.dp).clip(CircleShape).border(1.dp, rankColor.copy(alpha = 0.5f), CircleShape)
+                )
+            } else if (rank <= 3) {
                 Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(rankColor.copy(alpha = 0.2f)),
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(rankColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = rankColor, modifier = Modifier.size(16.dp))
-                }
+                ) { Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = rankColor, modifier = Modifier.size(16.dp)) }
             } else {
-                Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(30.dp), fontSize = 13.sp)
+                Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(34.dp), fontSize = 13.sp)
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    if (clan.is_private == true) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Lock, contentDescription = "Private", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(11.dp))
+                    }
+                }
                 Text("Lv.${clan.level} \u2022 ${clan.total_xp} XP", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
         }
     }
+}
+
+@Composable
+private fun ManageClanDialog(
+    clan: ClanDto,
+    pendingRequests: List<com.example.network.ClanJoinRequestDto>,
+    diamondBalance: Int,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit,
+    onTogglePrivacy: (Boolean) -> Unit,
+    onApproveRequest: (String) -> Unit,
+    onRejectRequest: (String) -> Unit,
+    onDeleteClan: () -> Unit
+) {
+    var newName by remember { mutableStateOf(clan.name) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Kelola Clan") },
+        text = {
+            Column(modifier = Modifier.animateContentSize()) {
+                Text("Ganti Nama Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Biaya 1.000 DM \u2014 saldo kamu: $diamondBalance DM", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newName, onValueChange = { newName = it }, singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { if (newName.isNotBlank() && newName != clan.name) onRename(newName) },
+                        enabled = newName.isNotBlank() && newName != clan.name
+                    ) { Text("Simpan") }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Clan Private", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Anggota baru butuh persetujuan kamu", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                    }
+                    Switch(checked = clan.is_private == true, onCheckedChange = onTogglePrivacy)
+                }
+
+                if (clan.is_private == true) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Permintaan Gabung (${pendingRequests.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    if (pendingRequests.isEmpty()) {
+                        Text("Belum ada permintaan", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.padding(top = 4.dp))
+                    }
+                    pendingRequests.forEach { req ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(req.username ?: "?", fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onApproveRequest(req.id) }) { Text("Terima") }
+                            TextButton(onClick = { onRejectRequest(req.id) }) { Text("Tolak", color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (!showDeleteConfirm) {
+                    TextButton(onClick = { showDeleteConfirm = true }) {
+                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Hapus Clan", color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    Text("Yakin mau hapus clan? Semua member bakal ikut keluar. Aksi ini gak bisa dibatalkan.", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row {
+                        Button(onClick = onDeleteClan, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                            Text("Ya, Hapus")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal") }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Tutup") } }
+    )
 }

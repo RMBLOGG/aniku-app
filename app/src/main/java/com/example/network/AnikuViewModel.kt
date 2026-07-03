@@ -1900,6 +1900,173 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    private val _isUploadingClanIcon = MutableStateFlow(false)
+    val isUploadingClanIcon: StateFlow<Boolean> = _isUploadingClanIcon.asStateFlow()
+
+    private val _pendingJoinRequests = MutableStateFlow<List<ClanJoinRequestDto>>(emptyList())
+    val pendingJoinRequests: StateFlow<List<ClanJoinRequestDto>> = _pendingJoinRequests.asStateFlow()
+
+    fun loadPendingJoinRequests(clanId: String) {
+        viewModelScope.launch {
+            try {
+                val raw = NetworkClient.supabaseDbApi.getClanJoinRequests("eq.$clanId", "eq.pending", getAuthHeader(), SUPABASE_ANON_KEY)
+                _pendingJoinRequests.value = raw.map { row ->
+                    @Suppress("UNCHECKED_CAST")
+                    val profileMap = row["profiles"] as? Map<String, Any?>
+                    ClanJoinRequestDto(
+                        id = row["id"] as? String ?: "",
+                        clan_id = row["clan_id"] as? String ?: "",
+                        user_id = row["user_id"] as? String ?: "",
+                        status = row["status"] as? String,
+                        username = profileMap?.get("username") as? String,
+                        avatar_url = profileMap?.get("avatar_url") as? String
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load join requests", e)
+            }
+        }
+    }
+
+    fun requestJoinClan(clanId: String) {
+        _clanActionError.value = null
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.requestJoinClan(mapOf("p_clan_id" to clanId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (!response.isSuccessful) _clanActionError.value = response.errorBody()?.string() ?: "Gagal request gabung clan"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal request gabung clan"
+            }
+        }
+    }
+
+    fun approveJoinRequest(requestId: String, clanId: String) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.approveJoinRequest(mapOf("p_request_id" to requestId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) {
+                    loadPendingJoinRequests(clanId)
+                    loadClanMembers(clanId)
+                    loadClans()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal approve"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal approve"
+            }
+        }
+    }
+
+    fun rejectJoinRequest(requestId: String, clanId: String) {
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.rejectJoinRequest(mapOf("p_request_id" to requestId), getAuthHeader(), SUPABASE_ANON_KEY)
+                loadPendingJoinRequests(clanId)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal reject join request", e)
+            }
+        }
+    }
+
+    fun kickMember(clanId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.kickMember(mapOf("p_clan_id" to clanId, "p_user_id" to userId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) loadClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal kick member"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal kick member"
+            }
+        }
+    }
+
+    fun deleteClan(clanId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.deleteClan(mapOf("p_clan_id" to clanId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                    onDone()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal hapus clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal hapus clan"
+            }
+        }
+    }
+
+    fun renameClan(clanId: String, newName: String) {
+        _clanActionError.value = null
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.renameClan(mapOf("p_clan_id" to clanId, "p_new_name" to newName), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                    refreshProfile()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal ganti nama clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal ganti nama clan"
+            }
+        }
+    }
+
+    fun setClanPrivacy(clanId: String, isPrivate: Boolean) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.setClanPrivacy(mapOf("p_clan_id" to clanId, "p_is_private" to isPrivate), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) loadMyClanMembership() else _clanActionError.value = response.errorBody()?.string() ?: "Gagal ubah privasi"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal ubah privasi"
+            }
+        }
+    }
+
+    fun uploadClanIcon(clanId: String, uri: android.net.Uri) {
+        _isUploadingClanIcon.value = true
+        viewModelScope.launch {
+            try {
+                val contentResolver = appContext.contentResolver
+                val inputStream = contentResolver.openInputStream(uri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(1024)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+
+                val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", "clan_icon.jpg", requestFile)
+                val presetBody = "aniku_avatar".toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val cloudinaryRes = NetworkClient.cloudinaryApi.uploadAvatar(body, presetBody)
+                val secureUrl = cloudinaryRes.secure_url
+
+                val response = NetworkClient.supabaseDbApi.updateClanIcon(
+                    mapOf("p_clan_id" to clanId, "p_icon_url" to secureUrl),
+                    getAuthHeader(), SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal update icon clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal upload icon clan"
+            } finally {
+                _isUploadingClanIcon.value = false
+            }
+        }
+    }
+
     // Admin only: kredit DM manual (dipanggil dari Admin Panel setelah verifikasi bukti transfer)
     fun adminAddDiamond(userId: String, amount: Int, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {

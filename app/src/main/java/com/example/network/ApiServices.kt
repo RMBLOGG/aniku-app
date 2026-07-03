@@ -298,6 +298,71 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    @POST("rest/v1/rpc/update_clan_icon")
+    suspend fun updateClanIcon(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/kick_member")
+    suspend fun kickMember(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/delete_clan")
+    suspend fun deleteClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/rename_clan")
+    suspend fun renameClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/set_clan_privacy")
+    suspend fun setClanPrivacy(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/request_join_clan")
+    suspend fun requestJoinClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<ClanJoinRequestDto>
+
+    @POST("rest/v1/rpc/approve_join_request")
+    suspend fun approveJoinRequest(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/rpc/reject_join_request")
+    suspend fun rejectJoinRequest(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    @GET("rest/v1/clan_join_requests")
+    suspend fun getClanJoinRequests(
+        @Query("clan_id") clanIdQuery: String,
+        @Query("status") statusQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "*,profiles(username,avatar_url)"
+    ): List<Map<String, @JvmSuppressWildcards Any?>>
+
     @POST("rest/v1/announcements")
     suspend fun insertAnnouncement(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
