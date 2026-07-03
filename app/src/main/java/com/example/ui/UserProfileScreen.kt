@@ -363,7 +363,7 @@ fun UserProfileScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (!clan.icon_url.isNullOrBlank()) {
-                                AsyncImage(model = clan.icon_url, contentDescription = "Icon Clan", modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                AsyncImage(model = clan.icon_url, contentDescription = "Icon Clan", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
                             } else {
                                 Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             }

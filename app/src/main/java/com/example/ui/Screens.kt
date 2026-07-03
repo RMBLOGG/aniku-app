@@ -1176,6 +1176,11 @@ fun HomeScreen(
     // Lambda stabil dishare ke semua card di screen ini, jadi gak bikin instance baru tiap card/tiap recomposition
     val onShowLoginDialog = remember { { showLoginDialog = true } }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
+    val myClanDetail by viewModel.myClanDetail.collectAsState()
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) viewModel.loadMyClanMembership()
+    }
 
     LaunchedEffect(ongoingList, recentList, popularList) {
         val slugs = (ongoingList + recentList + popularList).map { it.slug }
@@ -1572,6 +1577,33 @@ fun HomeScreen(
                                         Text(
                                             text = "#$num",
                                             color = Color.White.copy(alpha = 0.5f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+                                myClanDetail?.let { clan ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(20.dp))
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(Color(0xFF7B2FBF).copy(alpha = 0.3f), Color(0xFF2FA8BF).copy(alpha = 0.3f))
+                                                )
+                                            )
+                                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Shield,
+                                            contentDescription = "Clan",
+                                            tint = Color(0xFF5FC9DE),
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Text(
+                                            text = "[${clan.tag}]",
+                                            color = Color.White.copy(alpha = 0.85f),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )

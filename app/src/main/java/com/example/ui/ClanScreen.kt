@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.ClanDto
@@ -390,6 +392,7 @@ private fun MyClanCard(
                     } else if (!clan.icon_url.isNullOrBlank()) {
                         AsyncImage(
                             model = clan.icon_url, contentDescription = "Icon Clan",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
                     } else {
@@ -446,6 +449,7 @@ private fun MyClanCard(
                     if (!member.avatar_url.isNullOrBlank()) {
                         AsyncImage(
                             model = member.avatar_url, contentDescription = "Avatar",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.size(32.dp).clip(CircleShape)
                                 .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.5f), CircleShape)
                         )
@@ -457,9 +461,14 @@ private fun MyClanCard(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        (member.username ?: "?") + if (member.role == "leader") " [L]" else "",
-                        fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f)
+                        member.username ?: "?",
+                        fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f, fill = false)
                     )
+                    if (member.role == "leader") {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        ClanCrownIcon(modifier = Modifier.size(12.dp), tint = Color(0xFFFFD700))
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
                     Text("${member.contributed_xp ?: 0} XP", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
                     if (isLeader && member.user_id != currentUserId) {
                         Spacer(modifier = Modifier.width(8.dp))
@@ -554,6 +563,7 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: ()
             if (!clan.icon_url.isNullOrBlank()) {
                 AsyncImage(
                     model = clan.icon_url, contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier.size(34.dp).clip(CircleShape).border(1.dp, rankColor.copy(alpha = 0.5f), CircleShape)
                 )
             } else if (rank <= 3) {
@@ -803,5 +813,33 @@ private fun EmptyLeaderboardState() {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
+    }
+}
+
+// Icon mahkota digambar manual pakai Canvas (bukan emoji), buat nandain leader clan
+@Composable
+private fun ClanCrownIcon(modifier: Modifier = Modifier, tint: Color) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.06f, h * 0.95f)
+            lineTo(w * 0.06f, h * 0.42f)
+            lineTo(w * 0.28f, h * 0.62f)
+            lineTo(w * 0.5f, h * 0.10f)
+            lineTo(w * 0.72f, h * 0.62f)
+            lineTo(w * 0.94f, h * 0.42f)
+            lineTo(w * 0.94f, h * 0.95f)
+            close()
+        }
+        drawPath(path, color = tint)
+        drawRect(
+            color = tint,
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.06f, h * 0.88f),
+            size = androidx.compose.ui.geometry.Size(w * 0.88f, h * 0.10f)
+        )
+        drawCircle(color = tint, radius = w * 0.06f, center = androidx.compose.ui.geometry.Offset(w * 0.06f, h * 0.42f))
+        drawCircle(color = tint, radius = w * 0.065f, center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.10f))
+        drawCircle(color = tint, radius = w * 0.06f, center = androidx.compose.ui.geometry.Offset(w * 0.94f, h * 0.42f))
     }
 }
