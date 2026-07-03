@@ -743,157 +743,223 @@ private fun HomeQuickActionCard(
     }
 }
 
+private data class LeaderboardPageSpec(
+    val title: String,
+    val users: List<ProfileDto>,
+    val gradient: List<Color>,
+    val borderColor: Color,
+    val ringColor: Color,
+    val titleColor: Color,
+    val valueOf: (ProfileDto) -> String
+)
+
 @Composable
 private fun TopLeaderboardCard(
     topUsers: List<ProfileDto>,
+    topDonators: List<ProfileDto>,
     accentColor: Color,
     onUserClick: (ProfileDto) -> Unit,
     onSeeAllClick: () -> Unit
 ) {
+    val pages = remember(topUsers, topDonators) {
+        listOfNotNull(
+            LeaderboardPageSpec(
+                title = "TOP LEADERBOARD",
+                users = topUsers,
+                gradient = listOf(Color(0xFF0B1B33), Color(0xFF122A4D), Color(0xFF0A1626)),
+                borderColor = Color(0x334FC3F7),
+                ringColor = Color(0xFF4FC3F7),
+                titleColor = Color(0xFFFFC107),
+                valueOf = { u -> "${u.season_xp ?: 0} XP" }
+            ).takeIf { topUsers.isNotEmpty() },
+            LeaderboardPageSpec(
+                title = "TOP DONATUR",
+                users = topDonators,
+                gradient = listOf(Color(0xFF241541), Color(0xFF3A1E63), Color(0xFF1B0F33)),
+                borderColor = Color(0x33B388FF),
+                ringColor = Color(0xFFFFD54F),
+                titleColor = Color(0xFFFFC107),
+                valueOf = { u -> "${u.diamond_balance ?: 0}d" }
+            ).takeIf { topDonators.isNotEmpty() }
+        )
+    }
+
+    if (pages.isEmpty()) return
+
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val coroutineScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF3A0B0F), Color(0xFF551013), Color(0xFF2A0808))
-                )
-            )
-            .border(1.dp, Color(0x33FF6B6B), RoundedCornerShape(20.dp))
-            .padding(vertical = 16.dp, horizontal = 18.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onSeeAllClick),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CrownIcon(
-                        modifier = Modifier.size(15.dp),
-                        tint = Color(0xFFFFC107)
-                    )
-                    Text(
-                        text = "TOP LEADERBOARD",
-                        color = Color(0xFFFFC107),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        letterSpacing = 0.8.sp
-                    )
-                }
-                Text(
-                    text = "›",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
+        HorizontalPager(state = pagerState) { page ->
+            val spec = pages[page]
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
-                    .clipToBounds()
+                    .background(brush = Brush.linearGradient(colors = spec.gradient))
+                    .border(1.dp, spec.borderColor, RoundedCornerShape(20.dp))
+                    .padding(vertical = 16.dp, horizontal = 18.dp)
             ) {
-                // faded rank #5 avatar, peeking at the edge
-                topUsers.getOrNull(4)?.let { user ->
-                    Box(
+                Column {
+                    Row(
                         modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .offset(x = 26.dp)
-                            .size(58.dp)
-                            .clip(CircleShape)
-                            .alpha(0.3f)
-                            .background(Color.White.copy(alpha = 0.06f))
-                            .clickable { onUserClick(user) }
+                            .fillMaxWidth()
+                            .clickable(onClick = onSeeAllClick),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        AsyncImage(
-                            model = user.avatar_url,
-                            contentDescription = user.username,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            CrownIcon(
+                                modifier = Modifier.size(15.dp),
+                                tint = spec.titleColor
+                            )
+                            Text(
+                                text = spec.title,
+                                color = spec.titleColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
+                        Text(
+                            text = "›",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                }
-                // faded rank #4 avatar, peeking at the edge
-                topUsers.getOrNull(3)?.let { user ->
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     Box(
                         modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .offset(x = 4.dp)
-                            .size(66.dp)
-                            .clip(CircleShape)
-                            .alpha(0.55f)
-                            .background(Color.White.copy(alpha = 0.06f))
-                            .clickable { onUserClick(user) }
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .clipToBounds()
                     ) {
-                        AsyncImage(
-                            model = user.avatar_url,
-                            contentDescription = user.username,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    }
-                }
+                        spec.users.getOrNull(2)?.let { user ->
+                            ClusterAvatar(
+                                user = user,
+                                size = 40.dp,
+                                ringColor = Color(0xFFCE8B5B),
+                                alpha = 0.65f,
+                                onClick = { onUserClick(user) },
+                                modifier = Modifier.align(Alignment.CenterStart).offset(x = 4.dp, y = 18.dp)
+                            )
+                        }
+                        spec.users.getOrNull(1)?.let { user ->
+                            ClusterAvatar(
+                                user = user,
+                                size = 46.dp,
+                                ringColor = Color(0xFFB0BEC5),
+                                alpha = 0.85f,
+                                onClick = { onUserClick(user) },
+                                modifier = Modifier.align(Alignment.CenterStart).offset(x = 46.dp, y = -8.dp)
+                            )
+                        }
+                        spec.users.getOrNull(3)?.let { user ->
+                            ClusterAvatar(
+                                user = user,
+                                size = 40.dp,
+                                ringColor = Color.White.copy(alpha = 0.3f),
+                                alpha = 0.5f,
+                                onClick = { onUserClick(user) },
+                                modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-6).dp, y = 20.dp)
+                            )
+                        }
+                        spec.users.getOrNull(4)?.let { user ->
+                            ClusterAvatar(
+                                user = user,
+                                size = 34.dp,
+                                ringColor = Color.White.copy(alpha = 0.25f),
+                                alpha = 0.35f,
+                                onClick = { onUserClick(user) },
+                                modifier = Modifier.align(Alignment.CenterEnd).offset(x = 4.dp, y = -18.dp)
+                            )
+                        }
 
-                // rank #1-3 mini list, left aligned
-                Column(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    verticalArrangement = Arrangement.spacedBy(9.dp)
-                ) {
-                    topUsers.take(3).forEachIndexed { idx, user ->
-                        RankMiniRow(
-                            rank = idx + 1,
-                            user = user,
-                            onClick = { onUserClick(user) }
-                        )
+                        spec.users.getOrNull(0)?.let { user ->
+                            Column(
+                                modifier = Modifier.align(Alignment.Center),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                CrownIcon(
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color(0xFFFFD54F)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.06f))
+                                        .border(3.dp, spec.ringColor, CircleShape)
+                                        .clickable { onUserClick(user) }
+                                ) {
+                                    AsyncImage(
+                                        model = user.avatar_url,
+                                        contentDescription = user.username,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    )
+                                }
+                            }
+                        }
                     }
-                }
 
-                // big highlighted center avatar (rank #1, featured)
-                topUsers.getOrNull(0)?.let { user ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .offset(x = 18.dp)
-                            .size(88.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.06f))
-                            .border(3.dp, Color(0xFF4FC3F7), CircleShape)
-                            .clickable { onUserClick(user) }
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        spec.users.take(2).forEachIndexed { idx, user ->
+                            RankMiniRow(
+                                rank = idx + 1,
+                                user = user,
+                                value = spec.valueOf(user),
+                                onClick = { onUserClick(user) }
+                            )
+                        }
+                        if (spec.users.size > 2) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                spec.users.drop(2).take(3).forEachIndexed { i, user ->
+                                    RankMiniRowCompact(
+                                        rank = i + 3,
+                                        user = user,
+                                        onClick = { onUserClick(user) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AsyncImage(
-                            model = user.avatar_url,
-                            contentDescription = user.username,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
+                        pages.indices.forEach { i ->
+                            val isActive = pagerState.currentPage == i
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 3.dp)
+                                    .size(if (isActive) 16.dp else 6.dp, 6.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (isActive) accentColor else Color.White.copy(alpha = 0.2f))
+                                    .clickable {
+                                        coroutineScope.launch { pagerState.animateScrollToPage(i) }
+                                    }
+                            )
+                        }
                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                repeat(3) { i ->
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(if (i == 0) 16.dp else 6.dp, 6.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(if (i == 0) accentColor else Color.White.copy(alpha = 0.2f))
-                    )
                 }
             }
         }
@@ -901,9 +967,37 @@ private fun TopLeaderboardCard(
 }
 
 @Composable
+private fun ClusterAvatar(
+    user: ProfileDto,
+    size: androidx.compose.ui.unit.Dp,
+    ringColor: Color,
+    alpha: Float,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .alpha(alpha)
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.5.dp, ringColor, CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        AsyncImage(
+            model = user.avatar_url,
+            contentDescription = user.username,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().clip(CircleShape)
+        )
+    }
+}
+
+@Composable
 private fun RankMiniRow(
     rank: Int,
     user: ProfileDto,
+    value: String,
     onClick: () -> Unit
 ) {
     val ringColor = when (rank) {
@@ -912,28 +1006,74 @@ private fun RankMiniRow(
         else -> Color(0xFFCE8B5B)
     }
     Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(30))
+            .background(Color.White.copy(alpha = 0.05f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.clickable(onClick = onClick)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .border(1.5.dp, ringColor, CircleShape)
-                .background(Color.White.copy(alpha = 0.06f))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            AsyncImage(
-                model = user.avatar_url,
-                contentDescription = user.username,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().clip(CircleShape)
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .border(1.5.dp, ringColor, CircleShape)
+                    .background(Color.White.copy(alpha = 0.06f))
+            ) {
+                AsyncImage(
+                    model = user.avatar_url,
+                    contentDescription = user.username,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
+            }
+            Text(
+                text = "#$rank ${user.username ?: "Anonim"}",
+                color = if (rank == 1) ringColor else Color.White.copy(alpha = 0.85f),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
         }
         Text(
-            text = "#$rank ${user.username ?: "Anonim"}",
-            color = if (rank == 1) ringColor else Color.White.copy(alpha = 0.85f),
-            fontSize = 11.5.sp,
+            text = value,
+            color = Color(0xFFFFC107),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun RankMiniRowCompact(
+    rank: Int,
+    user: ProfileDto,
+    onClick: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.clickable(onClick = onClick)
+    ) {
+        Text(
+            text = "#$rank",
+            color = Color.White.copy(alpha = 0.4f),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = user.username ?: "Anonim",
+            color = Color.White.copy(alpha = 0.75f),
+            fontSize = 10.5.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1586,14 +1726,21 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ── Top Leaderboard Card ──
+                    // ── Top Leaderboard Card (2 halaman: XP & Top Donatur) ──
                     val topUsers = remember(userDirectory) {
                         userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(6)
                     }
+                    val topDonators = remember(userDirectory) {
+                        userDirectory
+                            .filter { (it.diamond_balance ?: 0) > 0 }
+                            .sortedByDescending { it.diamond_balance ?: 0 }
+                            .take(6)
+                    }
 
-                    if (topUsers.isNotEmpty()) {
+                    if (topUsers.isNotEmpty() || topDonators.isNotEmpty()) {
                         TopLeaderboardCard(
                             topUsers = topUsers,
+                            topDonators = topDonators,
                             accentColor = accentColor,
                             onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
                             onSeeAllClick = { navController.navigate("user_list") }
