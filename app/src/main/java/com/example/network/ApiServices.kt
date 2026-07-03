@@ -275,6 +275,21 @@ interface SupabaseDbApi {
     ): retrofit2.Response<Unit>
 
     // --- Clan & Diamond ---
+    @GET("rest/v1/clan_members")
+    suspend fun getUserClanMembership(
+        @Query("user_id") userIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "clan_id,clans(id,name,tag,icon_url,level)"
+    ): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @GET("rest/v1/clan_members")
+    suspend fun getAllClanTags(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "user_id,clans(tag,icon_url)"
+    ): List<Map<String, @JvmSuppressWildcards Any?>>
+
     @GET("rest/v1/clans")
     suspend fun getClanById(
         @Query("id") idQuery: String,

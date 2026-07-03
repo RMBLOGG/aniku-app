@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -339,6 +340,42 @@ fun UserProfileScreen(
                             fontSize = 11.sp
                         )
                     }
+                }
+
+                // Section: Clan (cuma tampil kalau user ini tergabung di clan)
+                val viewedClan by viewModel.viewedProfileClan.collectAsState()
+                viewedClan?.let { clan ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF16414D))))
+                            .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF)))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (!clan.icon_url.isNullOrBlank()) {
+                                AsyncImage(model = clan.icon_url, contentDescription = "Icon Clan", modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else {
+                                Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Anggota Clan", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                            Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
+                        }
+                        Text("Lv.${clan.level}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2FA8BF))
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // Section: Statistik

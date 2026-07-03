@@ -170,6 +170,28 @@ private val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF
 private val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
 private val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
 private val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
+private val clanTagGradientColors = listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))
+
+// Badge tag clan di chat, misal [COC], pakai icon perisai bukan emoji
+@Composable
+private fun ClanTagBadge(tag: String) {
+    val progress = rememberGlossyShimmer()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Default.Shield,
+            contentDescription = "Clan",
+            modifier = Modifier.size(11.dp),
+            tint = Color(0xFF2FA8BF)
+        )
+        Spacer(modifier = Modifier.width(2.dp))
+        Text(
+            text = "[$tag]",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            style = LocalTextStyle.current.copy(brush = glossyBrush(clanTagGradientColors, progress))
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,6 +207,7 @@ fun ChatScreen(
     val chatNotifEnabled by viewModel.chatNotifEnabled.collectAsState()
     val chatRoomEnabled by viewModel.remoteConfigManager.chatRoomEnabled.collectAsState()
     val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
+    val clanTagMap by viewModel.clanTagMap.collectAsState()
 
     val isLoggedIn = !session.token.isNullOrEmpty()
     val currentUserId = session.userId
@@ -209,6 +232,7 @@ fun ChatScreen(
     LaunchedEffect(Unit) {
         viewModel.loadChatMessages()
         viewModel.markChatRead()
+        viewModel.loadClanTagMap()
         while (true) {
             delay(5000)
             viewModel.loadChatMessages()
@@ -748,6 +772,7 @@ private fun ChatBubble(
                         fontWeight = FontWeight.Medium
                     )
                 }
+                clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
                 if (message.role == "admin" || message.is_admin == true) {
                     GlossyGradientText(
                         text = "ADMIN",
@@ -987,6 +1012,7 @@ private fun OwnChatBubble(
                         fontWeight = FontWeight.Medium
                     )
                 }
+                clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
                 GlossyGradientText(
                     text = message.username,
                     colors = when {

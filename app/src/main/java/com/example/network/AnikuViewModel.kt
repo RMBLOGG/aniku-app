@@ -1869,6 +1869,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // --- Clan & Diamond ---
+    private val _clanTagMap = MutableStateFlow<Map<String, Pair<String, String?>>>(emptyMap())
+    val clanTagMap: StateFlow<Map<String, Pair<String, String?>>> = _clanTagMap.asStateFlow()
+
+    fun loadClanTagMap() {
+        viewModelScope.launch {
+            try {
+                val raw = NetworkClient.supabaseDbApi.getAllClanTags(getAuthHeader(), SUPABASE_ANON_KEY)
+                val map = mutableMapOf<String, Pair<String, String?>>()
+                raw.forEach { row ->
+                    @Suppress("UNCHECKED_CAST")
+                    val clanMap = row["clans"] as? Map<String, Any?>
+                    val userId = row["user_id"] as? String
+                    val tag = clanMap?.get("tag") as? String
+                    val iconUrl = clanMap?.get("icon_url") as? String
+                    if (userId != null && tag != null) map[userId] = tag to iconUrl
+                }
+                _clanTagMap.value = map
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load clan tag map", e)
+            }
+        }
+    }
+
     private val _topClans = MutableStateFlow<List<ClanDto>>(emptyList())
     val topClans: StateFlow<List<ClanDto>> = _topClans.asStateFlow()
 
@@ -2979,6 +3002,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isViewedProfileLoading = MutableStateFlow(false)
     val isViewedProfileLoading: StateFlow<Boolean> = _isViewedProfileLoading.asStateFlow()
 
+    private val _viewedProfileClan = MutableStateFlow<ClanDto?>(null)
+    val viewedProfileClan: StateFlow<ClanDto?> = _viewedProfileClan.asStateFlow()
+
     fun loadPublicUserProfile(userId: String) {
         viewModelScope.launch {
             _isViewedProfileLoading.value = true
@@ -2994,6 +3020,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 )
                 val profile = profileList.firstOrNull()
                 _viewedProfile.value = profile
+                _viewedProfileClan.value = null
+
+                try {
+                    val clanRows = NetworkClient.supabaseDbApi.getUserClanMembership("eq.$userId", authHeader, SUPABASE_ANON_KEY)
+                    @Suppress("UNCHECKED_CAST")
+                    val clanMap = clanRows.firstOrNull()?.get("clans") as? Map<String, Any?>
+                    if (clanMap != null) {
+                        _viewedProfileClan.value = ClanDto(
+                            id = clanMap["id"] as? String ?: "",
+                            name = clanMap["name"] as? String ?: "",
+                            tag = clanMap["tag"] as? String ?: "",
+                            level = (clanMap["level"] as? Double)?.toInt() ?: 1,
+                            icon_url = clanMap["icon_url"] as? String
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "loadPublicUserProfile clan error: ${e.message}")
+                }
 
                 if (profile?.username != null) {
                     try {
