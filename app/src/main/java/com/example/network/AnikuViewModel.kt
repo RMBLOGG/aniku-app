@@ -1451,9 +1451,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
                 val fileBytes = byteBuffer.toByteArray()
                 
-                // 2. Prepare multipart request body
-                val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
-                val body = MultipartBody.Part.createFormData("file", "avatar.jpg", requestFile)
+                // 2. Siapkan multipart request, deteksi GIF dari signature file biar Cloudinary
+                // tidak strip animasinya (sama kayak logic uploadBanner)
+                val isGif = fileBytes.size > 3 &&
+                    fileBytes[0] == 'G'.code.toByte() &&
+                    fileBytes[1] == 'I'.code.toByte() &&
+                    fileBytes[2] == 'F'.code.toByte()
+                val mimeType = if (isGif) "image/gif" else "image/*"
+                val fileName = if (isGif) "avatar.gif" else "avatar.jpg"
+                val requestFile = fileBytes.toRequestBody(mimeType.toMediaTypeOrNull(), 0, fileBytes.size)
+                val body = MultipartBody.Part.createFormData("file", fileName, requestFile)
                 val presetBody = "aniku_avatar".toRequestBody("text/plain".toMediaTypeOrNull())
 
                 // 3. Upload to Cloudinary unsigned preset
