@@ -660,6 +660,211 @@ fun LoadingScreen(message: String = "Memuat data anime...") {
 }
 
 @Composable
+private fun HomeQuickActionCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    gradientColors: List<Color>,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "quickActionScale"
+    )
+
+    Box(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .height(96.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(gradientColors))
+            .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(14.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(accent.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+            }
+            Column {
+                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    subtitle,
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopUserPodiumItem(
+    user: ProfileDto,
+    rank: Int,
+    onClick: () -> Unit
+) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(user.id, rank) {
+        delay((rank - 1) * 90L)
+        visible = true
+    }
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.5f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "podiumScale_$rank"
+    )
+    val avatarSize = if (rank == 1) 66.dp else 52.dp
+    val ringColor = when (rank) {
+        1 -> Color(0xFFFFD54F)
+        2 -> Color(0xFFB0BEC5)
+        else -> Color(0xFFCE8B5B)
+    }
+
+    Column(
+        modifier = Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = scale }
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp)
+            .widthIn(max = 84.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(contentAlignment = Alignment.TopCenter) {
+            Box(
+                modifier = Modifier
+                    .padding(top = if (rank == 1) 12.dp else 0.dp)
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .border(2.5.dp, ringColor, CircleShape)
+                    .background(Color.White.copy(alpha = 0.06f))
+            ) {
+                AsyncImage(
+                    model = user.avatar_url,
+                    contentDescription = user.username,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
+            if (rank == 1) {
+                Icon(
+                    Icons.Default.EmojiEvents,
+                    contentDescription = null,
+                    tint = ringColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = user.username ?: "Anonim",
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "Lvl ${user.season_level ?: 1}",
+            color = ringColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun TopUserRow(
+    rank: Int,
+    user: ProfileDto,
+    accentColor: Color,
+    delayMs: Int = 0,
+    onClick: () -> Unit
+) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(user.id, rank) {
+        delay(delayMs.toLong())
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(300)) + slideInHorizontally(initialOffsetX = { it / 5 })
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White.copy(alpha = 0.04f))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "#$rank",
+                color = accentColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                modifier = Modifier.width(30.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.08f))
+            ) {
+                AsyncImage(
+                    model = user.avatar_url,
+                    contentDescription = user.username,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = user.username ?: "Anonim",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "Level ${user.season_level ?: 1}",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp
+                )
+            }
+            Text(
+                text = "${user.season_xp ?: 0} XP",
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
 fun HomeScreen(
     viewModel: AnikuViewModel,
     navController: NavController,
@@ -892,40 +1097,6 @@ fun HomeScreen(
         )
     }
 
-    var slideIndex by remember { mutableStateOf(0) }
-
-    // Auto-sliding Hero (3 seconds cycle)
-    // Hero banner → use ongoing[0] as first slide
-    val sliderItems = remember(ongoingList, slidesList) {
-        val list = mutableListOf<AnimeRaw>()
-        if (ongoingList.isNotEmpty()) {
-            list.add(ongoingList[0])
-            val processedSlugs = mutableSetOf(ongoingList[0].slug)
-            slidesList.forEach { slide ->
-                if (!processedSlugs.contains(slide.anime_slug)) {
-                    list.add(AnimeRaw(title = slide.anime_title ?: "", slug = slide.anime_slug, poster = slide.anime_poster ?: ""))
-                    processedSlugs.add(slide.anime_slug)
-                }
-            }
-            ongoingList.drop(1).forEach { anime ->
-                if (!processedSlugs.contains(anime.slug)) {
-                    list.add(anime)
-                    processedSlugs.add(anime.slug)
-                }
-            }
-        }
-        list.take(5)
-    }
-
-    LaunchedEffect(sliderItems) {
-        if (sliderItems.isNotEmpty()) {
-            while (true) {
-                delay(3500)
-                slideIndex = (slideIndex + 1) % sliderItems.size
-            }
-        }
-    }
-
     if (isHomeLoading) {
         LoadingScreen("Memuat data anime...")
     } else if (homeError != null) {
@@ -1127,216 +1298,223 @@ fun HomeScreen(
                 }
             }
 
-            // ── Carousel ─────────────────────────────────────────────
-            if (sliderItems.isNotEmpty()) {
-                item {
-                    val heroPagerState = androidx.compose.foundation.pager.rememberPagerState(
-                        initialPage = 0,
-                        pageCount = { sliderItems.size }
-                    )
+            // ── Top-Up Diamond, Clan/Room Chat, Top Users ─────────────
+            item {
+                val userDirectory by viewModel.userDirectory.collectAsState()
+                val diamondBalance by viewModel.diamondBalance.collectAsState()
 
-                    // Sync slideIndex ke pagerState supaya auto-slide tetap jalan
-                    LaunchedEffect(slideIndex) {
-                        if (heroPagerState.currentPage != slideIndex) {
-                            heroPagerState.animateScrollToPage(slideIndex)
-                        }
-                    }
-                    LaunchedEffect(heroPagerState.currentPage) {
-                        slideIndex = heroPagerState.currentPage
-                    }
+                LaunchedEffect(Unit) {
+                    viewModel.loadUserDirectory()
+                    if (isLoggedIn) viewModel.refreshProfile()
+                }
 
+                val diamondPulse = rememberInfiniteTransition(label = "diamondPulse")
+                val diamondGlow by diamondPulse.animateFloat(
+                    initialValue = 0.30f,
+                    targetValue = 0.70f,
+                    animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                    label = "diamondGlow"
+                )
+                val diamondFloat by diamondPulse.animateFloat(
+                    initialValue = -4f,
+                    targetValue = 4f,
+                    animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                    label = "diamondFloat"
+                )
+
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+
+                    // ── Top-Up Diamond banner ──
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp)
-                    ) {
-                        // HorizontalPager — card style dengan peek
-                        androidx.compose.foundation.pager.HorizontalPager(
-                            state = heroPagerState,
-                            contentPadding = PaddingValues(horizontal = 20.dp),
-                            pageSpacing = 12.dp,
-                            modifier = Modifier.fillMaxSize()
-                        ) { page ->
-                            val slide = sliderItems[page]
-                            val pageOffset = (heroPagerState.currentPage - page) + heroPagerState.currentPageOffsetFraction
-                            val scale by animateFloatAsState(
-                                targetValue = if (pageOffset == 0f) 1f else 0.93f,
-                                animationSpec = tween(300),
-                                label = "card_scale_$page"
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF3A0E4F), Color(0xFF6A1FA0), Color(0xFF9B3FD1))
+                                )
                             )
+                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
+                            .clickable { navController.navigate("diamond_topup") }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .drawBehind {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(Color.White.copy(alpha = diamondGlow * 0.30f), Color.Transparent)
+                                        ),
+                                        radius = size.minDimension * 0.85f,
+                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.88f, size.height * 0.15f)
+                                    )
+                                }
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer { scaleY = scale; scaleX = scale }
-                                    .clip(RoundedCornerShape(20.dp))
+                                    .size(52.dp)
+                                    .offset(y = diamondFloat.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color.White.copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
                             ) {
-                                // Poster
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(slide.poster)
-                                        .crossfade(400)
-                                        .build(),
-                                    contentDescription = slide.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                Icon(
+                                    Icons.Default.Diamond,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
-
-                                // Immersive Linear Gradients
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(
-                                                    Color.Black.copy(alpha = 0.6f),
-                                                    Color.Transparent,
-                                                    Color.Black.copy(alpha = 0.3f),
-                                                    MaterialTheme.colorScheme.background
-                                                )
-                                            )
-                                        )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Top-Up Diamond",
+                                    color = Color.White,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
-
-                                // Atmospheric Radial Bleeding overlay
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .drawBehind {
-                                            drawRect(
-                                                brush = Brush.radialGradient(
-                                                    colors = listOf(
-                                                        accentColor.copy(alpha = 0.15f),
-                                                        Color.Transparent
-                                                    ),
-                                                    center = center,
-                                                    radius = size.width * 0.7f
-                                                )
-                                            )
-                                        }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (isLoggedIn) "Saldo kamu: $diamondBalance Diamond" else "Isi Diamond, dukung Aniku & naik level",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 11.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-
-                                // Slider metadata info (Bottom overlay — style A)
-                                if (page == heroPagerState.currentPage) {
-                                    Column(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(horizontal = 20.dp, vertical = 24.dp)
-                                    ) {
-                                        val genresToShow = slide.genres?.filter { it.isNotBlank() } ?: listOf("Action", "Fantasy", "Adventure")
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(bottom = 8.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            genresToShow.take(3).forEach { genre ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(50))
-                                                        .background(Color.White.copy(alpha = 0.12f))
-                                                        .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(50))
-                                                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                                                ) {
-                                                    Text(
-                                                        text = genre,
-                                                        color = Color.White,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        letterSpacing = 0.5.sp
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Text(
-                                            text = slide.title,
-                                            color = Color.White,
-                                            fontSize = 28.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-
-                                        Spacer(modifier = Modifier.height(14.dp))
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Button(
-                                                onClick = { onNavigateToDetail(slide.slug) },
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = accentColor),
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(44.dp)
-                                                    .testTag("hero_play_btn")
-                                            ) {
-                                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text("Tonton Sekarang", fontWeight = FontWeight.Bold)
-                                            }
-
-                                            val isHeroBookmarked = bookmarkedSlugs.contains(slide.slug)
-                                            IconButton(
-                                                onClick = { viewModel.toggleBookmark(slide.slug, slide.title, slide.poster) },
-                                                modifier = Modifier
-                                                    .size(44.dp)
-                                                    .clip(RoundedCornerShape(12.dp))
-                                                    .background(Color.White.copy(alpha = 0.12f))
-                                                    .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                                                    .testTag("hero_bookmark_btn")
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isHeroBookmarked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                                    contentDescription = "Bookmark Hero",
-                                                    tint = if (isHeroBookmarked) accentColor else Color.White,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(16.dp))
-
-                                        // Dot selectors
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            sliderItems.forEachIndexed { idx, _ ->
-                                                val isSelected = idx == heroPagerState.currentPage
-                                                val dotWidthPx by animateFloatAsState(
-                                                    targetValue = if (isSelected) 20f else 6f,
-                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-                                                    label = "dot_width_$idx"
-                                                )
-                                                val dotAlpha by animateFloatAsState(
-                                                    targetValue = if (isSelected) 1f else 0.3f,
-                                                    animationSpec = tween(300),
-                                                    label = "dot_alpha_$idx"
-                                                )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .padding(horizontal = 3.dp)
-                                                        .width(dotWidthPx.dp)
-                                                        .height(6.dp)
-                                                        .clip(RoundedCornerShape(50))
-                                                        .background(if (isSelected) accentColor else Color.White.copy(alpha = dotAlpha))
-                                                        .clickable { slideIndex = idx }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White)
+                                    .padding(horizontal = 16.dp, vertical = 9.dp)
+                            ) {
+                                Text(
+                                    text = "TOP UP",
+                                    color = Color(0xFF6A1FA0),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
                             }
                         }
-
-
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // ── Clan & Room Chat row ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        HomeQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Clan",
+                            subtitle = "Buat / gabung clan",
+                            icon = Icons.Default.Groups,
+                            accent = accentColor,
+                            gradientColors = listOf(Color(0xFF3A0B0F), Color(0xFF641015)),
+                            onClick = { navController.navigate("clans") }
+                        )
+                        HomeQuickActionCard(
+                            modifier = Modifier.weight(1f),
+                            title = "Room Chat",
+                            subtitle = "Ngobrol bareng komunitas",
+                            icon = Icons.Default.Chat,
+                            accent = Color(0xFF4FC3F7),
+                            gradientColors = listOf(Color(0xFF0B2A3A), Color(0xFF104663)),
+                            onClick = { navController.navigate("chat") }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // ── Top Users ──
+                    val topUsers = remember(userDirectory) {
+                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
+                    }
+
+                    if (topUsers.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFC107),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "TOP USERS",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                            Text(
+                                text = "Lihat Semua ›",
+                                color = accentColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clickable { navController.navigate("user_list") }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        val top3 = topUsers.take(3)
+                        if (top3.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                val podiumOrder = listOfNotNull(
+                                    top3.getOrNull(1)?.let { 2 to it },
+                                    top3.getOrNull(0)?.let { 1 to it },
+                                    top3.getOrNull(2)?.let { 3 to it }
+                                )
+                                podiumOrder.forEach { (rank, user) ->
+                                    TopUserPodiumItem(
+                                        user = user,
+                                        rank = rank,
+                                        onClick = { navController.navigate("user_profile/${user.id}") }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(18.dp))
+                        }
+
+                        val restUsers = topUsers.drop(3)
+                        restUsers.forEachIndexed { idx, user ->
+                            TopUserRow(
+                                rank = idx + 4,
+                                user = user,
+                                accentColor = accentColor,
+                                delayMs = idx * 70,
+                                onClick = { navController.navigate("user_profile/${user.id}") }
+                            )
+                            if (idx != restUsers.lastIndex) Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+
 
 
 
