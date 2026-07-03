@@ -137,6 +137,46 @@ interface SamehadakuApi {
     suspend fun getServerLink(@Path("serverId") serverId: String): SamehadakuServerLinkResponse
 }
 
+// Animekompi (Dayynime-v3) — base url beda dari Animasu/Samehadaku:
+// https://www.sankavollerei.web.id/anime/animekompi/
+interface AnimekompiApi {
+    @GET("home")
+    suspend fun getHome(): AnimekompiHomeResponse
+
+    @GET("terbaru")
+    suspend fun getTerbaru(@Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("order/popular")
+    suspend fun getPopular(@Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("movie")
+    suspend fun getMovies(@Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("status/ongoing")
+    suspend fun getOngoing(@Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("status/completed")
+    suspend fun getCompleted(@Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("search")
+    suspend fun search(@Query("q") keyword: String, @Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("genres")
+    suspend fun getGenres(): AnimekompiGenresResponse
+
+    @GET("genre/{slug}")
+    suspend fun getAnimeByGenre(@Path("slug") slug: String, @Query("page") page: Int? = null): AnimekompiListResponse
+
+    @GET("schedule")
+    suspend fun getSchedule(): AnimekompiScheduleResponse
+
+    @GET("detail/{slug}")
+    suspend fun getDetail(@Path("slug") slug: String): AnimekompiDetailResponse
+
+    @GET("episode/{slug}")
+    suspend fun getEpisode(@Path("slug") slug: String): AnimekompiEpisodeResponse
+}
+
 interface SupabaseAuthApi {
     @POST("auth/v1/signup")
     suspend fun signUp(
@@ -766,6 +806,14 @@ object NetworkClient {
             .build()
             .create(SamehadakuApi::class.java)
 
+    fun animekompiApi(context: Context): AnimekompiApi =
+        Retrofit.Builder()
+            .baseUrl("https://www.sankavollerei.web.id/anime/animekompi/")
+            .client(animeOkHttpClient(context))
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(AnimekompiApi::class.java)
+
     val supabaseAuthApi: SupabaseAuthApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
@@ -809,9 +857,11 @@ object NetworkClient {
 //
 //   private val animeApi by lazy { NetworkClient.animeApi(appContext) }
 //   private val samehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
+//   private val animekompiApi by lazy { NetworkClient.animekompiApi(appContext) }
 //
 // Lalu ganti semua:
 //   NetworkClient.animeApi.xxx  →  animeApi.xxx
 //   NetworkClient.samehadakuApi.xxx  →  samehadakuApi.xxx
+//   NetworkClient.animekompiApi.xxx  →  animekompiApi.xxx
 //
 // NetworkClient.supabaseDbApi dan NetworkClient.supabaseAuthApi tidak perlu diubah.

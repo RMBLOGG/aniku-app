@@ -749,6 +749,209 @@ data class SamehadakuServerLinkData(
     val url: String?
 )
 
+// ================================================================
+// ANIMEKOMPI MODELS (Dayynime-v3)
+// Sumber: https://www.sankavollerei.web.id/anime/animekompi/
+// ================================================================
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiPagination(
+    val has_next: Boolean? = null,
+    val prev_page: Boolean? = null,
+    val current_page: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val image: String? = null,
+    val episode: String? = null,
+    val type: String? = null,
+    val rating: String? = null,
+    val status: String? = null,
+    val date: String? = null,
+    val time: String? = null,
+    val tooltip_id: String? = null,
+    val detail_slug: String? = null
+) {
+    // Endpoint home/terbaru/search/filter Animekompi ngebalikin slug *episode*,
+    // bukan slug anime. Contoh: "one-piece-episode-1168-subtitle-indonesia" -> "one-piece"
+    private fun animeSlugFromEpSlug(epSlug: String): String {
+        val match = Regex("^(.+?)-episode-\\d").find(epSlug)
+        return match?.groupValues?.get(1) ?: epSlug.removeSuffix("-subtitle-indonesia")
+    }
+
+    fun toAnimeRaw(): AnimeRaw {
+        val rawSlug = (slug ?: "").trim()
+        val animeSlug = detail_slug?.takeIf { it.isNotBlank() } ?: animeSlugFromEpSlug(rawSlug)
+        return AnimeRaw(
+            title = title ?: "Unknown",
+            slug = animeSlug,
+            poster = poster ?: image ?: "",
+            episode = episode,
+            type = type,
+            score = rating,
+            status = status,
+            release = date,
+            genres = null,
+            estimation = time
+        )
+    }
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiHomeResponse(
+    val data: List<AnimekompiItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiListResponse(
+    val data: List<AnimekompiItem>? = null,
+    val pagination: AnimekompiPagination? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiGenreItem(
+    val name: String? = null,
+    val value: String? = null
+) {
+    fun toGenreRaw() = GenreRaw(name = name ?: "", slug = value ?: "")
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiGenresResponse(
+    val data: List<AnimekompiGenreItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiScheduleItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val episode: String? = null,
+    val time: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = slug ?: "",
+        poster = poster ?: "",
+        episode = episode,
+        estimation = time
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiScheduleDay(
+    val day: String? = null,
+    val list: List<AnimekompiScheduleItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiScheduleResponse(
+    val data: List<AnimekompiScheduleDay>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDetailGenre(
+    val name: String? = null,
+    val slug: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDetailEpisode(
+    val title: String? = null,
+    val num: String? = null,
+    val slug: String? = null
+) {
+    fun toDetailEpisodeRaw() = DetailEpisodeRaw(
+        name = title?.takeIf { it.isNotBlank() } ?: num?.let { "Episode $it" } ?: (slug ?: ""),
+        slug = slug ?: ""
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiMetadata(
+    val tipe: String? = null,
+    val status: String? = null,
+    val dirilis: String? = null,
+    val dirilis_2: String? = null,
+    val durasi: String? = null,
+    val studio: String? = null,
+    val season: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDetailData(
+    val title: String? = null,
+    val alter_title: String? = null,
+    val image: String? = null,
+    val rating: String? = null,
+    val synopsis: String? = null,
+    val metadata: AnimekompiMetadata? = null,
+    val genres: List<AnimekompiDetailGenre>? = null,
+    val episodes: List<AnimekompiDetailEpisode>? = null
+) {
+    fun toDetailData() = DetailData(
+        title = title?.takeIf { it.isNotBlank() } ?: alter_title ?: "Unknown",
+        synonym = alter_title,
+        poster = image ?: "",
+        rating = rating ?: "N/A",
+        synopsis = synopsis,
+        trailer = null,
+        genres = genres?.map { DetailGenreRaw(it.name ?: "", it.slug ?: "") },
+        status = metadata?.status,
+        aired = metadata?.dirilis_2 ?: metadata?.dirilis,
+        type = metadata?.tipe,
+        duration = metadata?.durasi,
+        author = null,
+        studio = metadata?.studio,
+        season = metadata?.season,
+        episodes = episodes?.map { it.toDetailEpisodeRaw() },
+        characters = null
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDetailResponse(
+    val data: AnimekompiDetailData? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiMirror(
+    val name: String? = null,
+    val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDownloadLink(
+    val server: String? = null,
+    val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiDownloadItem(
+    val format: String? = null,
+    val resolution: String? = null,
+    val links: List<AnimekompiDownloadLink>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiEpisodeData(
+    val title: String? = null,
+    val detail_slug: String? = null,
+    val prev_episode: String? = null,
+    val next_episode: String? = null,
+    val mirrors: List<AnimekompiMirror>? = null,
+    val downloads: List<AnimekompiDownloadItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimekompiEpisodeResponse(
+    val data: AnimekompiEpisodeData? = null
+)
+
 // Trakteer Donation
 @JsonClass(generateAdapter = true)
 data class Donation(

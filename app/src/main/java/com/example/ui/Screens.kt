@@ -1385,7 +1385,8 @@ fun HomeScreen(
         val currentSource by viewModel.dataSource.collectAsState()
         val servers = listOf(
             "Dayynime-v1" to "Server 1 (Utama)",
-            "Dayynime-v2" to "Server 2 (Alternatif)"
+            "Dayynime-v2" to "Server 2 (Alternatif)",
+            "Dayynime-v3" to "Server 3 (Animekompi)"
         )
         Box(modifier = Modifier.fillMaxSize()) {
             // Tombol settings tetap bisa diakses di pojok kanan atas
@@ -4212,6 +4213,7 @@ fun NobarRoomCard(
                 val sourceLabel = when (room.dataSource) {
                     "Dayynime-v1" -> "Server 1 (Utama)"
                     "Dayynime-v2" -> "Server 2 (Alternatif)"
+                    "Dayynime-v3" -> "Server 3 (Animekompi)"
                     else -> room.dataSource
                 }
                 Box(
@@ -5162,6 +5164,7 @@ fun WatchScreen(
                                                 "animasu.cc", "sanka.my.id",
                                                 "abysscdn.com",
                                                 "samehadaku.how", "v2.samehadaku.how",
+                                                "sankavollerei.web.id", "sankavollerei.com",
                                                 "wibufile.com", "wibu.io",
                                                 "pixeldrain.com",
                                                 "letsupload.io", "letsupload.cc",
@@ -8845,7 +8848,8 @@ fun SumberDataScreen(
 
             val sources = listOf(
                 "Dayynime-v1" to "Sumber utama (server 1)",
-                "Dayynime-v2" to "Sumber alternatif (server 2)"
+                "Dayynime-v2" to "Sumber alternatif (server 2)",
+                "Dayynime-v3" to "Animekompi (server 3)"
             )
 
             sources.forEach { (sourceKey, sourceDesc) ->

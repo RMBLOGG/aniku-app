@@ -33,6 +33,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
     private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
     private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
+    private val animekompiApi: AnimekompiApi by lazy { NetworkClient.animekompiApi(appContext) }
+
+    // Nama hari Indonesia sesuai urutan Calendar.DAY_OF_WEEK (1=Minggu ... 7=Sabtu),
+    // dipakai buat mapping jadwal tayang Animekompi (Dayynime-v3) yang sudah pakai nama hari Indonesia.
+    private val indoDayNames = listOf("minggu", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu")
 
     // Watch history state
     private val _watchHistory = MutableStateFlow<List<WatchHistoryItem>>(emptyList())
@@ -594,6 +599,50 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
                             } catch (se: Exception) { Log.e("AnikuVM", "Failed samehadaku home schedule", se) }
                         }
+                    } else if (dataSource.value == "Dayynime-v3") {
+                        launch {
+                            try {
+                                val homeRes = retryIO { animekompiApi.getHome() }
+                                val terbaruRes = retryIO { animekompiApi.getTerbaru(page = 1) }
+                                // Samain urutan sama proxy referensi: "recent" dari /home, "ongoing" dari /terbaru
+                                _homeRecent.value = (homeRes.data ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homeOngoing.value = (terbaruRes.data ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (he: Exception) { Log.e("AnikuVM", "Failed animekompi home", he) }
+                        }
+                        launch {
+                            try {
+                                val popularRes = retryIO { animekompiApi.getPopular(page = 1) }
+                                _homePopular.value = (popularRes.data ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (pe: Exception) { Log.e("AnikuVM", "Failed animekompi home popular", pe) }
+                        }
+                        launch {
+                            try {
+                                val moviesRes = retryIO { animekompiApi.getMovies(page = 1) }
+                                _homeMovies.value = (moviesRes.data ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (me: Exception) { Log.e("AnikuVM", "Failed animekompi home movies", me) }
+                        }
+                        launch {
+                            try {
+                                val completedRes = retryIO { animekompiApi.getCompleted(page = 1) }
+                                _homeCompleted.value = (completedRes.data ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (ce: Exception) { Log.e("AnikuVM", "Failed animekompi home completed", ce) }
+                        }
+                        launch {
+                            try {
+                                val schedRes = retryIO { animekompiApi.getSchedule() }
+                                val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                                val todayName = indoDayNames[todayDay - 1]
+                                val todayList = schedRes.data
+                                    ?.firstOrNull { (it.day ?: "").lowercase().replace("'", "") == todayName }
+                                    ?.list?.map { it.toAnimeRaw() } ?: emptyList()
+                                _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                            } catch (se: Exception) { Log.e("AnikuVM", "Failed animekompi home schedule", se) }
+                        }
                     } else {
                         launch {
                             try {
@@ -675,6 +724,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val res = retryIO { samehadakuApi.getPopular(page = 1) }
                     _searchPopular.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.getPopular(page = 1) }
+                    _searchPopular.value = (res.data ?: emptyList())
+                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
                     val res = retryIO { animeApi.getPopular(page = 1) }
                     _searchPopular.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -701,6 +754,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val res = retryIO { samehadakuApi.search(query) }
                     _searchResults.value = (res.data?.animeList ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.search(keyword = query) }
+                    _searchResults.value = (res.data ?: emptyList())
+                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
                     val res = retryIO { animeApi.search(query) }
                     _searchResults.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -720,6 +777,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { samehadakuApi.getGenres() }
                     _genres.value = (res.data?.genreList ?: emptyList()).map { it.toGenreRaw() }
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.getGenres() }
+                    _genres.value = (res.data ?: emptyList()).map { it.toGenreRaw() }
+                        .sortedBy { it.name }
                 } else {
                     val list = retryIO { animeApi.getGenres() }
                     _genres.value = list.genres ?: emptyList()
@@ -779,6 +840,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         }
                         val items = (sRes.data?.animeList ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                         val hasNext = sRes.pagination?.hasNextPage ?: items.isNotEmpty()
+                        Pair(items, hasNext)
+                    } else if (dataSource.value == "Dayynime-v3") {
+                        val kRes = if (_selectedGenreSlug.value != null) {
+                            animekompiApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
+                        } else {
+                            when (_exploreTab.value) {
+                                "Ongoing" -> animekompiApi.getOngoing(page = page)
+                                "Completed" -> animekompiApi.getCompleted(page = page)
+                                "Movie" -> animekompiApi.getMovies(page = page)
+                                "Latest" -> animekompiApi.getTerbaru(page = page)
+                                else -> animekompiApi.getOngoing(page = page)
+                            }
+                        }
+                        val items = (kRes.data ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                        val hasNext = kRes.pagination?.has_next ?: items.isNotEmpty()
                         Pair(items, hasNext)
                     } else {
                         val aRes = if (_selectedGenreSlug.value != null) {
@@ -851,6 +927,20 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     }
                     _scheduleMap.value = map
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.getSchedule() }
+                    val map = mutableMapOf<String, List<AnimeRaw>>()
+                    for (dayEntry in res.data ?: emptyList()) {
+                        val normalized = (dayEntry.day ?: "").lowercase().replace("'", "")
+                        val key = when (normalized) {
+                            "minggu" -> "Minggu"; "senin" -> "Senin"; "selasa" -> "Selasa"
+                            "rabu" -> "Rabu"; "kamis" -> "Kamis"; "jumat" -> "Jumat"; "sabtu" -> "Sabtu"
+                            else -> dayEntry.day ?: ""
+                        }
+                        map[key] = (dayEntry.list ?: emptyList())
+                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                    }
+                    _scheduleMap.value = map
                 } else {
                     val res = retryIO { animeApi.getSchedule() }
                     val sched = res.schedule
@@ -890,6 +980,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
                 if (dataSource.value == "Dayynime-v2") {
                     val res = retryIO { samehadakuApi.getDetail(slug) }
+                    _animeDetail.value = res.data?.toDetailData()
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.getDetail(slug) }
                     _animeDetail.value = res.data?.toDetailData()
                 } else {
                     val res = retryIO { animeApi.getDetail(slug) }
@@ -987,6 +1080,38 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             }
                         } else {
                             _activeStreamUrl.value = firstUrl
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                        }
+                    } else {
+                        _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                    }
+                } else if (dataSource.value == "Dayynime-v3") {
+                    val res = retryIO { animekompiApi.getEpisode(slug) }
+                    val epData = res.data
+                    _streamEpisodeTitle.value = epData?.title ?: "Tonton Tayangan"
+
+                    // Urutin mirror: yang namanya ada "bebas iklan" (biasanya direct/tanpa ads) naik duluan,
+                    // sama kaya prioritas di web referensi.
+                    val rawMirrors = epData?.mirrors ?: emptyList()
+                    val streamList = rawMirrors
+                        .filter { !it.url.isNullOrBlank() }
+                        .sortedByDescending { Regex("bebas iklan", RegexOption.IGNORE_CASE).containsMatchIn(it.name ?: "") }
+                        .map { StreamRaw(name = it.name ?: "Server", url = it.url!!) }
+                    _streams.value = streamList
+
+                    if (streamList.isNotEmpty()) {
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
+                            _activeStreamUrl.value = resolved.url
+                            _resolvedHeaders.value = resolved.headers
+                            _isDirectStream.value = true
+                        } else {
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
+                            _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
                         }
                     } else {
