@@ -660,6 +660,33 @@ fun LoadingScreen(message: String = "Memuat data anime...") {
 }
 
 @Composable
+private fun CrownIcon(modifier: Modifier = Modifier, tint: Color) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.06f, h * 0.95f)
+            lineTo(w * 0.06f, h * 0.42f)
+            lineTo(w * 0.28f, h * 0.62f)
+            lineTo(w * 0.5f, h * 0.10f)
+            lineTo(w * 0.72f, h * 0.62f)
+            lineTo(w * 0.94f, h * 0.42f)
+            lineTo(w * 0.94f, h * 0.95f)
+            close()
+        }
+        drawPath(path, color = tint)
+        drawRect(
+            color = tint,
+            topLeft = androidx.compose.ui.geometry.Offset(w * 0.06f, h * 0.88f),
+            size = androidx.compose.ui.geometry.Size(w * 0.88f, h * 0.10f)
+        )
+        drawCircle(color = tint, radius = w * 0.06f, center = androidx.compose.ui.geometry.Offset(w * 0.06f, h * 0.42f))
+        drawCircle(color = tint, radius = w * 0.065f, center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.10f))
+        drawCircle(color = tint, radius = w * 0.06f, center = androidx.compose.ui.geometry.Offset(w * 0.94f, h * 0.42f))
+    }
+}
+
+@Composable
 private fun HomeQuickActionCard(
     modifier: Modifier = Modifier,
     title: String,
@@ -764,11 +791,9 @@ private fun TopUserPodiumItem(
                 )
             }
             if (rank == 1) {
-                Icon(
-                    Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = ringColor,
-                    modifier = Modifier.size(22.dp)
+                CrownIcon(
+                    modifier = Modifier.size(22.dp),
+                    tint = ringColor
                 )
             }
         }
@@ -1437,7 +1462,7 @@ fun HomeScreen(
 
                     // ── Top Users ──
                     val topUsers = remember(userDirectory) {
-                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
+                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(6)
                     }
 
                     if (topUsers.isNotEmpty()) {
@@ -1450,11 +1475,9 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.EmojiEvents,
-                                    contentDescription = null,
-                                    tint = Color(0xFFFFC107),
-                                    modifier = Modifier.size(18.dp)
+                                CrownIcon(
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(0xFFFFC107)
                                 )
                                 Text(
                                     text = "TOP USERS",
