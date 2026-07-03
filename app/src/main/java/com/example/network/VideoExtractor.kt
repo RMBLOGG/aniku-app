@@ -89,13 +89,73 @@ object VideoExtractor {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
+        .retryOnConnectionFailure(true)
+        // Pool lebih gede & keep-alive lebih lama - dalam satu sesi nonton,
+        // host yang sama (mis. server video/CDN) sering di-hit berkali-kali
+        // (getHome page, resolve, ganti kualitas...), jadi koneksi TCP/TLS-nya
+        // enak dipakai ulang instead of handshake dari nol tiap kali.
+        .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))
         .dns(FallbackDns)
         .build()
 
+    // ---------------------------------------------------------------------
+    // Cache hasil resolve (in-memory, per proses app - bukan disk) supaya
+    // buka episode yang sama / gonta-ganti kualitas / balik ke episode
+    // sebelumnya gak perlu scrape ulang dari nol tiap kali (itu penyebab
+    // utama loading lama, karena tiap resolve = 1+ HTTP request + parsing
+    // HTML/JS, kadang sampe WebView buat Blogger).
+    //
+    // TTL dibikin pendek (10 menit) karena banyak host (Filedon dkk) ngasih
+    // presigned URL yang expired setelah beberapa waktu - jangan di-cache
+    // kelamaan atau nanti player dapet link basi.
+    // ---------------------------------------------------------------------
+    private data class CacheEntry(val stream: ResolvedStream, val expiresAt: Long)
+
+    private val resolveCache = java.util.concurrent.ConcurrentHashMap<String, CacheEntry>()
+    private const val CACHE_TTL_MS = 10 * 60 * 1000L
+    private const val CACHE_MAX_SIZE = 200
+
+    private fun cacheKey(embedUrl: String, referer: String?) = "$embedUrl|${referer ?: ""}"
+
+    private fun cacheGet(key: String): ResolvedStream? {
+        val entry = resolveCache[key] ?: return null
+        if (System.currentTimeMillis() > entry.expiresAt) {
+            resolveCache.remove(key)
+            return null
+        }
+        return entry.stream
+    }
+
+    private fun cachePut(key: String, stream: ResolvedStream) {
+        if (resolveCache.size > CACHE_MAX_SIZE) {
+            // Beres-beres entry basi biar map gak numpuk terus selama app hidup
+            val now = System.currentTimeMillis()
+            resolveCache.entries.removeAll { it.value.expiresAt < now }
+        }
+        resolveCache[key] = CacheEntry(stream, System.currentTimeMillis() + CACHE_TTL_MS)
+    }
+
+    /** Buang seluruh cache resolve — dipanggil manual kalau ada link yang udah kadaluarsa/rusak. */
+    fun clearCache() {
+        resolveCache.clear()
+    }
+
     suspend fun resolve(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
+        val key = cacheKey(embedUrl, referer)
+        cacheGet(key)?.let {
+            Log.d("VideoExtractor", "Cache hit: $embedUrl")
+            return it
+        }
+        val result = resolveUncached(embedUrl, referer, context)
+        if (result != null) cachePut(key, result)
+        return result
+    }
+
+    private suspend fun resolveUncached(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
         Log.d("VideoExtractor", "Resolving embed: $embedUrl (referer=$referer)")
 
         // Fast-path: beberapa server (terutama varian Wibufile seperti s0.wibufile.com)
@@ -207,12 +267,27 @@ object VideoExtractor {
     // ---------------------------------------------------------------------
     // Follow redirect chain (buat shortlink kayak short.ink) pakai OkHttp
     // (yang udah pasang FallbackDns), terus balikin URL final-nya.
+    // Coba HEAD duluan (gak download body sama sekali, jauh lebih cepat &
+    // hemat data buat halaman yang cuma nge-redirect doang) - kalau server-nya
+    // nolak HEAD (405/403/dll atau gak ke-redirect sama sekali), baru fallback GET.
     // ---------------------------------------------------------------------
     private fun followRedirect(url: String, referer: String?): String? {
-        val builder = Request.Builder().url(url).header("User-Agent", DESKTOP_UA)
-        if (referer != null) builder.header("Referer", referer)
+        fun request(method: String) = Request.Builder().url(url).method(method, null)
+            .header("User-Agent", DESKTOP_UA)
+            .apply { if (referer != null) header("Referer", referer) }
+            .build()
+
+        try {
+            client.newCall(request("HEAD")).execute().use { resp ->
+                val finalUrl = resp.request.url.toString()
+                if (resp.isSuccessful && finalUrl != url) return finalUrl
+            }
+        } catch (_: Exception) {
+            // sebagian server nolak/error di HEAD - lanjut coba GET di bawah
+        }
+
         return try {
-            client.newCall(builder.build()).execute().use { resp ->
+            client.newCall(request("GET")).execute().use { resp ->
                 resp.request.url.toString()
             }
         } catch (e: Exception) {
@@ -418,6 +493,14 @@ object VideoExtractor {
     /**
      * Implementasi unpacker generik untuk "Dean Edwards packer"
      * — format obfuscation umum yang dipakai banyak situs mirror video.
+     *
+     * CATATAN PERFORMA: versi lama nge-loop tiap keyword (bisa ratusan) dan
+     * bikin + jalanin Regex baru + scan ULANG SELURUH string per keyword —
+     * jadi O(jumlah_keyword x panjang_payload). Ini penyebab utama lag di
+     * host yang JS-nya di-pack (Filemoon/Vidhide/Wibufile/Streamhide/dll).
+     * Versi ini cuma sekali scan (O(n)): jalan karakter per karakter, kumpulin
+     * token alfanumerik, terus lookup ke dictionary — hasil akhirnya identik,
+     * tapi jauh lebih cepat (dari ratusan pass jadi 1 pass).
      */
     private fun unpackJs(packed: String): String? {
         val match = Regex(
@@ -425,17 +508,34 @@ object VideoExtractor {
             RegexOption.DOT_MATCHES_ALL
         ).find(packed) ?: return null
 
-        var payload = match.groupValues[1]
+        val payload = match.groupValues[1]
         val radix = match.groupValues[2].toIntOrNull() ?: 36
         val count = match.groupValues[3].toIntOrNull() ?: return null
         val keywords = match.groupValues[4].split("|")
 
-        for (c in count - 1 downTo 0) {
+        // token base-radix (mis. "a3", "12") -> keyword aslinya, sekali bikin aja
+        val dict = HashMap<String, String>(count * 2)
+        for (c in 0 until count) {
             if (c < keywords.size && keywords[c].isNotEmpty()) {
-                val token = Integer.toString(c, radix)
-                payload = Regex("\\b$token\\b").replace(payload, keywords[c])
+                dict[Integer.toString(c, radix)] = keywords[c]
             }
         }
-        return payload.replace("\\'", "'").replace("\\\\", "\\")
+
+        val sb = StringBuilder(payload.length + payload.length / 2)
+        val n = payload.length
+        var i = 0
+        while (i < n) {
+            val ch = payload[i]
+            if (ch.isLetterOrDigit()) {
+                val start = i
+                while (i < n && payload[i].isLetterOrDigit()) i++
+                val token = payload.substring(start, i)
+                sb.append(dict[token] ?: token)
+            } else {
+                sb.append(ch)
+                i++
+            }
+        }
+        return sb.toString().replace("\\'", "'").replace("\\\\", "\\")
     }
 }
