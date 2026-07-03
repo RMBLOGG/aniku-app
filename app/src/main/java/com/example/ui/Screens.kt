@@ -743,220 +743,197 @@ private fun HomeQuickActionCard(
     }
 }
 
-private data class LeaderboardPageSpec(
-    val title: String,
-    val users: List<ProfileDto>,
-    val gradient: List<Color>,
-    val borderColor: Color,
-    val ringColor: Color,
-    val titleColor: Color,
-    val valueOf: (ProfileDto) -> String
-)
-
 @Composable
 private fun TopLeaderboardCard(
     topUsers: List<ProfileDto>,
-    topDonators: List<ProfileDto>,
     accentColor: Color,
     onUserClick: (ProfileDto) -> Unit,
     onSeeAllClick: () -> Unit
 ) {
-    val pages = remember(topUsers, topDonators) {
-        listOfNotNull(
-            LeaderboardPageSpec(
-                title = "TOP LEADERBOARD",
-                users = topUsers,
-                gradient = listOf(Color(0xFF0B1B33), Color(0xFF122A4D), Color(0xFF0A1626)),
-                borderColor = Color(0x334FC3F7),
-                ringColor = Color(0xFF4FC3F7),
-                titleColor = Color(0xFFFFC107),
-                valueOf = { u -> "${u.season_xp ?: 0} XP" }
-            ).takeIf { topUsers.isNotEmpty() },
-            LeaderboardPageSpec(
-                title = "TOP DONATUR",
-                users = topDonators,
-                gradient = listOf(Color(0xFF241541), Color(0xFF3A1E63), Color(0xFF1B0F33)),
-                borderColor = Color(0x33B388FF),
-                ringColor = Color(0xFFFFD54F),
-                titleColor = Color(0xFFFFC107),
-                valueOf = { u -> "${u.diamond_balance ?: 0}d" }
-            ).takeIf { topDonators.isNotEmpty() }
-        )
-    }
-
-    if (pages.isEmpty()) return
-
-    val pagerState = rememberPagerState(pageCount = { pages.size })
-    val coroutineScope = rememberCoroutineScope()
+    if (topUsers.isEmpty()) return
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF0B1B33), Color(0xFF122A4D), Color(0xFF0A1626))
+                )
+            )
+            .border(1.dp, Color(0x334FC3F7), RoundedCornerShape(20.dp))
+            .padding(vertical = 16.dp, horizontal = 18.dp)
     ) {
-        HorizontalPager(state = pagerState) { page ->
-            val spec = pages[page]
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onSeeAllClick),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CrownIcon(
+                        modifier = Modifier.size(15.dp),
+                        tint = Color(0xFFFFC107)
+                    )
+                    Text(
+                        text = "TOP LEADERBOARD",
+                        color = Color(0xFFFFC107),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 0.8.sp
+                    )
+                }
+                Text(
+                    text = "›",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(brush = Brush.linearGradient(colors = spec.gradient))
-                    .border(1.dp, spec.borderColor, RoundedCornerShape(20.dp))
-                    .padding(vertical = 16.dp, horizontal = 18.dp)
+                    .height(90.dp)
+                    .clipToBounds()
             ) {
-                Column {
-                    Row(
+                topUsers.getOrNull(2)?.let { user ->
+                    ClusterAvatar(
+                        user = user,
+                        size = 40.dp,
+                        ringColor = Color(0xFFCE8B5B),
+                        alpha = 0.65f,
+                        floatDurationMs = 2600,
+                        floatDelayMs = 0,
+                        onClick = { onUserClick(user) },
+                        modifier = Modifier.align(Alignment.CenterStart).offset(x = 4.dp, y = 18.dp)
+                    )
+                }
+                topUsers.getOrNull(1)?.let { user ->
+                    ClusterAvatar(
+                        user = user,
+                        size = 46.dp,
+                        ringColor = Color(0xFFB0BEC5),
+                        alpha = 0.85f,
+                        floatDurationMs = 3100,
+                        floatDelayMs = 300,
+                        onClick = { onUserClick(user) },
+                        modifier = Modifier.align(Alignment.CenterStart).offset(x = 46.dp, y = -8.dp)
+                    )
+                }
+                topUsers.getOrNull(3)?.let { user ->
+                    ClusterAvatar(
+                        user = user,
+                        size = 40.dp,
+                        ringColor = Color.White.copy(alpha = 0.3f),
+                        alpha = 0.5f,
+                        floatDurationMs = 2900,
+                        floatDelayMs = 500,
+                        onClick = { onUserClick(user) },
+                        modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-6).dp, y = 20.dp)
+                    )
+                }
+                topUsers.getOrNull(4)?.let { user ->
+                    ClusterAvatar(
+                        user = user,
+                        size = 34.dp,
+                        ringColor = Color.White.copy(alpha = 0.25f),
+                        alpha = 0.35f,
+                        floatDurationMs = 2400,
+                        floatDelayMs = 800,
+                        onClick = { onUserClick(user) },
+                        modifier = Modifier.align(Alignment.CenterEnd).offset(x = 4.dp, y = -18.dp)
+                    )
+                }
+
+                // rank #1 — big, centered, featured, floating + breathing
+                topUsers.getOrNull(0)?.let { user ->
+                    val infinite = rememberInfiniteTransition(label = "rank1")
+                    val floatY by infinite.animateFloat(
+                        initialValue = -5f,
+                        targetValue = 5f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(2800, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "rank1Float"
+                    )
+                    val scale by infinite.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.06f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1600, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "rank1Scale"
+                    )
+                    val glow by infinite.animateFloat(
+                        initialValue = 0.35f,
+                        targetValue = 0.85f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1600, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "rank1Glow"
+                    )
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onSeeAllClick),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .align(Alignment.Center)
+                            .offset(y = floatY.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            CrownIcon(
-                                modifier = Modifier.size(15.dp),
-                                tint = spec.titleColor
-                            )
-                            Text(
-                                text = spec.title,
-                                color = spec.titleColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                letterSpacing = 0.8.sp
-                            )
-                        }
-                        Text(
-                            text = "›",
-                            color = Color.White.copy(alpha = 0.4f),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                        CrownIcon(
+                            modifier = Modifier.size(16.dp),
+                            tint = Color(0xFFFFD54F)
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp)
-                            .clipToBounds()
-                    ) {
-                        spec.users.getOrNull(2)?.let { user ->
-                            ClusterAvatar(
-                                user = user,
-                                size = 40.dp,
-                                ringColor = Color(0xFFCE8B5B),
-                                alpha = 0.65f,
-                                onClick = { onUserClick(user) },
-                                modifier = Modifier.align(Alignment.CenterStart).offset(x = 4.dp, y = 18.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .graphicsLayer { scaleX = scale; scaleY = scale }
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .border(3.dp, Color(0xFF4FC3F7).copy(alpha = glow), CircleShape)
+                                .clickable { onUserClick(user) }
+                        ) {
+                            AsyncImage(
+                                model = user.avatar_url,
+                                contentDescription = user.username,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
-                        }
-                        spec.users.getOrNull(1)?.let { user ->
-                            ClusterAvatar(
-                                user = user,
-                                size = 46.dp,
-                                ringColor = Color(0xFFB0BEC5),
-                                alpha = 0.85f,
-                                onClick = { onUserClick(user) },
-                                modifier = Modifier.align(Alignment.CenterStart).offset(x = 46.dp, y = -8.dp)
-                            )
-                        }
-                        spec.users.getOrNull(3)?.let { user ->
-                            ClusterAvatar(
-                                user = user,
-                                size = 40.dp,
-                                ringColor = Color.White.copy(alpha = 0.3f),
-                                alpha = 0.5f,
-                                onClick = { onUserClick(user) },
-                                modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-6).dp, y = 20.dp)
-                            )
-                        }
-                        spec.users.getOrNull(4)?.let { user ->
-                            ClusterAvatar(
-                                user = user,
-                                size = 34.dp,
-                                ringColor = Color.White.copy(alpha = 0.25f),
-                                alpha = 0.35f,
-                                onClick = { onUserClick(user) },
-                                modifier = Modifier.align(Alignment.CenterEnd).offset(x = 4.dp, y = -18.dp)
-                            )
-                        }
-
-                        spec.users.getOrNull(0)?.let { user ->
-                            Column(
-                                modifier = Modifier.align(Alignment.Center),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                CrownIcon(
-                                    modifier = Modifier.size(16.dp),
-                                    tint = Color(0xFFFFD54F)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(64.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.06f))
-                                        .border(3.dp, spec.ringColor, CircleShape)
-                                        .clickable { onUserClick(user) }
-                                ) {
-                                    AsyncImage(
-                                        model = user.avatar_url,
-                                        contentDescription = user.username,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
-                                    )
-                                }
-                            }
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        spec.users.take(2).forEachIndexed { idx, user ->
-                            RankMiniRow(
-                                rank = idx + 1,
-                                user = user,
-                                value = spec.valueOf(user),
-                                onClick = { onUserClick(user) }
-                            )
-                        }
-                        if (spec.users.size > 2) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                spec.users.drop(2).take(3).forEachIndexed { i, user ->
-                                    RankMiniRowCompact(
-                                        rank = i + 3,
-                                        user = user,
-                                        onClick = { onUserClick(user) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                topUsers.take(2).forEachIndexed { idx, user ->
+                    RankMiniRow(
+                        rank = idx + 1,
+                        user = user,
+                        value = "${user.season_xp ?: 0} XP",
+                        onClick = { onUserClick(user) }
+                    )
+                }
+                if (topUsers.size > 2) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        pages.indices.forEach { i ->
-                            val isActive = pagerState.currentPage == i
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .size(if (isActive) 16.dp else 6.dp, 6.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(if (isActive) accentColor else Color.White.copy(alpha = 0.2f))
-                                    .clickable {
-                                        coroutineScope.launch { pagerState.animateScrollToPage(i) }
-                                    }
+                        topUsers.drop(2).take(3).forEachIndexed { i, user ->
+                            RankMiniRowCompact(
+                                rank = i + 3,
+                                user = user,
+                                onClick = { onUserClick(user) }
                             )
                         }
                     }
@@ -973,10 +950,24 @@ private fun ClusterAvatar(
     ringColor: Color,
     alpha: Float,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    floatDurationMs: Int = 2800,
+    floatDelayMs: Int = 0
 ) {
+    val infinite = rememberInfiniteTransition(label = "cluster")
+    val floatY by infinite.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(floatDurationMs, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+            initialStartOffset = StartOffset(floatDelayMs)
+        ),
+        label = "clusterFloat"
+    )
     Box(
         modifier = modifier
+            .offset(y = floatY.dp)
             .size(size)
             .clip(CircleShape)
             .alpha(alpha)
@@ -1726,21 +1717,14 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ── Top Leaderboard Card (2 halaman: XP & Top Donatur) ──
+                    // ── Top Leaderboard Card ──
                     val topUsers = remember(userDirectory) {
                         userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(6)
                     }
-                    val topDonators = remember(userDirectory) {
-                        userDirectory
-                            .filter { (it.diamond_balance ?: 0) > 0 }
-                            .sortedByDescending { it.diamond_balance ?: 0 }
-                            .take(6)
-                    }
 
-                    if (topUsers.isNotEmpty() || topDonators.isNotEmpty()) {
+                    if (topUsers.isNotEmpty()) {
                         TopLeaderboardCard(
                             topUsers = topUsers,
-                            topDonators = topDonators,
                             accentColor = accentColor,
                             onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
                             onSeeAllClick = { navController.navigate("user_list") }
