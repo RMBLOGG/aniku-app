@@ -39,6 +39,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -742,88 +744,196 @@ private fun HomeQuickActionCard(
 }
 
 @Composable
-private fun CompactTopUserItem(
-    user: ProfileDto,
+private fun TopLeaderboardCard(
+    topUsers: List<ProfileDto>,
+    accentColor: Color,
+    onUserClick: (ProfileDto) -> Unit,
+    onSeeAllClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0xFF3A0B0F), Color(0xFF551013), Color(0xFF2A0808))
+                )
+            )
+            .border(1.dp, Color(0x33FF6B6B), RoundedCornerShape(20.dp))
+            .padding(vertical = 16.dp, horizontal = 18.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onSeeAllClick),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CrownIcon(
+                        modifier = Modifier.size(15.dp),
+                        tint = Color(0xFFFFC107)
+                    )
+                    Text(
+                        text = "TOP LEADERBOARD",
+                        color = Color(0xFFFFC107),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 0.8.sp
+                    )
+                }
+                Text(
+                    text = "›",
+                    color = Color.White.copy(alpha = 0.4f),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp)
+                    .clipToBounds()
+            ) {
+                // faded rank #5 avatar, peeking at the edge
+                topUsers.getOrNull(4)?.let { user ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = 26.dp)
+                            .size(58.dp)
+                            .clip(CircleShape)
+                            .alpha(0.3f)
+                            .background(Color.White.copy(alpha = 0.06f))
+                            .clickable { onUserClick(user) }
+                    ) {
+                        AsyncImage(
+                            model = user.avatar_url,
+                            contentDescription = user.username,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    }
+                }
+                // faded rank #4 avatar, peeking at the edge
+                topUsers.getOrNull(3)?.let { user ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = 4.dp)
+                            .size(66.dp)
+                            .clip(CircleShape)
+                            .alpha(0.55f)
+                            .background(Color.White.copy(alpha = 0.06f))
+                            .clickable { onUserClick(user) }
+                    ) {
+                        AsyncImage(
+                            model = user.avatar_url,
+                            contentDescription = user.username,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    }
+                }
+
+                // rank #1-3 mini list, left aligned
+                Column(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    topUsers.take(3).forEachIndexed { idx, user ->
+                        RankMiniRow(
+                            rank = idx + 1,
+                            user = user,
+                            onClick = { onUserClick(user) }
+                        )
+                    }
+                }
+
+                // big highlighted center avatar (rank #1, featured)
+                topUsers.getOrNull(0)?.let { user ->
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .offset(x = 18.dp)
+                            .size(88.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.06f))
+                            .border(3.dp, Color(0xFF4FC3F7), CircleShape)
+                            .clickable { onUserClick(user) }
+                    ) {
+                        AsyncImage(
+                            model = user.avatar_url,
+                            contentDescription = user.username,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(3) { i ->
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(if (i == 0) 16.dp else 6.dp, 6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (i == 0) accentColor else Color.White.copy(alpha = 0.2f))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankMiniRow(
     rank: Int,
+    user: ProfileDto,
     onClick: () -> Unit
 ) {
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(user.id, rank) {
-        delay((rank - 1) * 60L)
-        visible = true
-    }
-    val scale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.5f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "compactScale_$rank"
-    )
-    val avatarSize = when {
-        rank == 1 -> 50.dp
-        rank <= 3 -> 38.dp
-        else -> 32.dp
-    }
     val ringColor = when (rank) {
         1 -> Color(0xFFFFD54F)
         2 -> Color(0xFFB0BEC5)
-        3 -> Color(0xFFCE8B5B)
-        else -> Color.White.copy(alpha = 0.3f)
+        else -> Color(0xFFCE8B5B)
     }
-
-    Column(
-        modifier = Modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = scale }
-            .clickable(onClick = onClick)
-            .padding(horizontal = 3.dp)
-            .widthIn(max = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
-        Box(contentAlignment = Alignment.TopCenter) {
-            Box(
-                modifier = Modifier
-                    .padding(top = if (rank == 1) 8.dp else 0.dp)
-                    .size(avatarSize)
-                    .clip(CircleShape)
-                    .border(2.dp, ringColor, CircleShape)
-                    .background(Color.White.copy(alpha = 0.06f))
-            ) {
-                AsyncImage(
-                    model = user.avatar_url,
-                    contentDescription = user.username,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                )
-            }
-            if (rank == 1) {
-                CrownIcon(
-                    modifier = Modifier.size(16.dp),
-                    tint = ringColor
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(x = 1.dp, y = 1.dp)
-                    .size(15.dp)
-                    .clip(CircleShape)
-                    .background(ringColor)
-                    .border(1.dp, Color(0xFF141414), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "$rank",
-                    color = Color(0xFF141414),
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .border(1.5.dp, ringColor, CircleShape)
+                .background(Color.White.copy(alpha = 0.06f))
+        ) {
+            AsyncImage(
+                model = user.avatar_url,
+                contentDescription = user.username,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape)
+            )
         }
-        Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = user.username ?: "Anonim",
-            color = Color.White,
-            fontSize = 9.sp,
+            text = "#$rank ${user.username ?: "Anonim"}",
+            color = if (rank == 1) ringColor else Color.White.copy(alpha = 0.85f),
+            fontSize = 11.5.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1476,64 +1586,18 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ── Top Users ──
+                    // ── Top Leaderboard Card ──
                     val topUsers = remember(userDirectory) {
                         userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(6)
                     }
 
                     if (topUsers.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                CrownIcon(
-                                    modifier = Modifier.size(18.dp),
-                                    tint = Color(0xFFFFC107)
-                                )
-                                Text(
-                                    text = "TOP USERS",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                            Text(
-                                text = "Lihat Semua ›",
-                                color = accentColor,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.clickable { navController.navigate("user_list") }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            val compactOrder = listOfNotNull(
-                                topUsers.getOrNull(1)?.let { 2 to it },
-                                topUsers.getOrNull(0)?.let { 1 to it },
-                                topUsers.getOrNull(2)?.let { 3 to it },
-                                topUsers.getOrNull(3)?.let { 4 to it },
-                                topUsers.getOrNull(4)?.let { 5 to it }
-                            )
-                            compactOrder.forEach { (rank, user) ->
-                                CompactTopUserItem(
-                                    user = user,
-                                    rank = rank,
-                                    onClick = { navController.navigate("user_profile/${user.id}") }
-                                )
-                            }
-                        }
+                        TopLeaderboardCard(
+                            topUsers = topUsers,
+                            accentColor = accentColor,
+                            onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
+                            onSeeAllClick = { navController.navigate("user_list") }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
