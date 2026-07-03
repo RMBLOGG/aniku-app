@@ -619,6 +619,7 @@ fun ChatScreen(
                                 message = message,
                                 isOwnMessage = isOwn,
                                 navController = navController,
+                                clanTagMap = clanTagMap,
                                 onReply = if (isLoggedIn) { { replyTarget = message } } else null,
                                 onDelete = if (isOwn || session.canModerate()) {
                                     { viewModel.deleteChatMessage(message.id) }
@@ -639,6 +640,7 @@ private fun ChatBubble(
     message: ChatMessage,
     isOwnMessage: Boolean,
     navController: NavController,
+    clanTagMap: Map<String, Pair<String, String?>>,
     onReply: (() -> Unit)?,
     onDelete: (() -> Unit)?
 ) {
@@ -703,6 +705,7 @@ private fun ChatBubble(
             message = message,
             timeStr = timeStr,
             navController = navController,
+            clanTagMap = clanTagMap,
             modifier = dragModifier
         )
     } else {
@@ -940,6 +943,7 @@ private fun OwnChatBubble(
     message: ChatMessage,
     timeStr: String,
     navController: NavController,
+    clanTagMap: Map<String, Pair<String, String?>>,
     modifier: Modifier = Modifier
 ) {
     var showFullImage by remember { mutableStateOf(false) }
