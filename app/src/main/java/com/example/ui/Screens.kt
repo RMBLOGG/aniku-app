@@ -742,43 +742,48 @@ private fun HomeQuickActionCard(
 }
 
 @Composable
-private fun TopUserPodiumItem(
+private fun CompactTopUserItem(
     user: ProfileDto,
     rank: Int,
     onClick: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(user.id, rank) {
-        delay((rank - 1) * 90L)
+        delay((rank - 1) * 60L)
         visible = true
     }
     val scale by animateFloatAsState(
         targetValue = if (visible) 1f else 0.5f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "podiumScale_$rank"
+        label = "compactScale_$rank"
     )
-    val avatarSize = if (rank == 1) 66.dp else 52.dp
+    val avatarSize = when {
+        rank == 1 -> 50.dp
+        rank <= 3 -> 38.dp
+        else -> 32.dp
+    }
     val ringColor = when (rank) {
         1 -> Color(0xFFFFD54F)
         2 -> Color(0xFFB0BEC5)
-        else -> Color(0xFFCE8B5B)
+        3 -> Color(0xFFCE8B5B)
+        else -> Color.White.copy(alpha = 0.3f)
     }
 
     Column(
         modifier = Modifier
             .graphicsLayer { scaleX = scale; scaleY = scale; alpha = scale }
             .clickable(onClick = onClick)
-            .padding(horizontal = 4.dp)
-            .widthIn(max = 84.dp),
+            .padding(horizontal = 3.dp)
+            .widthIn(max = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(contentAlignment = Alignment.TopCenter) {
             Box(
                 modifier = Modifier
-                    .padding(top = if (rank == 1) 12.dp else 0.dp)
+                    .padding(top = if (rank == 1) 8.dp else 0.dp)
                     .size(avatarSize)
                     .clip(CircleShape)
-                    .border(2.5.dp, ringColor, CircleShape)
+                    .border(2.dp, ringColor, CircleShape)
                     .background(Color.White.copy(alpha = 0.06f))
             ) {
                 AsyncImage(
@@ -792,25 +797,36 @@ private fun TopUserPodiumItem(
             }
             if (rank == 1) {
                 CrownIcon(
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = ringColor
                 )
             }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 1.dp, y = 1.dp)
+                    .size(15.dp)
+                    .clip(CircleShape)
+                    .background(ringColor)
+                    .border(1.dp, Color(0xFF141414), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$rank",
+                    color = Color(0xFF141414),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = user.username ?: "Anonim",
             color = Color.White,
-            fontSize = 12.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = "Lvl ${user.season_level ?: 1}",
-            color = ringColor,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -1496,41 +1512,27 @@ fun HomeScreen(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        val top3 = topUsers.take(3)
-                        if (top3.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                val podiumOrder = listOfNotNull(
-                                    top3.getOrNull(1)?.let { 2 to it },
-                                    top3.getOrNull(0)?.let { 1 to it },
-                                    top3.getOrNull(2)?.let { 3 to it }
-                                )
-                                podiumOrder.forEach { (rank, user) ->
-                                    TopUserPodiumItem(
-                                        user = user,
-                                        rank = rank,
-                                        onClick = { navController.navigate("user_profile/${user.id}") }
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(18.dp))
-                        }
-
-                        val restUsers = topUsers.drop(3)
-                        restUsers.forEachIndexed { idx, user ->
-                            TopUserRow(
-                                rank = idx + 4,
-                                user = user,
-                                accentColor = accentColor,
-                                delayMs = idx * 70,
-                                onClick = { navController.navigate("user_profile/${user.id}") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            val compactOrder = listOfNotNull(
+                                topUsers.getOrNull(1)?.let { 2 to it },
+                                topUsers.getOrNull(0)?.let { 1 to it },
+                                topUsers.getOrNull(2)?.let { 3 to it },
+                                topUsers.getOrNull(3)?.let { 4 to it },
+                                topUsers.getOrNull(4)?.let { 5 to it }
                             )
-                            if (idx != restUsers.lastIndex) Spacer(modifier = Modifier.height(8.dp))
+                            compactOrder.forEach { (rank, user) ->
+                                CompactTopUserItem(
+                                    user = user,
+                                    rank = rank,
+                                    onClick = { navController.navigate("user_profile/${user.id}") }
+                                )
+                            }
                         }
                     }
 
