@@ -4737,6 +4737,7 @@ fun WatchScreen(
 
     val activity = LocalContext.current as? android.app.Activity
     var isFullscreen by remember { mutableStateOf(false) }
+    var showExtractorDebugDialog by remember { mutableStateOf(false) }
 
     // Jaga layar tetap nyala selama di WatchScreen
     DisposableEffect(Unit) {
@@ -5741,12 +5742,22 @@ fun WatchScreen(
 
         // Fullscreen enter button (shown below video when not fullscreen)
         if (!isFullscreen) {
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(end = 16.dp, top = 8.dp),
-                contentAlignment = Alignment.CenterEnd
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // Tombol debug sementara — buat liat kenapa extractor gagal (kalau gagal)
+                // TANPA perlu Logcat/adb/Android Studio. Aman dibiarin nempel di production;
+                // kalau extractor sukses, isinya bakal null dan dialog bilang "gak ada info".
+                TextButton(onClick = { showExtractorDebugDialog = true }) {
+                    Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Debug", fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 FilledTonalButton(
                     onClick = { isFullscreen = true },
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
@@ -5757,6 +5768,29 @@ fun WatchScreen(
                     Text("Layar Penuh", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        if (showExtractorDebugDialog) {
+            val clipboard = LocalClipboardManager.current
+            val debugText = com.example.network.VideoExtractor.lastDebugSnippet
+                ?: "Gak ada info debug tersimpan.\n\nIni berarti salah satu dari:\n- Server ini berhasil di-extract langsung (bukan lewat WebView), atau\n- Belum ada percobaan extract sejak app dibuka (coba ganti-ganti server dulu)."
+            AlertDialog(
+                onDismissRequest = { showExtractorDebugDialog = false },
+                title = { Text("Debug Extractor") },
+                text = {
+                    Box(modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                        Text(debugText, fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(debugText))
+                    }) { Text("Salin") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExtractorDebugDialog = false }) { Text("Tutup") }
+                }
+            )
         }
 
         // Horizontal server/quality selection

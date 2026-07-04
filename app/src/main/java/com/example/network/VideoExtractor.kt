@@ -33,6 +33,16 @@ data class ResolvedStream(
  */
 object VideoExtractor {
 
+    /**
+     * Debug info dari percobaan resolve terakhir yang GAGAL (fileUrl == null).
+     * Diisi dari extractPackedJwPlayer (dan bisa dipakai extractor lain juga).
+     * Tujuannya biar bisa ditampilin di UI (Toast/dialog) buat yang gak punya
+     * akses Logcat/adb — jadi tinggal screenshot popup-nya aja.
+     */
+    @Volatile
+    var lastDebugSnippet: String? = null
+        private set
+
     private const val DESKTOP_UA =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
@@ -159,6 +169,7 @@ object VideoExtractor {
 
     suspend fun resolve(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
         val embedUrl = normalizeUrl(embedUrl)
+        lastDebugSnippet = null
         val key = cacheKey(embedUrl, referer)
         cacheGet(key)?.let {
             Log.d("VideoExtractor", "Cache hit: $embedUrl")
@@ -427,6 +438,19 @@ object VideoExtractor {
 
         val rawUrl = fileUrl ?: run {
             Log.d("VideoExtractor", "Gak nemu sources/file di $embedUrl - mungkin JS-nya render dinamis (SPA/XHR), bukan static config")
+            val hasPacked = Regex("""eval\(function\(p,a,c,k,e,[rd]\)""").containsMatchIn(html)
+            val hasSourcesWord = html.contains("sources")
+            val hasFileWord = html.contains("\"file\"") || html.contains("'file'") || html.contains("file:")
+            lastDebugSnippet = buildString {
+                appendLine("embedUrl: $embedUrl")
+                appendLine("html length: ${html.length}")
+                appendLine("html blank?: ${html.isBlank()}")
+                appendLine("ada packed-JS (eval p,a,c,k,e)?: $hasPacked")
+                appendLine("ada kata 'sources'?: $hasSourcesWord")
+                appendLine("ada kata 'file'?: $hasFileWord")
+                appendLine("--- 600 char pertama HTML ---")
+                appendLine(html.take(600))
+            }
             return null
         }
         // Beberapa host (mis. gdriveplayer.to) nulis `file:` sebagai path relatif
