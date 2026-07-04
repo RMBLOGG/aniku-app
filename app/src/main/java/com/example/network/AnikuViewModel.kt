@@ -2713,6 +2713,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isPostingEpisodeComment = MutableStateFlow(false)
     val isPostingEpisodeComment: StateFlow<Boolean> = _isPostingEpisodeComment.asStateFlow()
 
+    private val _episodeCommentError = MutableStateFlow<String?>(null)
+    val episodeCommentError: StateFlow<String?> = _episodeCommentError.asStateFlow()
+
+    fun clearEpisodeCommentError() {
+        _episodeCommentError.value = null
+    }
+
     fun loadEpisodeComments(episodeSlug: String) {
         viewModelScope.launch {
             _isEpisodeCommentsLoading.value = true
@@ -2786,9 +2793,26 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 loadEpisodeComments(episodeSlug)
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal kirim komentar episode", e)
+                _episodeCommentError.value = extractSupabaseErrorMessage(e)
             } finally {
                 _isPostingEpisodeComment.value = false
             }
+        }
+    }
+
+    // Ambil pesan error dari response Supabase (mis. dari "raise exception" di trigger Postgres),
+    // fallback ke pesan generik kalau gak ketemu/gagal parse.
+    private fun extractSupabaseErrorMessage(e: Exception): String {
+        return try {
+            if (e is retrofit2.HttpException) {
+                val body = e.response()?.errorBody()?.string()
+                val msg = body?.let { org.json.JSONObject(it).optString("message").takeIf { m -> m.isNotBlank() } }
+                msg ?: "Komentar gagal terkirim, coba lagi nanti"
+            } else {
+                "Komentar gagal terkirim, coba lagi nanti"
+            }
+        } catch (parseError: Exception) {
+            "Komentar gagal terkirim, coba lagi nanti"
         }
     }
 

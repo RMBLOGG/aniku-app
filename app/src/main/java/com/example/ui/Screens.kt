@@ -6014,6 +6014,15 @@ fun WatchScreen(
                 viewModel.loadClanTagMap()
             }
 
+            val episodeCommentError by viewModel.episodeCommentError.collectAsState()
+            val commentErrorContext = LocalContext.current
+            LaunchedEffect(episodeCommentError) {
+                episodeCommentError?.let {
+                    Toast.makeText(commentErrorContext, it, Toast.LENGTH_LONG).show()
+                    viewModel.clearEpisodeCommentError()
+                }
+            }
+
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
