@@ -436,18 +436,68 @@ object VideoExtractor {
             attempts++
         }
 
+        // Kalau gak nemu di HTML utama, coba juga file.js eksternal yang direferensikan
+        // (mis. <script src="file.js?v=1">) — mungkin logic isi sources/file-nya ada
+        // di situ, bukan di HTML utama.
+        var jsSrc: String? = null
+        var externalJs: String? = null
+        if (fileUrl == null) {
+            jsSrc = Regex("""<script[^>]+src=["']([^"']*file\.js[^"']*)["']""").find(html)?.groupValues?.get(1)
+            if (jsSrc != null) {
+                val jsUrl = runCatching { URI(embedUrl).resolve(normalizeUrl(jsSrc)).toString() }.getOrDefault(jsSrc)
+                externalJs = runCatching { fetchHtml(jsUrl, embedUrl) }.getOrNull()
+                if (!externalJs.isNullOrBlank()) {
+                    fileUrl = extractSourceFile(externalJs)
+                    var jsWorking = externalJs
+                    var jsAttempts = 0
+                    while (fileUrl == null && jsAttempts < 3) {
+                        val packedMatch = Regex(
+                            """eval\(function\(p,a,c,k,e,[rd]\).*?\)\)""",
+                            RegexOption.DOT_MATCHES_ALL
+                        ).find(jsWorking) ?: break
+                        val unpacked = unpackJs(packedMatch.value) ?: break
+                        fileUrl = extractSourceFile(unpacked)
+                        jsWorking = unpacked
+                        jsAttempts++
+                    }
+                }
+            }
+        }
+
         val rawUrl = fileUrl ?: run {
             Log.d("VideoExtractor", "Gak nemu sources/file di $embedUrl - mungkin JS-nya render dinamis (SPA/XHR), bukan static config")
             val hasPacked = Regex("""eval\(function\(p,a,c,k,e,[rd]\)""").containsMatchIn(html)
-            val hasSourcesWord = html.contains("sources")
-            val hasFileWord = html.contains("\"file\"") || html.contains("'file'") || html.contains("file:")
+            fun findContext(pattern: String, label: String): String {
+                val idx = html.indexOf(pattern, ignoreCase = true)
+                if (idx == -1) return "[$label]: tidak ketemu"
+                val start = (idx - 80).coerceAtLeast(0)
+                val end = (idx + pattern.length + 200).coerceAtMost(html.length)
+                return "[$label] @$idx: ...${html.substring(start, end).replace("\n", " ")}..."
+            }
             lastDebugSnippet = buildString {
                 appendLine("embedUrl: $embedUrl")
                 appendLine("html length: ${html.length}")
-                appendLine("html blank?: ${html.isBlank()}")
                 appendLine("ada packed-JS (eval p,a,c,k,e)?: $hasPacked")
-                appendLine("ada kata 'sources'?: $hasSourcesWord")
-                appendLine("ada kata 'file'?: $hasFileWord")
+                appendLine("file.js src ditemuin di HTML?: ${jsSrc ?: "tidak ada"}")
+                appendLine("file.js berhasil di-fetch?: ${!externalJs.isNullOrBlank()} (length=${externalJs?.length ?: 0})")
+                appendLine()
+                appendLine(findContext("hlsplaylist", "hlsplaylist"))
+                appendLine()
+                appendLine(findContext("eardropcurls", "eardropcurls (domain fetch json)"))
+                appendLine()
+                appendLine(findContext("fetch(", "fetch("))
+                appendLine()
+                appendLine(findContext(".setup(", "jwplayer .setup("))
+                appendLine()
+                appendLine(findContext("jwplayer(", "jwplayer("))
+                appendLine()
+                appendLine(findContext("no_adult", "no_adult (param embed)"))
+                appendLine()
+                if (!externalJs.isNullOrBlank()) {
+                    appendLine("--- 800 char pertama file.js ---")
+                    appendLine(externalJs.take(800))
+                    appendLine()
+                }
                 appendLine("--- 600 char pertama HTML ---")
                 appendLine(html.take(600))
             }
