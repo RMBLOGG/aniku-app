@@ -12,14 +12,17 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,6 +78,10 @@ fun UserProfileScreen(
     LaunchedEffect(userId) {
         viewModel.loadPublicUserProfile(userId)
         hasMounted = true
+    }
+
+    LaunchedEffect(clanForDialog) {
+        clanForDialog?.let { viewModel.loadClanMembers(it.id) }
     }
 
     LaunchedEffect(banStatusMessage) {
@@ -350,39 +357,91 @@ fun UserProfileScreen(
                 // Section: Clan (cuma tampil kalau user ini tergabung di clan)
                 val viewedClan by viewModel.viewedProfileClan.collectAsState()
                 viewedClan?.let { clan ->
+                    val memberRank = remember(clanMembersForDialog, userId) {
+                        val sorted = clanMembersForDialog.sortedByDescending { it.contributed_xp ?: 0 }
+                        val idx = sorted.indexOfFirst { it.user_id == userId }
+                        if (idx >= 0) idx + 1 else null
+                    }
+                    val rankColor = when (memberRank) {
+                        1 -> Color(0xFFFFD700)
+                        2 -> Color(0xFFC9D6E3)
+                        3 -> Color(0xFFCD7F32)
+                        else -> Color(0xFF2FA8BF)
+                    }
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF16414D))))
-                            .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Brush.linearGradient(listOf(Color(0xFF241530), Color(0xFF102830))))
+                            .border(1.dp, Brush.linearGradient(listOf(rankColor.copy(alpha = 0.5f), Color(0xFF7B2FBF).copy(alpha = 0.25f))), RoundedCornerShape(18.dp))
                             .clickable {
                                 viewModel.loadClanMembers(clan.id)
                                 showClanMembers = true
                             }
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF)))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!clan.icon_url.isNullOrBlank()) {
-                                AsyncImage(model = clan.icon_url, contentDescription = "Icon Clan", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                            } else {
-                                Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                .size(90.dp)
+                                .align(Alignment.TopEnd)
+                                .offset(x = 25.dp, y = (-25).dp)
+                                .background(rankColor.copy(alpha = 0.12f), CircleShape)
+                        )
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))))
+                                        .border(1.5.dp, rankColor.copy(alpha = 0.7f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (!clan.icon_url.isNullOrBlank()) {
+                                        AsyncImage(model = clan.icon_url, contentDescription = "Icon Clan", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                                    } else {
+                                        Text(clan.name.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("ANGGOTA CLAN", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, color = Color.White.copy(alpha = 0.45f))
+                                    Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                                }
+                                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(12.dp))
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(26.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(rankColor.copy(alpha = 0.18f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = rankColor, modifier = Modifier.size(15.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        memberRank?.let { "Peringkat #$it Kontributor" } ?: "Kontributor Clan",
+                                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.85f)
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color(0xFF2FA8BF), modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Lv.${clan.level}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2FA8BF))
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Anggota Clan", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
-                            Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.White)
-                        }
-                        Text("Lv.${clan.level}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2FA8BF))
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }

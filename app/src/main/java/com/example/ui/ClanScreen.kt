@@ -71,6 +71,7 @@ fun ClanScreen(
     var showContributeDialog by remember { mutableStateOf(false) }
     var showManageDialog by remember { mutableStateOf(false) }
     val pendingRequests by viewModel.pendingJoinRequests.collectAsState()
+    var clanTabIndex by remember { mutableStateOf(0) }
 
     val isLeader = myMembership?.role == "leader" && myMembership?.user_id == session.userId
 
@@ -164,27 +165,32 @@ fun ClanScreen(
                 }
             }
 
-            // Leaderboard clan lain, tetep muncul walaupun user udah punya clan sendiri
+            // Daftar Clan & Leaderboard, tetep muncul walaupun user udah punya clan sendiri
             item {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    Text("TOP CLANS", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFFD700), letterSpacing = 1.sp)
-                }
+                ClanTabRow(selectedIndex = clanTabIndex, onSelect = { clanTabIndex = it })
             }
 
             if (topClans.isEmpty()) {
                 item { EmptyLeaderboardState() }
-            }
+            } else {
+                val displayedClans = if (clanTabIndex == 0) {
+                    topClans.sortedBy { it.name.lowercase() }
+                } else {
+                    topClans.sortedByDescending { it.total_xp ?: 0 }
+                }
 
-            itemsIndexed(topClans, key = { _, c -> c.id }) { index, clan ->
-                ClanLeaderboardRow(
-                    clan = clan,
-                    rank = index + 1,
-                    index = index,
-                    onClick = {
-                        selectedClan = clan
-                        viewModel.loadClanMembers(clan.id)
-                    }
-                )
+                itemsIndexed(displayedClans, key = { _, c -> "${clanTabIndex}_${c.id}" }) { index, clan ->
+                    ClanLeaderboardRow(
+                        clan = clan,
+                        rank = index + 1,
+                        index = index,
+                        showRank = clanTabIndex == 1,
+                        onClick = {
+                            selectedClan = clan
+                            viewModel.loadClanMembers(clan.id)
+                        }
+                    )
+                }
             }
         }
     }
@@ -564,11 +570,49 @@ private fun CreateClanSection(
 }
 
 @Composable
-private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: () -> Unit) {
+private fun ClanTabRow(selectedIndex: Int, onSelect: (Int) -> Unit) {
+    val tabs = listOf("Daftar Clan" to Icons.Default.Groups, "Leaderboard" to Icons.Default.EmojiEvents)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+            .padding(4.dp)
+    ) {
+        tabs.forEachIndexed { index, (label, icon) ->
+            val selected = selectedIndex == index
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 9.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    icon, contentDescription = null,
+                    tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(15.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    label, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, showRank: Boolean = true, onClick: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { delay(index * 60L); visible = true }
 
-    val rankColor = when (rank) {
+    val effectiveRank = if (showRank) rank else 0
+    val rankColor = when (effectiveRank) {
         1 -> Color(0xFFFFD700)
         2 -> Color(0xFFC0C0C0)
         3 -> Color(0xFFCD7F32)
@@ -583,10 +627,10 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: ()
         Row(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                 .background(
-                    if (rank <= 3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.15f), Color(0xFF7B2FBF).copy(alpha = 0.06f)))
+                    if (effectiveRank in 1..3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.15f), Color(0xFF7B2FBF).copy(alpha = 0.06f)))
                     else Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)))
                 )
-                .border(1.dp, if (rank <= 3) rankColor.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(16.dp))
+                .border(1.dp, if (effectiveRank in 1..3) rankColor.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(16.dp))
                 .clickable(onClick = onClick).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -596,13 +640,18 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, onClick: ()
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(34.dp).clip(CircleShape).border(1.dp, rankColor.copy(alpha = 0.5f), CircleShape)
                 )
-            } else if (rank <= 3) {
+            } else if (effectiveRank in 1..3) {
                 Box(
                     modifier = Modifier.size(34.dp).clip(CircleShape).background(rankColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) { Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = rankColor, modifier = Modifier.size(16.dp)) }
-            } else {
+            } else if (showRank) {
                 Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(34.dp), fontSize = 13.sp)
+            } else {
+                Box(
+                    modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF7B2FBF).copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) { Text(clan.name.take(1).uppercase(), color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
