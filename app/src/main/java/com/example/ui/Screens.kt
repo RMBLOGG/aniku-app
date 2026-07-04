@@ -373,6 +373,13 @@ fun AnimeCard(
     }
 }
 
+// Ekstrak label episode ringkas ("Ep 201") dari episode_slug, dipakai buat keterangan
+// asal komentar di widget "Komentar Terbaru" (Home) yang nampilin komentar lintas episode.
+private fun episodeLabelFromSlug(slug: String): String {
+    val match = Regex("episode[-_]?(\\d+)", RegexOption.IGNORE_CASE).find(slug)
+    return if (match != null) "Ep ${match.groupValues[1]}" else slug
+}
+
 @Composable
 fun SectionHeader(
     title: String,
@@ -1178,9 +1185,11 @@ fun HomeScreen(
     val viewerCounts by viewModel.viewerCounts.collectAsState()
     val myClanDetail by viewModel.myClanDetail.collectAsState()
     val recentComments by viewModel.recentComments.collectAsState()
+    val clanTagMap by viewModel.clanTagMap.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadRecentComments()
+        viewModel.loadClanTagMap()
     }
 
     LaunchedEffect(isLoggedIn) {
@@ -2300,8 +2309,8 @@ fun HomeScreen(
                             }
                             ElevatedCard(
                                 modifier = Modifier
-                                    .width(250.dp)
-                                    .heightIn(min = 92.dp),
+                                    .width(260.dp)
+                                    .heightIn(min = 122.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.elevatedCardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -2341,7 +2350,13 @@ fun HomeScreen(
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
                                             GlossyGradientText(
                                                 text = c.username,
                                                 colors = when {
@@ -2349,16 +2364,20 @@ fun HomeScreen(
                                                     isMod -> moderatorGradientColors
                                                     else -> defaultNameGradientColors
                                                 },
-                                                fontSize = 12.sp,
-                                                modifier = Modifier.weight(1f, fill = false)
+                                                fontSize = 12.sp
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = timeStr,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                                fontSize = 10.sp,
-                                                maxLines = 1
-                                            )
+                                            c.season_level?.let { lvl ->
+                                                GlossyGradientText(text = "Lv.$lvl", colors = levelGradientColors, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                            }
+                                            c.user_number?.let { num ->
+                                                GlossyGradientText(text = "#$num", colors = idGradientColors, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                                            }
+                                            clanTagMap[c.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                                            if (isAdmin) {
+                                                GlossyGradientText(text = "ADMIN", colors = adminGradientColors, fontSize = 9.sp, letterSpacing = 0.4.sp)
+                                            } else if (isMod) {
+                                                GlossyGradientText(text = "MODERATOR", colors = moderatorGradientColors, fontSize = 9.sp, letterSpacing = 0.4.sp)
+                                            }
                                         }
                                         Spacer(modifier = Modifier.height(3.dp))
                                         Text(
@@ -2369,6 +2388,33 @@ fun HomeScreen(
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Text(
+                                                text = timeStr,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                fontSize = 10.sp,
+                                                maxLines = 1
+                                            )
+                                            Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), fontSize = 10.sp)
+                                            Text(
+                                                text = episodeLabelFromSlug(c.episode_slug),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                fontSize = 10.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            c.source?.let { src ->
+                                                Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), fontSize = 10.sp)
+                                                Text(
+                                                    text = src,
+                                                    color = accentColor.copy(alpha = 0.85f),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -6013,6 +6059,9 @@ fun WatchScreen(
                                             Spacer(Modifier.height(4.dp))
                                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                                 Text(timeStr, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                                c.source?.let { src ->
+                                                    Text(src, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = accentColor.copy(alpha = 0.85f))
+                                                }
                                                 if (isMe) {
                                                     Text(
                                                         "Hapus",

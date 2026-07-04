@@ -2654,6 +2654,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
         if (currentSession.token.isNullOrEmpty()) return
         val trimmed = message.trim()
         if (trimmed.isEmpty() || trimmed.length > 500) return
+        // Label sumber data saat komentar dikirim, mis. "Dayynime-v1" -> "v1" (tanpa prefix "Dayynime")
+        val sourceLabel = dataSource.value.substringAfterLast("-")
         viewModelScope.launch {
             _isPostingEpisodeComment.value = true
             try {
@@ -2665,7 +2667,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         avatar_url = currentSession.avatarUrl,
                         role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                         is_admin = currentSession.isAdmin,
-                        message = trimmed
+                        message = trimmed,
+                        source = sourceLabel
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY
@@ -2690,10 +2693,26 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             _isRecentCommentsLoading.value = true
             try {
-                _recentComments.value = NetworkClient.supabaseDbApi.getRecentComments(
+                val comments = NetworkClient.supabaseDbApi.getRecentComments(
                     authHeader = "Bearer $SUPABASE_ANON_KEY",
                     apiKey = SUPABASE_ANON_KEY
                 )
+                // Join profiles biar badge Lv./#id di widget Home sama kayak di komentar episode
+                val profilesMap = try {
+                    NetworkClient.supabaseDbApi.getProfiles(
+                        authHeader = getAuthHeader(),
+                        apiKey = SUPABASE_ANON_KEY
+                    ).associateBy { it.id }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "Gagal fetch profiles buat join komentar terbaru", e)
+                    emptyMap()
+                }
+                _recentComments.value = comments.map { c ->
+                    c.copy(
+                        user_number = profilesMap[c.user_id]?.user_number,
+                        season_level = profilesMap[c.user_id]?.season_level
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal load komentar terbaru", e)
             } finally {
