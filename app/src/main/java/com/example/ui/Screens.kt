@@ -2282,7 +2282,8 @@ fun HomeScreen(
                 item {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
                     ) {
                         itemsIndexed(recentComments, key = { idx, it -> "${it.id}_${idx}" }) { _, c ->
                             val isAdmin = c.role == "admin" || c.is_admin == true
@@ -2308,16 +2309,17 @@ fun HomeScreen(
                                 } catch (e: Exception) { "" }
                             }
                             ElevatedCard(
-                                modifier = Modifier
-                                    .width(260.dp)
-                                    .heightIn(min = 136.dp),
+                                modifier = Modifier.width(260.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.elevatedCardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                                 ),
                                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
                             ) {
-                                Row(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
                                     // Avatar
                                     Box(
                                         modifier = Modifier
@@ -4490,6 +4492,125 @@ fun NobarRoomCard(
     }
 }
 
+// Baris satu komentar episode, dipakai ulang buat komentar utama maupun balasan (isReply=true).
+@Composable
+private fun EpisodeCommentRow(
+    c: EpisodeComment,
+    isMe: Boolean,
+    accentColor: Color,
+    clanTagMap: Map<String, Pair<String, String?>>,
+    isReply: Boolean = false,
+    onReplyClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    val timeStr = remember(c.created_at) {
+        try {
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val date = parser.parse(c.created_at.take(19)) ?: java.util.Date()
+            val formatter = java.text.SimpleDateFormat("dd MMM, HH:mm", java.util.Locale.getDefault())
+            formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+            formatter.format(date)
+        } catch (e: Exception) { "" }
+    }
+    val isAdmin = c.role == "admin" || c.is_admin == true
+    val isMod = c.role == "moderator"
+    val ringColor = when {
+        isAdmin -> Color(0xFFFFC107)
+        isMod -> Color(0xFFB388FF)
+        else -> Color.Transparent
+    }
+    val avatarSize = if (isReply) 28.dp else 36.dp
+
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        // Avatar
+        Box(
+            modifier = Modifier
+                .size(avatarSize)
+                .clip(CircleShape)
+                .then(
+                    if (ringColor != Color.Transparent)
+                        Modifier.border(1.5.dp, ringColor, CircleShape).padding(1.5.dp)
+                    else Modifier
+                )
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!c.avatar_url.isNullOrEmpty()) {
+                AsyncImage(model = c.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
+            } else {
+                Text(c.username.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                GlossyGradientText(
+                    text = c.username,
+                    colors = when {
+                        isAdmin -> adminGradientColors
+                        isMod -> moderatorGradientColors
+                        else -> defaultNameGradientColors
+                    },
+                    fontSize = 13.sp
+                )
+                c.season_level?.let { lvl ->
+                    GlossyGradientText(text = "Lv.$lvl", colors = levelGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+                c.user_number?.let { num ->
+                    GlossyGradientText(text = "#$num", colors = idGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+                clanTagMap[c.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                if (isAdmin) {
+                    GlossyGradientText(text = "ADMIN", colors = adminGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
+                } else if (isMod) {
+                    GlossyGradientText(text = "MODERATOR", colors = moderatorGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            c.reply_to_username?.let { replyTo ->
+                Text(
+                    "Membalas @$replyTo",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = accentColor.copy(alpha = 0.8f)
+                )
+                Spacer(Modifier.height(2.dp))
+            }
+            Text(c.message, fontSize = 13.5.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f))
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(timeStr, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                c.source?.let { src ->
+                    Text(src, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = accentColor.copy(alpha = 0.85f))
+                }
+                Text(
+                    "Balas",
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable(onClick = onReplyClick)
+                )
+                if (isMe) {
+                    Text(
+                        "Hapus",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.clickable(onClick = onDeleteClick)
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ================================================================
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
@@ -5851,6 +5972,7 @@ fun WatchScreen(
             val session by viewModel.session.collectAsState()
             var commentInput by remember { mutableStateOf("") }
             var deleteTargetId by remember { mutableStateOf<String?>(null) }
+            var replyTarget by remember { mutableStateOf<Pair<String, String>?>(null) } // id to username
 
             LaunchedEffect(currentEpisodeSlug) {
                 viewModel.loadEpisodeComments(currentEpisodeSlug)
@@ -5922,6 +6044,37 @@ fun WatchScreen(
                             }
                         }
                     } else {
+                        if (replyTarget != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Reply,
+                                    contentDescription = null,
+                                    tint = accentColor,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "Membalas @${replyTarget?.second}",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accentColor,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Batal balas",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clickable { replyTarget = null }
+                                )
+                            }
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.Bottom,
@@ -5930,7 +6083,7 @@ fun WatchScreen(
                             OutlinedTextField(
                                 value = commentInput,
                                 onValueChange = { if (it.length <= 500) commentInput = it },
-                                placeholder = { Text("Tulis komentar...", fontSize = 13.sp) },
+                                placeholder = { Text(if (replyTarget != null) "Tulis balasan..." else "Tulis komentar...", fontSize = 13.sp) },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(20.dp),
                                 maxLines = 4,
@@ -5946,8 +6099,16 @@ fun WatchScreen(
                                 enabled = !isPostingComment && commentInput.isNotBlank(),
                                 onClick = {
                                     if (commentInput.isNotBlank()) {
-                                        viewModel.postEpisodeComment(currentEpisodeSlug, commentInput, currentAnimeSlug, animeTitle)
+                                        viewModel.postEpisodeComment(
+                                            currentEpisodeSlug,
+                                            commentInput,
+                                            currentAnimeSlug,
+                                            animeTitle,
+                                            parentCommentId = replyTarget?.first,
+                                            replyToUsername = replyTarget?.second
+                                        )
                                         commentInput = ""
+                                        replyTarget = null
                                     }
                                 },
                                 shape = CircleShape,
@@ -5993,100 +6154,48 @@ fun WatchScreen(
                             }
                         }
                         else -> {
+                            val topLevel = remember(episodeComments) {
+                                episodeComments.reversed().filter { it.parent_comment_id == null }
+                            }
                             Column {
-                                episodeComments.reversed().forEachIndexed { index, c ->
-                                    val isMe = c.user_id == session.userId
-                                    val timeStr = remember(c.created_at) {
-                                        try {
-                                            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
-                                            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                                            val date = parser.parse(c.created_at.take(19)) ?: java.util.Date()
-                                            val formatter = java.text.SimpleDateFormat("dd MMM, HH:mm", java.util.Locale.getDefault())
-                                            formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
-                                            formatter.format(date)
-                                        } catch (e: Exception) { "" }
+                                topLevel.forEachIndexed { index, c ->
+                                    val replies = remember(episodeComments, c.id) {
+                                        episodeComments.filter { it.parent_comment_id == c.id }
                                     }
-                                    val isAdmin = c.role == "admin" || c.is_admin == true
-                                    val isMod = c.role == "moderator"
-                                    val ringColor = when {
-                                        isAdmin -> Color(0xFFFFC107)
-                                        isMod -> Color(0xFFB388FF)
-                                        else -> Color.Transparent
-                                    }
-
-                                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                                        // Avatar
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .then(
-                                                    if (ringColor != Color.Transparent)
-                                                        Modifier.border(1.5.dp, ringColor, CircleShape).padding(1.5.dp)
-                                                    else Modifier
+                                    EpisodeCommentRow(
+                                        c = c,
+                                        isMe = c.user_id == session.userId,
+                                        accentColor = accentColor,
+                                        clanTagMap = clanTagMap,
+                                        onReplyClick = { replyTarget = c.id to c.username },
+                                        onDeleteClick = { deleteTargetId = c.id }
+                                    )
+                                    replies.forEach { r ->
+                                        Spacer(Modifier.height(12.dp))
+                                        Row(modifier = Modifier.fillMaxWidth()) {
+                                            Spacer(modifier = Modifier.width(30.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(2.dp)
+                                                    .height(20.dp)
+                                                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                EpisodeCommentRow(
+                                                    c = r,
+                                                    isMe = r.user_id == session.userId,
+                                                    accentColor = accentColor,
+                                                    clanTagMap = clanTagMap,
+                                                    isReply = true,
+                                                    onReplyClick = { replyTarget = c.id to r.username },
+                                                    onDeleteClick = { deleteTargetId = r.id }
                                                 )
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primary),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (!c.avatar_url.isNullOrEmpty()) {
-                                                AsyncImage(model = c.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
-                                            } else {
-                                                Text(c.username.take(1).uppercase(), color = MaterialTheme.colorScheme.onPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                        Spacer(Modifier.width(10.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                            ) {
-                                                GlossyGradientText(
-                                                    text = c.username,
-                                                    colors = when {
-                                                        isAdmin -> adminGradientColors
-                                                        isMod -> moderatorGradientColors
-                                                        else -> defaultNameGradientColors
-                                                    },
-                                                    fontSize = 13.sp
-                                                )
-                                                c.season_level?.let { lvl ->
-                                                    GlossyGradientText(text = "Lv.$lvl", colors = levelGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                                }
-                                                c.user_number?.let { num ->
-                                                    GlossyGradientText(text = "#$num", colors = idGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                                }
-                                                clanTagMap[c.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
-                                                if (isAdmin) {
-                                                    GlossyGradientText(text = "ADMIN", colors = adminGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
-                                                } else if (isMod) {
-                                                    GlossyGradientText(text = "MODERATOR", colors = moderatorGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
-                                                }
-                                            }
-                                            Spacer(Modifier.height(4.dp))
-                                            Text(c.message, fontSize = 13.5.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f))
-                                            Spacer(Modifier.height(4.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                Text(timeStr, fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                                                c.source?.let { src ->
-                                                    Text(src, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = accentColor.copy(alpha = 0.85f))
-                                                }
-                                                if (isMe) {
-                                                    Text(
-                                                        "Hapus",
-                                                        fontSize = 10.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.error,
-                                                        modifier = Modifier.clickable { deleteTargetId = c.id }
-                                                    )
-                                                }
                                             }
                                         }
                                     }
 
-                                    if (index != episodeComments.lastIndex) {
+                                    if (index != topLevel.lastIndex) {
                                         HorizontalDivider(
                                             modifier = Modifier.padding(vertical = 12.dp),
                                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)

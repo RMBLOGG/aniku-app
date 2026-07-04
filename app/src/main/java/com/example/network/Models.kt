@@ -991,6 +991,7 @@ data class WatchChatRequest(
 // source: label sumber data saat komentar dikirim ("v1"/"v2"/"v3").
 // anime_title/anime_slug: disimpen pas komentar dikirim biar widget "Komentar Terbaru" di Home
 // bisa nampilin judul animenya (episode_slug doang gak cukup buat dapetin judul yang rapi).
+// parent_comment_id/reply_to_username: buat fitur balas komentar — null berarti komentar utama (bukan balasan).
 // Semua nullable biar backward-compatible sama baris lama / kalau kolomnya belum ditambahin di Supabase.
 @JsonClass(generateAdapter = true)
 data class EpisodeComment(
@@ -1007,7 +1008,9 @@ data class EpisodeComment(
     val season_level: Int? = null,
     val source: String? = null,
     val anime_title: String? = null,
-    val anime_slug: String? = null
+    val anime_slug: String? = null,
+    val parent_comment_id: String? = null,
+    val reply_to_username: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -1021,5 +1024,7 @@ data class EpisodeCommentRequest(
     val message: String,
     val source: String? = null,
     val anime_title: String? = null,
-    val anime_slug: String? = null
+    val anime_slug: String? = null,
+    val parent_comment_id: String? = null,
+    val reply_to_username: String? = null
 )

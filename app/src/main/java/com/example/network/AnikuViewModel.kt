@@ -2649,7 +2649,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun postEpisodeComment(episodeSlug: String, message: String, animeSlug: String? = null, animeTitle: String? = null) {
+    fun postEpisodeComment(
+        episodeSlug: String,
+        message: String,
+        animeSlug: String? = null,
+        animeTitle: String? = null,
+        parentCommentId: String? = null,
+        replyToUsername: String? = null
+    ) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) return
         val trimmed = message.trim()
@@ -2670,7 +2677,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         message = trimmed,
                         source = sourceLabel,
                         anime_slug = animeSlug,
-                        anime_title = animeTitle
+                        anime_title = animeTitle,
+                        parent_comment_id = parentCommentId,
+                        reply_to_username = replyToUsername
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY
