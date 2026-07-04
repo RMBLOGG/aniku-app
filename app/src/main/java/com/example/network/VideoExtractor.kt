@@ -220,7 +220,12 @@ object VideoExtractor {
                 host.contains("streamhide") ||
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
-                host.contains("guccihide") -> extractPackedJwPlayer(embedUrl, referer)
+                host.contains("guccihide") ||
+                // GDRIVE/GDRIVE HD (gdriveplayer.to) — dari network trace-nya kepakai
+                // JWPlayer juga (ssl.p.jwpcdn.com, provider.hlsjs.js), source video-nya
+                // di endpoint sendiri (hlsplaylist.php?s=...), jadi extractor JWPlayer
+                // generik yang udah ada di bawah ini bisa dipakai ulang.
+                host.contains("gdriveplayer") -> extractPackedJwPlayer(embedUrl, referer)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -420,10 +425,17 @@ object VideoExtractor {
             attempts++
         }
 
-        val url = fileUrl ?: run {
+        val rawUrl = fileUrl ?: run {
             Log.d("VideoExtractor", "Gak nemu sources/file di $embedUrl - mungkin JS-nya render dinamis (SPA/XHR), bukan static config")
             return null
         }
+        // Beberapa host (mis. gdriveplayer.to) nulis `file:` sebagai path relatif
+        // ke domain sendiri (mis. "hlsplaylist.php?s=xxx", bukan URL absolut).
+        // Resolve relatif ke embedUrl dulu, biar ExoPlayer/WebView gak nerima
+        // path mentah tanpa scheme+host (penyebab bug file:/// yang sama kayak
+        // di normalizeUrl()).
+        val url = runCatching { URI(embedUrl).resolve(normalizeUrl(rawUrl)).toString() }
+            .getOrDefault(normalizeUrl(rawUrl))
         return ResolvedStream(
             url = url,
             isHls = url.contains(".m3u8"),
