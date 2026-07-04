@@ -7242,6 +7242,7 @@ fun ProfileScreen(
 // 10. ADMIN PANEL SCREEN
 // ================================================================
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AdminPanelScreen(
     viewModel: AnikuViewModel,
