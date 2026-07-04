@@ -477,10 +477,18 @@ object VideoExtractor {
             fun findFullIife(): String {
                 val idx = html.indexOf("var k=")
                 if (idx == -1) return "[var k= IIFE]: tidak ketemu"
-                // Cari start-nya balik ke "(function(){" terdekat sebelum "var k="
-                val iifeStart = html.lastIndexOf("(function(){", idx).let { if (it == -1) (idx - 30).coerceAtLeast(0) else it }
-                val end = (idx + 4000).coerceAtMost(html.length)
-                return "[var k= IIFE] @$idx: ${html.substring(iifeStart, end)}"
+                // Cari penutup atob("....") -> lompat ke SETELAH blob base64-nya,
+                // karena bagian penting (fungsi decode k+b) ada di situ, bukan di
+                // tengah-tengah blob base64 yang panjang banget.
+                val atobIdx = html.indexOf("atob(", idx)
+                val afterBlobIdx = if (atobIdx != -1) {
+                    // cari `")` pertama setelah atob( sebagai penutup string base64
+                    val closeIdx = html.indexOf("\")", atobIdx)
+                    if (closeIdx != -1) closeIdx else idx
+                } else idx
+                val start = (afterBlobIdx - 40).coerceAtLeast(0)
+                val end = (afterBlobIdx + 3000).coerceAtMost(html.length)
+                return "[lanjutan setelah atob(...) ] @$afterBlobIdx: ${html.substring(start, end)}"
             }
             lastDebugSnippet = buildString {
                 appendLine("embedUrl: $embedUrl")
