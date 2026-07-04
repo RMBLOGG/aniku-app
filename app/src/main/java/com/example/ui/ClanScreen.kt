@@ -39,6 +39,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.R
 import com.example.network.AnikuViewModel
 import com.example.network.ClanDto
 import com.example.network.ClanMemberDto
@@ -70,6 +76,7 @@ fun ClanScreen(
     var selectedClan by remember { mutableStateOf<ClanDto?>(null) }
     var contributeAmount by remember { mutableStateOf("") }
     var showContributeDialog by remember { mutableStateOf(false) }
+    var showContributeBurst by remember { mutableStateOf(false) }
     var showManageDialog by remember { mutableStateOf(false) }
     val pendingRequests by viewModel.pendingJoinRequests.collectAsState()
     var clanTabIndex by remember { mutableStateOf(0) }
@@ -96,6 +103,13 @@ fun ClanScreen(
         myClan?.let { viewModel.loadMyClanMembers(it.id) }
     }
 
+    LaunchedEffect(showContributeBurst) {
+        if (showContributeBurst) {
+            delay(1400)
+            showContributeBurst = false
+        }
+    }
+
     Scaffold(
         topBar = {
             Column {
@@ -115,10 +129,10 @@ fun ClanScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+                .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -213,6 +227,19 @@ fun ClanScreen(
                 }
             }
         }
+
+        if (showContributeBurst) {
+            val burstComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.confetti_burst))
+            val burstProgress by animateLottieCompositionAsState(burstComposition, iterations = 1)
+            LottieAnimation(
+                composition = burstComposition,
+                progress = { burstProgress },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize()
+            )
+        }
+        }
     }
 
     if (showContributeDialog) {
@@ -244,6 +271,7 @@ fun ClanScreen(
                         contributeAmount.toIntOrNull()?.let { viewModel.contributeToClan(it) }
                         showContributeDialog = false
                         contributeAmount = ""
+                        showContributeBurst = true
                     },
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2FA8BF))
@@ -401,16 +429,54 @@ private fun MyClanCard(
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 
+    // Deteksi level naik buat mainin confetti sekali pas clan naik level
+    var previousLevel by remember { mutableStateOf(clan.level) }
+    var showLevelUpBurst by remember { mutableStateOf(false) }
+    LaunchedEffect(clan.level) {
+        val prev = previousLevel
+        if (prev != null && (clan.level ?: 0) > prev) {
+            showLevelUpBurst = true
+            delay(2200)
+            showLevelUpBurst = false
+        }
+        previousLevel = clan.level
+    }
+
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
                 .background(Brush.linearGradient(listOf(Color(0xFF3A1560), Color(0xFF241530))))
                 .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.35f), RoundedCornerShape(22.dp))
-                .padding(18.dp)
-                .animateContentSize()
         ) {
+            val sparkleComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.sparkle_shine))
+            val sparkleProgress by animateLottieCompositionAsState(sparkleComposition, iterations = LottieConstants.IterateForever)
+            LottieAnimation(
+                composition = sparkleComposition,
+                progress = { sparkleProgress },
+                modifier = Modifier
+                    .size(110.dp)
+                    .align(Alignment.TopEnd)
+                    .offset(x = 26.dp, y = (-26).dp)
+            )
+
+            if (showLevelUpBurst) {
+                val confettiComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.confetti_burst))
+                val confettiProgress by animateLottieCompositionAsState(confettiComposition, iterations = 1)
+                LottieAnimation(
+                    composition = confettiComposition,
+                    progress = { confettiProgress },
+                    modifier = Modifier.matchParentSize()
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+                    .animateContentSize()
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
@@ -468,11 +534,25 @@ private fun MyClanCard(
                 Text("$xpIntoLevel / 1000 XP", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
             }
             Spacer(modifier = Modifier.height(4.dp))
+            val shimmerTransition = rememberInfiniteTransition(label = "xp_shimmer")
+            val shimmerX by shimmerTransition.animateFloat(
+                initialValue = -80f, targetValue = 260f,
+                animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
+                label = "shimmer_x"
+            )
             Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f))) {
                 Box(
                     modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
                         .clip(RoundedCornerShape(50)).background(AnimeGradient)
-                )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(36.dp)
+                            .graphicsLayer { translationX = shimmerX }
+                            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent)))
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -534,6 +614,7 @@ private fun MyClanCard(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -649,40 +730,63 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, showRank: B
         enter = fadeIn(tween(300)) + expandVertically(tween(300)),
         exit = fadeOut() + shrinkVertically()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(
-                    if (effectiveRank in 1..3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.15f), Color(0xFF7B2FBF).copy(alpha = 0.06f)))
-                    else Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)))
-                )
-                .border(1.dp, if (effectiveRank in 1..3) rankColor.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(16.dp))
-                .clickable(onClick = onClick).padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (!clan.icon_url.isNullOrBlank()) {
-                AsyncImage(
-                    model = clan.icon_url, contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(34.dp).clip(CircleShape).border(1.dp, rankColor.copy(alpha = 0.5f), CircleShape)
-                )
-            } else if (effectiveRank in 1..3) {
-                Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(rankColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (effectiveRank == 1) {
-                        ClanCrownIcon(modifier = Modifier.size(17.dp), tint = rankColor)
-                    } else {
-                        RankMedalIcon(rank = effectiveRank, tint = rankColor, modifier = Modifier.size(22.dp))
+        Box {
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (effectiveRank in 1..3) Brush.horizontalGradient(listOf(rankColor.copy(alpha = 0.15f), Color(0xFF7B2FBF).copy(alpha = 0.06f)))
+                        else Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f), MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)))
+                    )
+                    .border(1.dp, if (effectiveRank in 1..3) rankColor.copy(alpha = 0.3f) else Color.Transparent, RoundedCornerShape(16.dp))
+                    .clickable(onClick = onClick).padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+            Box {
+                if (!clan.icon_url.isNullOrBlank()) {
+                    AsyncImage(
+                        model = clan.icon_url, contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(34.dp).clip(CircleShape).border(1.dp, rankColor.copy(alpha = 0.5f), CircleShape)
+                    )
+                } else if (effectiveRank in 1..3) {
+                    Box(
+                        modifier = Modifier.size(34.dp).clip(CircleShape).background(rankColor.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (effectiveRank == 1) {
+                            ClanCrownIcon(modifier = Modifier.size(17.dp), tint = rankColor)
+                        } else {
+                            RankMedalIcon(rank = effectiveRank, tint = rankColor, modifier = Modifier.size(22.dp))
+                        }
+                    }
+                } else if (showRank) {
+                    Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(34.dp), fontSize = 13.sp)
+                } else {
+                    Box(
+                        modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF7B2FBF).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) { Text(clan.name.take(1).uppercase(), color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                }
+
+                // Badge kecil di pojok buat rank 1-3, tetep muncul walaupun clan udah punya icon custom
+                if (effectiveRank in 1..3 && !clan.icon_url.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 3.dp, y = 3.dp)
+                            .size(16.dp)
+                            .clip(CircleShape)
+                            .background(rankColor)
+                            .border(1.dp, Color(0xFF1F1530), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (effectiveRank == 1) {
+                            ClanCrownIcon(modifier = Modifier.size(9.dp), tint = Color(0xFF1F1530))
+                        } else {
+                            Text("$effectiveRank", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F1530))
+                        }
                     }
                 }
-            } else if (showRank) {
-                Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(34.dp), fontSize = 13.sp)
-            } else {
-                Box(
-                    modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF7B2FBF).copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) { Text(clan.name.take(1).uppercase(), color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
             }
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -696,6 +800,17 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, showRank: B
                 Text("Lv.${clan.level} \u2022 ${clan.total_xp} XP", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
+            }
+
+            if (effectiveRank == 1) {
+                val confettiComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.confetti_burst))
+                val confettiProgress by animateLottieCompositionAsState(confettiComposition, iterations = 1)
+                LottieAnimation(
+                    composition = confettiComposition,
+                    progress = { confettiProgress },
+                    modifier = Modifier.matchParentSize()
+                )
+            }
         }
     }
 }
@@ -915,7 +1030,16 @@ private fun EmptyLeaderboardState() {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f), modifier = Modifier.size(30.dp))
+        Box(contentAlignment = Alignment.Center) {
+            val sparkleComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.sparkle_shine))
+            val sparkleProgress by animateLottieCompositionAsState(sparkleComposition, iterations = LottieConstants.IterateForever)
+            LottieAnimation(
+                composition = sparkleComposition,
+                progress = { sparkleProgress },
+                modifier = Modifier.size(70.dp)
+            )
+            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f), modifier = Modifier.size(30.dp))
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             "Leaderboard masih kosong \u2014 jadilah clan pertama yang duduk di puncak",
