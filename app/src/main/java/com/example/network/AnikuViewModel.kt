@@ -2679,6 +2679,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── Komentar Terbaru (lintas semua episode) — widget Home ──
+    private val _recentComments = MutableStateFlow<List<EpisodeComment>>(emptyList())
+    val recentComments: StateFlow<List<EpisodeComment>> = _recentComments.asStateFlow()
+
+    private val _isRecentCommentsLoading = MutableStateFlow(false)
+    val isRecentCommentsLoading: StateFlow<Boolean> = _isRecentCommentsLoading.asStateFlow()
+
+    fun loadRecentComments() {
+        viewModelScope.launch {
+            _isRecentCommentsLoading.value = true
+            try {
+                _recentComments.value = NetworkClient.supabaseDbApi.getRecentComments(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load komentar terbaru", e)
+            } finally {
+                _isRecentCommentsLoading.value = false
+            }
+        }
+    }
+
     fun deleteEpisodeComment(episodeSlug: String, commentId: String) {
         val currentSession = session.value
         val userId = currentSession.userId ?: return

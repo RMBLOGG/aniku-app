@@ -1177,6 +1177,11 @@ fun HomeScreen(
     val onShowLoginDialog = remember { { showLoginDialog = true } }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
     val myClanDetail by viewModel.myClanDetail.collectAsState()
+    val recentComments by viewModel.recentComments.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadRecentComments()
+    }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) viewModel.loadMyClanMembership()
@@ -2227,6 +2232,147 @@ fun HomeScreen(
                             viewerCount = viewerCounts[anim.slug] ?: 0,
                         cardStyle = cardStyle
                         )
+                    }
+                }
+            }
+
+            // Section 2.5: Komentar Terbaru — widget ringkas, horizontal-scroll biar gak makan tempat
+            if (recentComments.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Forum,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Komentar Terbaru",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.5).sp
+                            ),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(recentComments, key = { idx, it -> "${it.id}_${idx}" }) { _, c ->
+                            val isAdmin = c.role == "admin" || c.is_admin == true
+                            val isMod = c.role == "moderator"
+                            val ringColor = when {
+                                isAdmin -> Color(0xFFFFC107)
+                                isMod -> Color(0xFFB388FF)
+                                else -> Color.Transparent
+                            }
+                            val timeStr = remember(c.created_at) {
+                                try {
+                                    val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                                    parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                    val date = parser.parse(c.created_at.take(19)) ?: java.util.Date()
+                                    val now = System.currentTimeMillis()
+                                    val diffMin = (now - date.time) / 60000
+                                    when {
+                                        diffMin < 1 -> "Baru saja"
+                                        diffMin < 60 -> "${diffMin}m lalu"
+                                        diffMin < 1440 -> "${diffMin / 60}j lalu"
+                                        else -> "${diffMin / 1440}h lalu"
+                                    }
+                                } catch (e: Exception) { "" }
+                            }
+                            ElevatedCard(
+                                modifier = Modifier
+                                    .width(250.dp)
+                                    .heightIn(min = 92.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.elevatedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                ),
+                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Row(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                                    // Avatar
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .then(
+                                                if (ringColor != Color.Transparent)
+                                                    Modifier.border(1.5.dp, ringColor, CircleShape).padding(1.5.dp)
+                                                else Modifier
+                                            )
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!c.avatar_url.isNullOrEmpty()) {
+                                            AsyncImage(
+                                                model = c.avatar_url,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Text(
+                                                c.username.take(1).uppercase(),
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            GlossyGradientText(
+                                                text = c.username,
+                                                colors = when {
+                                                    isAdmin -> adminGradientColors
+                                                    isMod -> moderatorGradientColors
+                                                    else -> defaultNameGradientColors
+                                                },
+                                                fontSize = 12.sp,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = timeStr,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                                fontSize = 10.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = c.message,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                            fontSize = 12.sp,
+                                            lineHeight = 15.sp,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4937,24 +5083,30 @@ fun WatchScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // Quality chip
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                                                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
-                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                                            ) {
-                                                Text("720p", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(0.8f))
-                                            }
+                                            AssistChip(
+                                                onClick = {},
+                                                label = { Text("720p", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                                                colors = AssistChipDefaults.assistChipColors(
+                                                    containerColor = Color.Black.copy(alpha = 0.4f),
+                                                    labelColor = Color.White.copy(alpha = 0.9f)
+                                                ),
+                                                border = AssistChipDefaults.assistChipBorder(
+                                                    enabled = true,
+                                                    borderColor = Color.White.copy(alpha = 0.15f)
+                                                ),
+                                                modifier = Modifier.height(28.dp)
+                                            )
                                             // PiP button
                                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                IconButton(
+                                                FilledIconButton(
                                                     onClick = { enterPiP() },
-                                                    modifier = Modifier
-                                                        .size(34.dp)
-                                                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                                                        .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                                        containerColor = Color.Black.copy(alpha = 0.4f),
+                                                        contentColor = Color.White
+                                                    ),
+                                                    modifier = Modifier.size(34.dp)
                                                 ) {
-                                                    Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", tint = Color.White, modifier = Modifier.size(16.dp))
+                                                    Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", modifier = Modifier.size(16.dp))
                                                 }
                                             }
                                         }
@@ -4966,38 +5118,63 @@ fun WatchScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // -10s
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                                Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White.copy(0.8f), modifier = Modifier.size(28.dp))
-                                                Text("-10s", fontSize = 9.sp, color = Color.White.copy(0.6f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp)
-                                            }
-                                            // Play/Pause
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(60.dp)
-                                                    .background(accentColor.copy(alpha = 0.9f), CircleShape)
-                                                    .border(1.5.dp, Color.White.copy(0.15f), CircleShape)
-                                                    .clickable {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                                IconButton(
+                                                    onClick = {
                                                         if (canControlPlayback) {
-                                                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                                            showControls = true
+                                                            exoPlayer.seekTo(exoPlayer.currentPosition - 10_000)
                                                         } else {
                                                             coroutineScope.launch {
                                                                 nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
                                                             }
                                                         }
                                                     },
-                                                contentAlignment = Alignment.Center
+                                                    modifier = Modifier.size(44.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Replay10, contentDescription = "-10s", tint = Color.White.copy(0.85f), modifier = Modifier.size(28.dp))
+                                                }
+                                                Text("-10s", fontSize = 9.sp, color = Color.White.copy(0.6f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp)
+                                            }
+                                            // Play/Pause
+                                            FilledIconButton(
+                                                onClick = {
+                                                    if (canControlPlayback) {
+                                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                                        showControls = true
+                                                    } else {
+                                                        coroutineScope.launch {
+                                                            nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
+                                                        }
+                                                    }
+                                                },
+                                                colors = IconButtonDefaults.filledIconButtonColors(
+                                                    containerColor = accentColor,
+                                                    contentColor = Color.White
+                                                ),
+                                                modifier = Modifier.size(60.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                                     contentDescription = null,
-                                                    tint = Color.White,
                                                     modifier = Modifier.size(32.dp)
                                                 )
                                             }
-                                            // +15s
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                                Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White.copy(0.8f), modifier = Modifier.size(28.dp))
+                                            // +10s
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                                                IconButton(
+                                                    onClick = {
+                                                        if (canControlPlayback) {
+                                                            exoPlayer.seekTo(exoPlayer.currentPosition + 10_000)
+                                                        } else {
+                                                            coroutineScope.launch {
+                                                                nobarSnackbarHostState.showSnackbar("Hanya host yang bisa kontrol video di room Nobar")
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(44.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Forward10, contentDescription = "+10s", tint = Color.White.copy(0.85f), modifier = Modifier.size(28.dp))
+                                                }
                                                 Text("+10s", fontSize = 9.sp, color = Color.White.copy(0.6f), fontWeight = FontWeight.SemiBold, letterSpacing = 0.05.sp)
                                             }
                                         }
@@ -5043,26 +5220,30 @@ fun WatchScreen(
                                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     // Speed pill
                                                     Box {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .background(Color.Black.copy(0.4f), RoundedCornerShape(20.dp))
-                                                                .border(1.dp, Color.White.copy(0.15f), RoundedCornerShape(20.dp))
-                                                                .clickable { showSpeedMenu = true }
-                                                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                                                        ) {
-                                                            Text("${playbackSpeed}×", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accentColor)
-                                                        }
+                                                        AssistChip(
+                                                            onClick = { showSpeedMenu = true },
+                                                            label = { Text("${playbackSpeed}×", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                                            colors = AssistChipDefaults.assistChipColors(
+                                                                containerColor = Color.Black.copy(alpha = 0.4f),
+                                                                labelColor = accentColor
+                                                            ),
+                                                            border = AssistChipDefaults.assistChipBorder(
+                                                                enabled = true,
+                                                                borderColor = Color.White.copy(alpha = 0.15f)
+                                                            ),
+                                                            modifier = Modifier.height(28.dp)
+                                                        )
                                                         DropdownMenu(
                                                             expanded = showSpeedMenu,
                                                             onDismissRequest = { showSpeedMenu = false },
-                                                            modifier = Modifier.background(Color(0xFF1A1A1A))
+                                                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                                         ) {
                                                             listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
                                                                 DropdownMenuItem(
                                                                     text = {
                                                                         Text(
                                                                             "${speed}×",
-                                                                            color = if (speed == playbackSpeed) accentColor else Color.White,
+                                                                            color = if (speed == playbackSpeed) accentColor else MaterialTheme.colorScheme.onSurface,
                                                                             fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal,
                                                                             fontSize = 13.sp
                                                                         )
@@ -5082,20 +5263,20 @@ fun WatchScreen(
                                     }
 
                                     // Lock button — always visible
-                                    Box(
+                                    FilledIconButton(
+                                        onClick = { isLocked = !isLocked },
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = if (isLocked) accentColor.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.45f),
+                                            contentColor = Color.White
+                                        ),
                                         modifier = Modifier
                                             .align(Alignment.CenterEnd)
                                             .padding(end = 10.dp)
                                             .size(36.dp)
-                                            .background(Color.Black.copy(0.45f), CircleShape)
-                                            .border(1.dp, Color.White.copy(0.12f), CircleShape)
-                                            .clickable { isLocked = !isLocked },
-                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
                                             contentDescription = "Lock",
-                                            tint = if (isLocked) accentColor else Color.White.copy(0.7f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }

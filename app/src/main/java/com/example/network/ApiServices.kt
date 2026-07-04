@@ -498,6 +498,15 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<EpisodeComment>
 
+    // Komentar terbaru lintas semua episode — dipakai untuk widget "Komentar Terbaru" di Home
+    @GET("rest/v1/episode_comments")
+    suspend fun getRecentComments(
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 15,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<EpisodeComment>
+
     @POST("rest/v1/episode_comments")
     suspend fun insertEpisodeComment(
         @Body data: EpisodeCommentRequest,
