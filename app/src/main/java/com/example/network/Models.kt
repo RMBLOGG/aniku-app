@@ -985,3 +985,31 @@ data class WatchChatRequest(
     val avatar_url: String? = null,
     val message: String
 )
+
+// Komentar episode (permanen, non-realtime) - beda dari watch_chat yang cuma sementara.
+// user_number & season_level di-join manual dari profiles pas load, sama kayak pola ChatMessage.
+@JsonClass(generateAdapter = true)
+data class EpisodeComment(
+    val id: String,
+    val episode_slug: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val role: String? = "user",
+    val is_admin: Boolean? = false,
+    val message: String,
+    val created_at: String,
+    val user_number: Int? = null,
+    val season_level: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class EpisodeCommentRequest(
+    val episode_slug: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val role: String? = "user",
+    val is_admin: Boolean? = false,
+    val message: String
+)

@@ -5586,24 +5586,20 @@ fun WatchScreen(
         }
         } // end if (!isFullscreen)
 
-        // ── Live Chat ────────────────────────────────────────────
+        // ── Komentar Episode ─────────────────────────────────────
         if (!isFullscreen) {
-            val watchChatMessages by viewModel.watchChatMessages.collectAsState()
+            val episodeComments by viewModel.episodeComments.collectAsState()
+            val isCommentsLoading by viewModel.isEpisodeCommentsLoading.collectAsState()
+            val isPostingComment by viewModel.isPostingEpisodeComment.collectAsState()
+            val clanTagMap by viewModel.clanTagMap.collectAsState()
             val session by viewModel.session.collectAsState()
-            var chatInput by remember { mutableStateOf("") }
-            var chatExpanded by remember { mutableStateOf(false) }
-            val listState = rememberLazyListState()
+            var commentInput by remember { mutableStateOf("") }
+            var commentsExpanded by remember { mutableStateOf(false) }
+            var deleteTargetId by remember { mutableStateOf<String?>(null) }
 
             LaunchedEffect(currentEpisodeSlug) {
-                viewModel.startWatchChatPolling(currentEpisodeSlug)
-            }
-            DisposableEffect(Unit) {
-                onDispose { viewModel.stopWatchChatPolling() }
-            }
-            LaunchedEffect(watchChatMessages.size) {
-                if (watchChatMessages.isNotEmpty() && chatExpanded) {
-                    listState.animateScrollToItem(watchChatMessages.size - 1)
-                }
+                viewModel.loadEpisodeComments(currentEpisodeSlug)
+                viewModel.loadClanTagMap()
             }
 
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -5613,105 +5609,35 @@ fun WatchScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { chatExpanded = !chatExpanded }
+                        .clickable { commentsExpanded = !commentsExpanded }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Forum, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
-                        Text("Live Chat", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
-                        if (watchChatMessages.isNotEmpty()) {
+                        Text("Komentar", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                        if (episodeComments.isNotEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .background(accentColor, RoundedCornerShape(10.dp))
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("${watchChatMessages.size}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("${episodeComments.size}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     Icon(
-                        if (chatExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        if (commentsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
                 }
 
-                androidx.compose.animation.AnimatedVisibility(visible = chatExpanded) {
+                androidx.compose.animation.AnimatedVisibility(visible = commentsExpanded) {
                     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        // Message list
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(220.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            if (watchChatMessages.isEmpty()) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Belum ada pesan. Mulai chat!", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 13.sp)
-                                }
-                            } else {
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    items(watchChatMessages, key = { it.id }) { msg ->
-                                        val isMe = msg.user_id == session.userId
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
-                                            verticalAlignment = Alignment.Top
-                                        ) {
-                                            if (!isMe) {
-                                                // Avatar
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(28.dp)
-                                                        .clip(CircleShape)
-                                                        .background(accentColor),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    if (!msg.avatar_url.isNullOrEmpty()) {
-                                                        AsyncImage(model = msg.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                                    } else {
-                                                        Text(msg.username.take(1).uppercase(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                                Spacer(Modifier.width(6.dp))
-                                            }
-                                            Column(horizontalAlignment = if (isMe) Alignment.End else Alignment.Start) {
-                                                if (!isMe) {
-                                                    Text(msg.username, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 2.dp))
-                                                }
-                                                Box(
-                                                    modifier = Modifier
-                                                        .background(
-                                                            if (isMe) accentColor else MaterialTheme.colorScheme.surfaceVariant,
-                                                            RoundedCornerShape(
-                                                                topStart = if (isMe) 12.dp else 2.dp,
-                                                                topEnd = if (isMe) 2.dp else 12.dp,
-                                                                bottomStart = 12.dp,
-                                                                bottomEnd = 12.dp
-                                                            )
-                                                        )
-                                                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                                                ) {
-                                                    Text(msg.message, color = if (isMe) Color.White else MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(8.dp))
-
-                        // Input
+                        // Input duluan di atas biar gampang dijangkau
                         if (session.token.isNullOrEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -5721,7 +5647,7 @@ fun WatchScreen(
                                     .padding(12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Login untuk ikut chat", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 13.sp)
+                                Text("Login untuk kasih komentar", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), fontSize = 13.sp)
                             }
                         } else {
                             Row(
@@ -5730,12 +5656,12 @@ fun WatchScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 OutlinedTextField(
-                                    value = chatInput,
-                                    onValueChange = { if (it.length <= 200) chatInput = it },
-                                    placeholder = { Text("Tulis pesan...", fontSize = 13.sp) },
+                                    value = commentInput,
+                                    onValueChange = { if (it.length <= 500) commentInput = it },
+                                    placeholder = { Text("Tulis komentar...", fontSize = 13.sp) },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
-                                    maxLines = 2,
+                                    maxLines = 4,
                                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = accentColor,
@@ -5743,22 +5669,139 @@ fun WatchScreen(
                                     )
                                 )
                                 IconButton(
+                                    enabled = !isPostingComment,
                                     onClick = {
-                                        if (chatInput.isNotBlank()) {
-                                            viewModel.sendWatchChatMessage(currentEpisodeSlug, chatInput)
-                                            chatInput = ""
+                                        if (commentInput.isNotBlank()) {
+                                            viewModel.postEpisodeComment(currentEpisodeSlug, commentInput)
+                                            commentInput = ""
                                         }
                                     },
                                     modifier = Modifier
                                         .size(44.dp)
                                         .background(accentColor, RoundedCornerShape(10.dp))
                                 ) {
-                                    Icon(Icons.Default.Send, contentDescription = "Kirim", tint = Color.White, modifier = Modifier.size(20.dp))
+                                    if (isPostingComment) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Default.Send, contentDescription = "Kirim", tint = Color.White, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Daftar komentar
+                        when {
+                            isCommentsLoading && episodeComments.isEmpty() -> {
+                                Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = accentColor, strokeWidth = 2.dp)
+                                }
+                            }
+                            episodeComments.isEmpty() -> {
+                                Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                                    Text("Belum ada komentar. Jadi yang pertama!", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), fontSize = 13.sp)
+                                }
+                            }
+                            else -> {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    episodeComments.reversed().forEach { c ->
+                                        val isMe = c.user_id == session.userId
+                                        val timeStr = remember(c.created_at) {
+                                            try {
+                                                val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                                                parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                                val date = parser.parse(c.created_at.take(19)) ?: java.util.Date()
+                                                val formatter = java.text.SimpleDateFormat("dd MMM, HH:mm", java.util.Locale.getDefault())
+                                                formatter.timeZone = java.util.TimeZone.getTimeZone("Asia/Jakarta")
+                                                formatter.format(date)
+                                            } catch (e: Exception) { "" }
+                                        }
+
+                                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                                            // Avatar
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(accentColor),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (!c.avatar_url.isNullOrEmpty()) {
+                                                    AsyncImage(model = c.avatar_url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                                } else {
+                                                    Text(c.username.take(1).uppercase(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                                ) {
+                                                    GlossyGradientText(
+                                                        text = c.username,
+                                                        colors = when {
+                                                            c.role == "admin" || c.is_admin == true -> adminGradientColors
+                                                            c.role == "moderator" -> moderatorGradientColors
+                                                            else -> defaultNameGradientColors
+                                                        },
+                                                        fontSize = 13.sp
+                                                    )
+                                                    c.season_level?.let { lvl ->
+                                                        GlossyGradientText(text = "Lv.$lvl", colors = levelGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                    c.user_number?.let { num ->
+                                                        GlossyGradientText(text = "#$num", colors = idGradientColors, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                    clanTagMap[c.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                                                    if (c.role == "admin" || c.is_admin == true) {
+                                                        GlossyGradientText(text = "ADMIN", colors = adminGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
+                                                    } else if (c.role == "moderator") {
+                                                        GlossyGradientText(text = "MODERATOR", colors = moderatorGradientColors, fontSize = 10.sp, letterSpacing = 0.4.sp)
+                                                    }
+                                                }
+                                                Spacer(Modifier.height(3.dp))
+                                                Text(c.message, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                                Spacer(Modifier.height(3.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                    Text(timeStr, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                                                    if (isMe) {
+                                                        Text(
+                                                            "Hapus",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                                            modifier = Modifier.clickable { deleteTargetId = c.id }
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (deleteTargetId != null) {
+                AlertDialog(
+                    onDismissRequest = { deleteTargetId = null },
+                    title = { Text("Hapus Komentar?") },
+                    text = { Text("Komentar yang dihapus tidak bisa dikembalikan.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            deleteTargetId?.let { viewModel.deleteEpisodeComment(currentEpisodeSlug, it) }
+                            deleteTargetId = null
+                        }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteTargetId = null }) { Text("Batal") }
+                    }
+                )
             }
         }
     }

@@ -103,7 +103,7 @@ private fun linkifyMessage(
  * Dipakai untuk efek glossy di teks nama/id/role chat.
  */
 @Composable
-private fun rememberGlossyShimmer(durationMillis: Int = 2200): Float {
+internal fun rememberGlossyShimmer(durationMillis: Int = 2200): Float {
     val infiniteTransition = rememberInfiniteTransition(label = "glossyShimmer")
     val progress by infiniteTransition.animateFloat(
         initialValue = -0.5f,
@@ -121,7 +121,7 @@ private fun rememberGlossyShimmer(durationMillis: Int = 2200): Float {
  * Brush gradient dasar [baseColors] yang dikasih highlight putih bergerak
  * sesuai [progress], jadi keliatan kayak kilau kaca/glossy yang lewat terus.
  */
-private fun glossyBrush(baseColors: List<Color>, progress: Float): Brush {
+internal fun glossyBrush(baseColors: List<Color>, progress: Float): Brush {
     val c0 = baseColors.first()
     val c1 = baseColors.last()
     val band = 0.22f
@@ -145,7 +145,7 @@ private fun glossyBrush(baseColors: List<Color>, progress: Float): Brush {
  * Dipakai buat nama pengirim, id (#angka), dan badge role di chat.
  */
 @Composable
-private fun GlossyGradientText(
+internal fun GlossyGradientText(
     text: String,
     colors: List<Color>,
     fontSize: TextUnit,
@@ -165,16 +165,16 @@ private fun GlossyGradientText(
 }
 
 // Set warna gradient khusus per role, dipakai bareng GlossyGradientText
-private val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), Color(0xFFFF8E53))
-private val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
-private val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
-private val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
-private val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
-private val clanTagGradientColors = listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))
+internal val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), Color(0xFFFF8E53))
+internal val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
+internal val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
+internal val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
+internal val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
+internal val clanTagGradientColors = listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))
 
 // Badge tag clan di chat, misal [COC], pakai icon perisai bukan emoji
 @Composable
-private fun ClanTagBadge(tag: String) {
+internal fun ClanTagBadge(tag: String) {
     val progress = rememberGlossyShimmer()
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(

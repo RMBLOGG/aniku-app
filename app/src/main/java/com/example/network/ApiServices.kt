@@ -489,6 +489,31 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=representation"
     ): List<WatchChatMessage>
 
+    @GET("rest/v1/episode_comments")
+    suspend fun getEpisodeComments(
+        @Query("episode_slug") episodeSlug: String,
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 200,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<EpisodeComment>
+
+    @POST("rest/v1/episode_comments")
+    suspend fun insertEpisodeComment(
+        @Body data: EpisodeCommentRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<EpisodeComment>
+
+    @DELETE("rest/v1/episode_comments")
+    suspend fun deleteEpisodeComment(
+        @Query("id") idQuery: String,
+        @Query("user_id") userIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/watch_events")
     suspend fun insertWatchEvent(
         @Body data: WatchEventRequest,

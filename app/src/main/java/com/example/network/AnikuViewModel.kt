@@ -2604,6 +2604,100 @@ class AnikuViewModel(context: Context) : ViewModel() {
         watchChatPollingJob = null
     }
 
+    // ── Komentar Episode (permanen, non-realtime) ───────────────
+    private val _episodeComments = MutableStateFlow<List<EpisodeComment>>(emptyList())
+    val episodeComments: StateFlow<List<EpisodeComment>> = _episodeComments.asStateFlow()
+
+    private val _isEpisodeCommentsLoading = MutableStateFlow(false)
+    val isEpisodeCommentsLoading: StateFlow<Boolean> = _isEpisodeCommentsLoading.asStateFlow()
+
+    private val _isPostingEpisodeComment = MutableStateFlow(false)
+    val isPostingEpisodeComment: StateFlow<Boolean> = _isPostingEpisodeComment.asStateFlow()
+
+    fun loadEpisodeComments(episodeSlug: String) {
+        viewModelScope.launch {
+            _isEpisodeCommentsLoading.value = true
+            try {
+                val comments = NetworkClient.supabaseDbApi.getEpisodeComments(
+                    episodeSlug = "eq.$episodeSlug",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                // Fetch semua profiles sekali buat manual-join user_number & season_level
+                val profilesMap = try {
+                    NetworkClient.supabaseDbApi.getProfiles(
+                        authHeader = getAuthHeader(),
+                        apiKey = SUPABASE_ANON_KEY
+                    ).associateBy { it.id }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "Gagal fetch profiles buat join komentar episode", e)
+                    emptyMap()
+                }
+                val joined = comments.map { c ->
+                    c.copy(
+                        user_number = profilesMap[c.user_id]?.user_number,
+                        season_level = profilesMap[c.user_id]?.season_level
+                    )
+                }
+                // API balikin terbaru dulu (desc), reverse jadi kronologis lama -> baru
+                _episodeComments.value = joined.reversed()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load komentar episode", e)
+            } finally {
+                _isEpisodeCommentsLoading.value = false
+            }
+        }
+    }
+
+    fun postEpisodeComment(episodeSlug: String, message: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+        val trimmed = message.trim()
+        if (trimmed.isEmpty() || trimmed.length > 500) return
+        viewModelScope.launch {
+            _isPostingEpisodeComment.value = true
+            try {
+                NetworkClient.supabaseDbApi.insertEpisodeComment(
+                    data = EpisodeCommentRequest(
+                        episode_slug = episodeSlug,
+                        user_id = currentSession.userId ?: "",
+                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "User",
+                        avatar_url = currentSession.avatarUrl,
+                        role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
+                        is_admin = currentSession.isAdmin,
+                        message = trimmed
+                    ),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadEpisodeComments(episodeSlug)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal kirim komentar episode", e)
+            } finally {
+                _isPostingEpisodeComment.value = false
+            }
+        }
+    }
+
+    fun deleteEpisodeComment(episodeSlug: String, commentId: String) {
+        val currentSession = session.value
+        val userId = currentSession.userId ?: return
+        if (currentSession.token.isNullOrEmpty()) return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteEpisodeComment(
+                    idQuery = "eq.$commentId",
+                    userIdQuery = "eq.$userId",
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _episodeComments.value = _episodeComments.value.filterNot { it.id == commentId }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal hapus komentar episode", e)
+            }
+        }
+    }
+
     // ── Active Viewers ───────────────────────────────────────────
     private val _viewerCounts = MutableStateFlow<Map<String, Int>>(emptyMap())
     val viewerCounts: StateFlow<Map<String, Int>> = _viewerCounts.asStateFlow()
