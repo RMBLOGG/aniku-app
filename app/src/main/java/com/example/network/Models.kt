@@ -276,6 +276,15 @@ data class BlacklistedAnimeDto(
     val created_at: String? = null
 )
 
+// Genre yang disembunyikan dari daftar pilihan genre di Eksplor
+@JsonClass(generateAdapter = true)
+data class BlacklistedGenreDto(
+    val id: String,
+    val genre_slug: String,
+    val genre_name: String? = null,
+    val created_at: String? = null
+)
+
 // Cloudinary models
 @JsonClass(generateAdapter = true)
 data class CloudinaryResponse(

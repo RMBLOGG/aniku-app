@@ -41,13 +41,15 @@ fun UserListScreen(
     }
 
     val filteredUsers = remember(users, query) {
-        val sorted = users.sortedByDescending { it.season_xp ?: 0 }
+        val active = users.filterNot { it.is_banned == true }
+        val sorted = active.sortedByDescending { it.season_xp ?: 0 }
         if (query.isBlank()) sorted
         else sorted.filter { it.username?.contains(query, ignoreCase = true) == true }
     }
     // Peringkat XP dihitung dari daftar lengkap (belum difilter pencarian) biar #rank-nya tetap konsisten
     val rankByUserId = remember(users) {
-        users.sortedByDescending { it.season_xp ?: 0 }
+        users.filterNot { it.is_banned == true }
+            .sortedByDescending { it.season_xp ?: 0 }
             .mapIndexed { index, user -> user.id to (index + 1) }
             .toMap()
     }

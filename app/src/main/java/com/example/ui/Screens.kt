@@ -2994,7 +2994,11 @@ fun ExploreScreen(
 ) {
     val activeTab by viewModel.exploreTab.collectAsState()
     val activeGenre by viewModel.selectedGenreSlug.collectAsState()
-    val genresList by viewModel.genres.collectAsState()
+    val genresListRaw by viewModel.genres.collectAsState()
+    val blacklistedGenreSlugs by viewModel.blacklistedGenreSlugs.collectAsState()
+    val genresList = remember(genresListRaw, blacklistedGenreSlugs) {
+        genresListRaw.filterNot { blacklistedGenreSlugs.contains(it.slug) }
+    }
     val itemsList by viewModel.exploreAnimes.collectAsState()
     val isLoading by viewModel.isExploreLoading.collectAsState()
     val hasNext by viewModel.exploreHasNext.collectAsState()
@@ -7259,7 +7263,7 @@ fun AdminPanelScreen(
         }
     }
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: Users, 1: Announcements, 2: Slider, 3: Blacklist
+    var selectedTab by remember { mutableStateOf(0) } // 0: Users, 1: Announcements, 2: Slider, 3: Blacklist Anime, 4: Blacklist Genre, 5: Anime Request
 
     // Announcements adding inputs state
     var annTitle by remember { mutableStateOf("") }
@@ -7334,6 +7338,7 @@ fun AdminPanelScreen(
                 "Pengumuman" to Icons.Default.Campaign,
                 "Hero Slider" to Icons.Default.ViewCarousel,
                 "Blacklist Anime" to Icons.Default.Block,
+                "Blacklist Genre" to Icons.Default.FilterAltOff,
                 "Anime Request" to Icons.Default.VideoLibrary
             )
             sections.forEachIndexed { index, (label, icon) ->
@@ -8038,6 +8043,72 @@ fun AdminPanelScreen(
                         }
                     }
                     4 -> {
+                        // Section E: Blacklist Genre — tinggal tap chip genre yang mau disembunyikan, gak perlu form
+                        val genresListRaw by viewModel.genres.collectAsState()
+                        val blacklistGenres by viewModel.adminBlacklistGenres.collectAsState()
+                        val blacklistedGenreSlugSet = remember(blacklistGenres) { blacklistGenres.map { it.genre_slug }.toSet() }
+
+                        Text("Blacklist Genre", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Tap genre buat sembunyikan dari daftar pilihan di Eksplor. Tap lagi buat nampilin.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (genresListRaw.isEmpty()) {
+                            Text("Memuat daftar genre...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                        } else {
+                            androidx.compose.foundation.layout.FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                genresListRaw.forEach { genre ->
+                                    val isBlacklisted = blacklistedGenreSlugSet.contains(genre.slug)
+                                    FilterChip(
+                                        selected = isBlacklisted,
+                                        onClick = { viewModel.toggleGenreBlacklist(genre.slug, genre.name) },
+                                        label = {
+                                            Text(
+                                                genre.name,
+                                                fontSize = 12.sp,
+                                                textDecoration = if (isBlacklisted) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                                            )
+                                        },
+                                        leadingIcon = if (isBlacklisted) {
+                                            { Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                                        } else null,
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer,
+                                            selectedLeadingIconColor = MaterialTheme.colorScheme.onErrorContainer
+                                        ),
+                                        border = FilterChipDefaults.filterChipBorder(
+                                            enabled = true,
+                                            selected = isBlacklisted,
+                                            borderColor = MaterialTheme.colorScheme.outlineVariant,
+                                            selectedBorderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        if (blacklistGenres.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            HorizontalDivider()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "${blacklistGenres.size} genre disembunyikan",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    5 -> {
                         AdminRequestAnimeSection(viewModel = viewModel)
                     }
                 }
