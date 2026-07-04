@@ -4504,90 +4504,104 @@ fun WatchScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // App controls Header row
-        if (!isFullscreen) Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(vertical = 8.dp, horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // App controls Header row — Material3 surface app bar
+        if (!isFullscreen) Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 3.dp,
+            shadowElevation = 1.dp
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = animeTitle,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = episodeTitle ?: "Memuat...",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            if (nobarRoom != null) {
-                // Salin kode room — aksi terpisah dari badge (yang dipakai untuk keluar room)
-                IconButton(
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(nobarRoom?.roomCode ?: ""))
-                        coroutineScope.launch {
-                            nobarSnackbarHostState.showSnackbar("Kode room disalin: ${nobarRoom?.roomCode}")
-                        }
-                    },
-                    modifier = Modifier.size(32.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = "Salin kode room",
-                        tint = accentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Kembali")
                 }
-                Spacer(modifier = Modifier.width(4.dp))
-                // Status room aktif: tampilkan kode + jumlah member, tap untuk keluar room
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .clickable { viewModel.leaveNobarRoom() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Groups,
-                        contentDescription = "Nobar aktif",
-                        tint = accentColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${nobarRoom?.roomCode} · ${nobarRoom?.memberCount}",
-                        color = accentColor,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        text = animeTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = episodeTitle ?: "Memuat...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-            } else {
-                IconButton(onClick = {
-                    if (isDirectStream) {
-                        showNobarDialog = true
-                    } else {
-                        coroutineScope.launch {
-                            nobarSnackbarHostState.showSnackbar(
-                                "Nobar belum bisa dipakai di server ini. Coba pindah ke server lain dulu."
-                            )
-                        }
+                if (nobarRoom != null) {
+                    // Salin kode room — aksi terpisah dari badge (yang dipakai untuk keluar room)
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(nobarRoom?.roomCode ?: ""))
+                            coroutineScope.launch {
+                                nobarSnackbarHostState.showSnackbar("Kode room disalin: ${nobarRoom?.roomCode}")
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Salin kode room",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                }) {
-                    Icon(Icons.Default.Groups, contentDescription = "Nobar", tint = MaterialTheme.colorScheme.onBackground)
+                    Spacer(modifier = Modifier.width(2.dp))
+                    // Status room aktif: tampilkan kode + jumlah member, tap untuk keluar room
+                    AssistChip(
+                        onClick = { viewModel.leaveNobarRoom() },
+                        label = {
+                            Text(
+                                text = "${nobarRoom?.roomCode} · ${nobarRoom?.memberCount}",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Groups,
+                                contentDescription = "Nobar aktif",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        border = null
+                    )
+                } else {
+                    FilledTonalIconButton(
+                        onClick = {
+                            if (isDirectStream) {
+                                showNobarDialog = true
+                            } else {
+                                coroutineScope.launch {
+                                    nobarSnackbarHostState.showSnackbar(
+                                        "Nobar belum bisa dipakai di server ini. Coba pindah ke server lain dulu."
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Groups, contentDescription = "Nobar")
+                    }
                 }
             }
         }
@@ -5336,50 +5350,57 @@ fun WatchScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(end = 12.dp, top = 4.dp),
+                    .padding(end = 16.dp, top = 8.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFF1A1A1A), RoundedCornerShape(8.dp))
-                        .border(1.dp, Color(0xFF333333), RoundedCornerShape(8.dp))
-                        .clickable { isFullscreen = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                FilledTonalButton(
+                    onClick = { isFullscreen = true },
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("⛶", color = Color.White, fontSize = 14.sp)
-                        Text("Layar Penuh", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
+                    Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Layar Penuh", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        // Horizontal quality tags selection
+        // Horizontal server/quality selection
         if (!isFullscreen && streams.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp, horizontal = 16.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                streams.forEachIndexed { i, q ->
-                    val isSelected = selectedIndex == i
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { viewModel.selectStreamQuality(i) }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = q.name,
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 16.dp, end = 16.dp)) {
+                Text(
+                    text = "Pilih Server",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    streams.forEachIndexed { i, q ->
+                        val isSelected = selectedIndex == i
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { viewModel.selectStreamQuality(i) },
+                            label = { Text(q.name, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            leadingIcon = if (isSelected) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                            } else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accentColor,
+                                selectedLabelColor = Color.White,
+                                selectedLeadingIconColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = MaterialTheme.colorScheme.outlineVariant,
+                                selectedBorderColor = accentColor
+                            )
                         )
                     }
                 }
@@ -5387,18 +5408,18 @@ fun WatchScreen(
         }
 
         // Previous and Next Episode controls
-        detail?.episodes?.let { eps ->
+        if (!isFullscreen) detail?.episodes?.let { eps ->
             val currentIndex = eps.indexOfFirst { it.slug == currentEpisodeSlug }
             if (currentIndex != -1) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     // Previous ep (index + 1 karena list descending)
                     val hasPrev = currentIndex < eps.size - 1
-                    Button(
+                    OutlinedButton(
                         onClick = {
                             val newEp = eps.getOrNull(currentIndex + 1)
                             if (newEp != null) {
@@ -5406,15 +5427,12 @@ fun WatchScreen(
                             }
                         },
                         enabled = hasPrev,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("< Sebelumnya")
+                        Icon(Icons.Default.SkipPrevious, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Sebelumnya", fontSize = 13.sp)
                     }
 
                     // Next ep (index - 1 karena list descending)
@@ -5427,22 +5445,19 @@ fun WatchScreen(
                             }
                         },
                         enabled = hasNext,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Selanjutnya >")
+                        Text("Selanjutnya", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (!isFullscreen) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
         // Episode List — Bstation grid pill style
         if (!isFullscreen) {
@@ -5470,21 +5485,28 @@ fun WatchScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "Semua Episode",
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold
             )
-            Text(
-                text = "$totalEps Episode",
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
-                fontSize = 12.sp
-            )
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    text = "$totalEps Episode",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
         }
 
         // Group range tabs
@@ -5492,26 +5514,27 @@ fun WatchScreen(
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 10.dp)
+                modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 itemsIndexed(groups) { idx, (start, end) ->
                     val epStart = eps.getOrNull(start)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (start + 1)
                     val epEnd = eps.getOrNull(end)?.name?.replace(Regex("[^0-9]"), "")?.toIntOrNull() ?: (end + 1)
                     val isSelected = selectedGroup == idx
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isSelected) accentColor else MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { selectedGroup = idx }
-                            .padding(horizontal = 14.dp, vertical = 7.dp)
-                    ) {
-                        Text(
-                            text = "$epStart-$epEnd",
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedGroup = idx },
+                        label = { Text("$epStart-$epEnd", fontSize = 13.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = accentColor,
+                            selectedLabelColor = Color.White
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = MaterialTheme.colorScheme.outlineVariant,
+                            selectedBorderColor = accentColor
                         )
-                    }
+                    )
                 }
             }
         }
@@ -5524,61 +5547,56 @@ fun WatchScreen(
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(displayEps, key = { idx, item -> "${item.slug}_${idx}" }) { _, item ->
                 val isActive = item.slug == currentEpisodeSlug
                 val isWatched = !isActive && watchedEpisodeSlugs.contains(item.slug)
                 val epNum = item.name.replace(Regex("[^0-9]"), "").ifEmpty { "-" }
-                Box(
+                Surface(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            if (isActive) accentColor
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        .border(
-                            1.dp,
-                            if (isActive) accentColor else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
+                        .size(54.dp)
                         .clickable { currentEpisodeSlug = item.slug },
-                    contentAlignment = Alignment.Center
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isActive) accentColor else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = if (isActive) 0.dp else 1.dp,
+                    border = if (isActive) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (isActive) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (isActive) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                            Text(
+                                text = "E$epNum",
+                                color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 11.sp,
+                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
                             )
                         }
-                        Text(
-                            text = "E$epNum",
-                            color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
-                    if (isWatched) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(3.dp)
-                                .size(14.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(Color(0xFF4CAF50)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = "Watched",
-                                tint = Color.White,
-                                modifier = Modifier.size(9.dp)
-                            )
+                        if (isWatched) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(3.dp)
+                                    .size(14.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF4CAF50)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Watched",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(9.dp)
+                                )
+                            }
                         }
                     }
                 }
