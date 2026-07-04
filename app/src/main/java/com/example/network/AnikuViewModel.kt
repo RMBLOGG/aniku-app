@@ -116,6 +116,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _blacklistedSlugs = MutableStateFlow<Set<String>>(emptySet())
     val blacklistedSlugs: StateFlow<Set<String>> = _blacklistedSlugs.asStateFlow()
 
+    // Blacklisted genre slugs — dipakai buat nyembunyiin genre dari daftar pilihan di Eksplor
+    private val _blacklistedGenreSlugs = MutableStateFlow<Set<String>>(emptySet())
+    val blacklistedGenreSlugs: StateFlow<Set<String>> = _blacklistedGenreSlugs.asStateFlow()
+
     // Home state
     private val _homeOngoing = MutableStateFlow<List<AnimeRaw>>(emptyList())
     val homeOngoing: StateFlow<List<AnimeRaw>> = _homeOngoing.asStateFlow()
@@ -301,6 +305,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _adminBlacklist = MutableStateFlow<List<BlacklistedAnimeDto>>(emptyList())
     val adminBlacklist: StateFlow<List<BlacklistedAnimeDto>> = _adminBlacklist.asStateFlow()
 
+    private val _adminBlacklistGenres = MutableStateFlow<List<BlacklistedGenreDto>>(emptyList())
+    val adminBlacklistGenres: StateFlow<List<BlacklistedGenreDto>> = _adminBlacklistGenres.asStateFlow()
+
     private val _isAdminLoading = MutableStateFlow(false)
     val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
@@ -360,6 +367,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         refreshBookmarks()
         refreshWatchHistory()
         loadBlacklistSlugs()
+        loadBlacklistGenreSlugs()
         loadHomeData()
         loadGenres()
         loadSearchPopular()
@@ -453,7 +461,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
             setTitle("Aniku $version")
             setDescription("Mengunduh update aplikasi...")
             setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "Aniku-${version}.apk")
+            // Pakai folder khusus app (bukan folder publik) biar gak butuh izin
+            // WRITE_EXTERNAL_STORAGE sama sekali -- itu udah gak berlaku lagi
+            // di Android 10+ (dicap maxSdkVersion 28), makanya kalau pakai
+            // setDestinationInExternalPublicDir bakal SecurityException di Android 10+.
+            setDestinationInExternalFilesDir(appContext, android.os.Environment.DIRECTORY_DOWNLOADS, "Aniku-${version}.apk")
             setMimeType("application/vnd.android.package-archive")
             addRequestHeader("Accept", "application/octet-stream")
         }
@@ -497,6 +509,20 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _blacklistedSlugs.value = response.map { it.anime_slug }.toSet()
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Failed to load blacklisted anime slugs", e)
+            }
+        }
+    }
+
+    private fun loadBlacklistGenreSlugs() {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.getBlacklistedGenres(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _blacklistedGenreSlugs.value = response.map { it.genre_slug }.toSet()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed to load blacklisted genre slugs", e)
             }
         }
     }
@@ -2257,6 +2283,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 
                 // 4. Load blacklisted items list
                 _adminBlacklist.value = NetworkClient.supabaseDbApi.getBlacklistedAnime(authHeader, SUPABASE_ANON_KEY)
+
+                // 4b. Load blacklisted genres list
+                _adminBlacklistGenres.value = NetworkClient.supabaseDbApi.getBlacklistedGenres(authHeader, SUPABASE_ANON_KEY)
                 
                 _isAdminLoading.value = false
             } catch (e: Exception) {
@@ -2497,6 +2526,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Blacklist genre — cukup tap chip buat nyembunyiin/nampilin lagi genre dari Eksplor, gak perlu form manual
+    fun toggleGenreBlacklist(genreSlug: String, genreName: String) {
+        val authHeader = getAuthHeader()
+        val existing = _adminBlacklistGenres.value.find { it.genre_slug == genreSlug }
+        viewModelScope.launch {
+            try {
+                if (existing != null) {
+                    NetworkClient.supabaseDbApi.deleteBlacklistedGenre("eq.${existing.id}", authHeader, SUPABASE_ANON_KEY)
+                } else {
+                    NetworkClient.supabaseDbApi.insertBlacklistedGenre(
+                        mapOf("genre_slug" to genreSlug, "genre_name" to genreName),
+                        authHeader,
+                        SUPABASE_ANON_KEY
+                    )
+                }
+                _adminBlacklistGenres.value = NetworkClient.supabaseDbApi.getBlacklistedGenres(authHeader, SUPABASE_ANON_KEY)
+                loadBlacklistGenreSlugs()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed toggling genre blacklist", e)
+            }
+        }
+    }
+
     // Edit Settings Details on DataStore
     fun toggleDarkMode(dark: Boolean) {
         viewModelScope.launch { settingsStore.setTheme(dark) }
@@ -2649,7 +2701,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun postEpisodeComment(episodeSlug: String, message: String, animeSlug: String? = null, animeTitle: String? = null) {
+    fun postEpisodeComment(
+        episodeSlug: String,
+        message: String,
+        animeSlug: String? = null,
+        animeTitle: String? = null,
+        parentCommentId: String? = null,
+        replyToUsername: String? = null
+    ) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) return
         val trimmed = message.trim()
@@ -2670,7 +2729,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         message = trimmed,
                         source = sourceLabel,
                         anime_slug = animeSlug,
-                        anime_title = animeTitle
+                        anime_title = animeTitle,
+                        parent_comment_id = parentCommentId,
+                        reply_to_username = replyToUsername
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY

@@ -41,8 +41,17 @@ fun UserListScreen(
     }
 
     val filteredUsers = remember(users, query) {
-        if (query.isBlank()) users
-        else users.filter { it.username?.contains(query, ignoreCase = true) == true }
+        val active = users.filterNot { it.is_banned == true }
+        val sorted = active.sortedByDescending { it.season_xp ?: 0 }
+        if (query.isBlank()) sorted
+        else sorted.filter { it.username?.contains(query, ignoreCase = true) == true }
+    }
+    // Peringkat XP dihitung dari daftar lengkap (belum difilter pencarian) biar #rank-nya tetap konsisten
+    val rankByUserId = remember(users) {
+        users.filterNot { it.is_banned == true }
+            .sortedByDescending { it.season_xp ?: 0 }
+            .mapIndexed { index, user -> user.id to (index + 1) }
+            .toMap()
     }
 
     Scaffold(
@@ -129,6 +138,7 @@ fun UserListScreen(
                         items(filteredUsers, key = { it.id }) { user ->
                             UserDirectoryRow(
                                 user = user,
+                                rank = rankByUserId[user.id] ?: 0,
                                 onClick = { onUserClick(user.id) }
                             )
                         }
@@ -142,6 +152,7 @@ fun UserListScreen(
 @Composable
 private fun UserDirectoryRow(
     user: ProfileDto,
+    rank: Int,
     onClick: () -> Unit
 ) {
     val accentColor = MaterialTheme.colorScheme.primary
@@ -151,6 +162,13 @@ private fun UserDirectoryRow(
         else -> null to null
     }
     val ringColor = roleColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    // Tiga besar XP dikasih warna medali biar langsung kebaca podium-nya
+    val rankColor = when (rank) {
+        1 -> Color(0xFFFFD700)
+        2 -> Color(0xFFC0C0C0)
+        3 -> Color(0xFFCD7F32)
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+    }
 
     Row(
         modifier = Modifier
@@ -221,15 +239,34 @@ private fun UserDirectoryRow(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
-                user.user_number?.let {
+                if (rank > 0) {
                     Text(
-                        "  \u2022  #$it",
+                        "  \u2022  #$rank",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                        fontWeight = if (rank <= 3) FontWeight.Bold else FontWeight.Normal,
+                        color = rankColor
                     )
                 }
             }
         }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Chip XP
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = accentColor.copy(alpha = 0.12f)
+        ) {
+            Text(
+                "${user.season_xp ?: 0} XP",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = accentColor,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(4.dp))
 
         Icon(
             Icons.Default.ChevronRight,
