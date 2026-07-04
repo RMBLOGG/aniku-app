@@ -988,8 +988,10 @@ data class WatchChatRequest(
 
 // Komentar episode (permanen, non-realtime) - beda dari watch_chat yang cuma sementara.
 // user_number & season_level di-join manual dari profiles pas load, sama kayak pola ChatMessage.
-// source: label sumber data saat komentar dikirim ("v1"/"v2"/"v3"), nullable biar backward-compatible
-// dengan baris lama / kalau kolom belum ditambahkan di Supabase.
+// source: label sumber data saat komentar dikirim ("v1"/"v2"/"v3").
+// anime_title/anime_slug: disimpen pas komentar dikirim biar widget "Komentar Terbaru" di Home
+// bisa nampilin judul animenya (episode_slug doang gak cukup buat dapetin judul yang rapi).
+// Semua nullable biar backward-compatible sama baris lama / kalau kolomnya belum ditambahin di Supabase.
 @JsonClass(generateAdapter = true)
 data class EpisodeComment(
     val id: String,
@@ -1003,7 +1005,9 @@ data class EpisodeComment(
     val created_at: String,
     val user_number: Int? = null,
     val season_level: Int? = null,
-    val source: String? = null
+    val source: String? = null,
+    val anime_title: String? = null,
+    val anime_slug: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -1015,5 +1019,7 @@ data class EpisodeCommentRequest(
     val role: String? = "user",
     val is_admin: Boolean? = false,
     val message: String,
-    val source: String? = null
+    val source: String? = null,
+    val anime_title: String? = null,
+    val anime_slug: String? = null
 )

@@ -2649,7 +2649,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun postEpisodeComment(episodeSlug: String, message: String) {
+    fun postEpisodeComment(episodeSlug: String, message: String, animeSlug: String? = null, animeTitle: String? = null) {
         val currentSession = session.value
         if (currentSession.token.isNullOrEmpty()) return
         val trimmed = message.trim()
@@ -2668,7 +2668,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                         is_admin = currentSession.isAdmin,
                         message = trimmed,
-                        source = sourceLabel
+                        source = sourceLabel,
+                        anime_slug = animeSlug,
+                        anime_title = animeTitle
                     ),
                     authHeader = "Bearer ${currentSession.token}",
                     apiKey = SUPABASE_ANON_KEY

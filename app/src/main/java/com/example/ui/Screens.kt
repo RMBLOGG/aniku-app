@@ -2310,7 +2310,7 @@ fun HomeScreen(
                             ElevatedCard(
                                 modifier = Modifier
                                     .width(260.dp)
-                                    .heightIn(min = 122.dp),
+                                    .heightIn(min = 136.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.elevatedCardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -2380,6 +2380,17 @@ fun HomeScreen(
                                             }
                                         }
                                         Spacer(modifier = Modifier.height(3.dp))
+                                        (c.anime_title)?.let { title ->
+                                            Text(
+                                                text = title,
+                                                color = accentColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                        }
                                         Text(
                                             text = c.message,
                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
@@ -5935,7 +5946,7 @@ fun WatchScreen(
                                 enabled = !isPostingComment && commentInput.isNotBlank(),
                                 onClick = {
                                     if (commentInput.isNotBlank()) {
-                                        viewModel.postEpisodeComment(currentEpisodeSlug, commentInput)
+                                        viewModel.postEpisodeComment(currentEpisodeSlug, commentInput, currentAnimeSlug, animeTitle)
                                         commentInput = ""
                                     }
                                 },
