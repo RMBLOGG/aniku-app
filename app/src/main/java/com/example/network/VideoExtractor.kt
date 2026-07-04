@@ -448,7 +448,7 @@ object VideoExtractor {
                 externalJs = runCatching { fetchHtml(jsUrl, embedUrl) }.getOrNull()
                 if (!externalJs.isNullOrBlank()) {
                     fileUrl = extractSourceFile(externalJs)
-                    var jsWorking = externalJs
+                    var jsWorking = externalJs!!
                     var jsAttempts = 0
                     while (fileUrl == null && jsAttempts < 3) {
                         val packedMatch = Regex(
