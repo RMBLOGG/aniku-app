@@ -232,11 +232,12 @@ object VideoExtractor {
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") ||
-                // GDRIVE/GDRIVE HD (gdriveplayer.to) — dari network trace-nya kepakai
-                // JWPlayer juga (ssl.p.jwpcdn.com, provider.hlsjs.js), source video-nya
-                // di endpoint sendiri (hlsplaylist.php?s=...), jadi extractor JWPlayer
-                // generik yang udah ada di bawah ini bisa dipakai ulang.
-                host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer) ?: extractPackedJwPlayer(embedUrl, referer)
+                // GDRIVE/GDRIVE HD (gdriveplayer.to) — dikonfirmasi dari network trace
+                // langsung: config JWPlayer-nya disimpen ter-obfuscate (base64+XOR,
+                // lihat extractGdrivePlayer). Gak di-chain ke extractPackedJwPlayer
+                // biar diagnostik gagal-nya gak ketiban/ke-overwrite sama diagnostik
+                // extractor lain yang emang gak match buat host ini.
+                host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -438,6 +439,19 @@ object VideoExtractor {
         val b64 = bMatch?.groupValues?.get(1)
         if (k.isNullOrEmpty() || b64.isNullOrEmpty()) {
             Log.d("VideoExtractor", "gdriveplayer: pola var k=/atob(...) gak ketemu di $embedUrl")
+            lastDebugSnippet = buildString {
+                appendLine("embedUrl: $embedUrl")
+                appendLine("html length: ${html.length}")
+                appendLine("kMatch ketemu?: ${k != null} (k=${k ?: "-"})")
+                appendLine("bMatch (atob) ketemu?: ${b64 != null} (length=${b64?.length ?: 0})")
+                val varKIdx = html.indexOf("var k")
+                appendLine("index 'var k' di html: $varKIdx")
+                if (varKIdx != -1) {
+                    val s = (varKIdx - 20).coerceAtLeast(0)
+                    val e = (varKIdx + 200).coerceAtMost(html.length)
+                    appendLine("konteks: ...${html.substring(s, e)}...")
+                }
+            }
             return null
         }
 
@@ -456,6 +470,13 @@ object VideoExtractor {
 
         if (decoded.isNullOrBlank()) {
             Log.d("VideoExtractor", "gdriveplayer: gagal decode base64+XOR di $embedUrl")
+            lastDebugSnippet = buildString {
+                appendLine("embedUrl: $embedUrl")
+                appendLine("k: $k")
+                appendLine("base64 length: ${b64.length}")
+                appendLine("Proses decode base64+XOR GAGAL (exception atau hasil blank).")
+                appendLine("base64 500 char pertama: ${b64.take(500)}")
+            }
             return null
         }
 
