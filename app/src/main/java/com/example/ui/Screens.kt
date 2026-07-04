@@ -5550,6 +5550,13 @@ fun WatchScreen(
                                             mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                                             userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                            // Eksplisit matiin dukungan popup/new-window — banyak server
+                                            // gratisan (gdriveplayer.to dkk) suka pasang iklan popunder
+                                            // yang manggil window.open(). Default WebView udah gak bikin
+                                            // window baru selama ini gak di-set true, tapi di-set eksplisit
+                                            // di sini biar jelas & gak kebalik gak sengaja di masa depan.
+                                            javaScriptCanOpenWindowsAutomatically = false
+                                            setSupportMultipleWindows(false)
                                         }
                                         android.webkit.CookieManager.getInstance().setAcceptCookie(true)
                                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
@@ -5586,6 +5593,9 @@ fun WatchScreen(
                                                 "premium.to",
                                                 "pucuk.eu.org",
                                                 "cdn.jsdelivr.net", "unpkg.com",
+                                                // GDRIVE / GDRIVE HD — perlu di-whitelist karena player-nya
+                                                // dirender via iframe sub-frame ke domain ini sendiri.
+                                                "gdriveplayer.to",
                                                 // Shortlink Animasu (kadang ganti-ganti provider)
                                                 "short.icu", "short.ink"
                                             )
@@ -5629,8 +5639,20 @@ fun WatchScreen(
                                                 view: WebView?,
                                                 request: WebResourceRequest?
                                             ): Boolean {
-                                                val url = request?.url?.toString() ?: return false
-                                                val host = request.url?.host?.lowercase() ?: return false
+                                                val url = request?.url?.toString() ?: return true
+                                                val scheme = request.url?.scheme?.lowercase()
+                                                // Skema selain http/https (intent://, market://, whatsapp://,
+                                                // dll) sering dipakai iklan buat "kabur" dari WebView ke app
+                                                // lain / Play Store. Host-nya bisa gagal ke-parse jadi null,
+                                                // jadi block eksplisit di sini, bukan cuma andelin host==null.
+                                                if (scheme != "http" && scheme != "https") {
+                                                    android.util.Log.w("AnikuWebView", "Blocked non-http scheme: $url")
+                                                    return true
+                                                }
+                                                val host = request.url?.host?.lowercase() ?: run {
+                                                    android.util.Log.w("AnikuWebView", "Blocked unparseable host: $url")
+                                                    return true
+                                                }
                                                 val isAllowed = allowedDomains.any { host.endsWith(it) }
                                                 if (!isAllowed) {
                                                     android.util.Log.w("AnikuWebView", "Blocked redirect: $url")
@@ -5656,6 +5678,15 @@ fun WatchScreen(
                                             override fun onHideCustomView() {
                                                 super.onHideCustomView()
                                                 handleHideCustomView()
+                                            }
+                                            override fun onCreateWindow(
+                                                view: WebView?,
+                                                isDialog: Boolean,
+                                                isUserGesture: Boolean,
+                                                resultMsg: android.os.Message?
+                                            ): Boolean {
+                                                android.util.Log.w("AnikuWebView", "Blocked popup window (onCreateWindow)")
+                                                return false
                                             }
                                         }
                                     }
