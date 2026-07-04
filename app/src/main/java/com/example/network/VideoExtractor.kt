@@ -474,6 +474,14 @@ object VideoExtractor {
                 val end = (idx + pattern.length + 200).coerceAtMost(html.length)
                 return "[$label] @$idx: ...${html.substring(start, end).replace("\n", " ")}..."
             }
+            fun findFullIife(): String {
+                val idx = html.indexOf("var k=")
+                if (idx == -1) return "[var k= IIFE]: tidak ketemu"
+                // Cari start-nya balik ke "(function(){" terdekat sebelum "var k="
+                val iifeStart = html.lastIndexOf("(function(){", idx).let { if (it == -1) (idx - 30).coerceAtLeast(0) else it }
+                val end = (idx + 4000).coerceAtMost(html.length)
+                return "[var k= IIFE] @$idx: ${html.substring(iifeStart, end)}"
+            }
             lastDebugSnippet = buildString {
                 appendLine("embedUrl: $embedUrl")
                 appendLine("html length: ${html.length}")
@@ -481,25 +489,13 @@ object VideoExtractor {
                 appendLine("file.js src ditemuin di HTML?: ${jsSrc ?: "tidak ada"}")
                 appendLine("file.js berhasil di-fetch?: ${!externalJs.isNullOrBlank()} (length=${externalJs?.length ?: 0})")
                 appendLine()
-                appendLine(findContext("hlsplaylist", "hlsplaylist"))
+                appendLine(findFullIife())
                 appendLine()
-                appendLine(findContext("eardropcurls", "eardropcurls (domain fetch json)"))
+                appendLine(findContext("hlsplaylist", "hlsplaylist"))
                 appendLine()
                 appendLine(findContext("fetch(", "fetch("))
                 appendLine()
-                appendLine(findContext(".setup(", "jwplayer .setup("))
-                appendLine()
-                appendLine(findContext("jwplayer(", "jwplayer("))
-                appendLine()
                 appendLine(findContext("no_adult", "no_adult (param embed)"))
-                appendLine()
-                if (!externalJs.isNullOrBlank()) {
-                    appendLine("--- 800 char pertama file.js ---")
-                    appendLine(externalJs.take(800))
-                    appendLine()
-                }
-                appendLine("--- 600 char pertama HTML ---")
-                appendLine(html.take(600))
             }
             return null
         }
