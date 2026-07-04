@@ -1927,6 +1927,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _myClanDetail = MutableStateFlow<ClanDto?>(null)
     val myClanDetail: StateFlow<ClanDto?> = _myClanDetail.asStateFlow()
 
+    // Member clan sendiri (dipakai di MyClanCard) - dipisah dari selectedClanMembers biar gak numpuk pas liat clan orang
+    private val _myClanMembers = MutableStateFlow<List<ClanMemberDto>>(emptyList())
+    val myClanMembers: StateFlow<List<ClanMemberDto>> = _myClanMembers.asStateFlow()
+
+    // Member clan yang lagi diliat (clan orang lain / dialog preview) - terpisah dari myClanMembers
     private val _selectedClanMembers = MutableStateFlow<List<ClanMemberDto>>(emptyList())
     val selectedClanMembers: StateFlow<List<ClanMemberDto>> = _selectedClanMembers.asStateFlow()
 
@@ -1987,25 +1992,42 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Fetch mentah + mapping, dipakai bareng oleh loadClanMembers (clan orang) dan loadMyClanMembers (clan sendiri)
+    private suspend fun fetchClanMembers(clanId: String): List<ClanMemberDto> {
+        val raw = NetworkClient.supabaseDbApi.getClanMembers("eq.$clanId", getAuthHeader(), SUPABASE_ANON_KEY)
+        return raw.map { row ->
+            @Suppress("UNCHECKED_CAST")
+            val profileMap = row["profiles"] as? Map<String, Any?>
+            ClanMemberDto(
+                id = row["id"] as? String ?: "",
+                clan_id = row["clan_id"] as? String ?: "",
+                user_id = row["user_id"] as? String ?: "",
+                role = row["role"] as? String,
+                contributed_xp = (row["contributed_xp"] as? Double)?.toInt(),
+                username = profileMap?.get("username") as? String,
+                avatar_url = profileMap?.get("avatar_url") as? String
+            )
+        }.sortedByDescending { it.contributed_xp ?: 0 }
+    }
+
+    // Buat liat member clan orang lain / dialog preview clan dari leaderboard & daftar clan
     fun loadClanMembers(clanId: String) {
         viewModelScope.launch {
             try {
-                val raw = NetworkClient.supabaseDbApi.getClanMembers("eq.$clanId", getAuthHeader(), SUPABASE_ANON_KEY)
-                _selectedClanMembers.value = raw.map { row ->
-                    @Suppress("UNCHECKED_CAST")
-                    val profileMap = row["profiles"] as? Map<String, Any?>
-                    ClanMemberDto(
-                        id = row["id"] as? String ?: "",
-                        clan_id = row["clan_id"] as? String ?: "",
-                        user_id = row["user_id"] as? String ?: "",
-                        role = row["role"] as? String,
-                        contributed_xp = (row["contributed_xp"] as? Double)?.toInt(),
-                        username = profileMap?.get("username") as? String,
-                        avatar_url = profileMap?.get("avatar_url") as? String
-                    )
-                }.sortedByDescending { it.contributed_xp ?: 0 }
+                _selectedClanMembers.value = fetchClanMembers(clanId)
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal load clan members", e)
+            }
+        }
+    }
+
+    // Khusus buat member clan sendiri (MyClanCard) - state-nya kepisah dari selectedClanMembers
+    fun loadMyClanMembers(clanId: String) {
+        viewModelScope.launch {
+            try {
+                _myClanMembers.value = fetchClanMembers(clanId)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load my clan members", e)
             }
         }
     }
@@ -2127,7 +2149,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val response = NetworkClient.supabaseDbApi.approveJoinRequest(mapOf("p_request_id" to requestId), getAuthHeader(), SUPABASE_ANON_KEY)
                 if (response.isSuccessful) {
                     loadPendingJoinRequests(clanId)
-                    loadClanMembers(clanId)
+                    loadMyClanMembers(clanId)
                     loadClans()
                 } else {
                     _clanActionError.value = response.errorBody()?.string() ?: "Gagal approve"
@@ -2158,7 +2180,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 if (response.isSuccessful) {
                     _myClanMembership.value = null
                     _myClanDetail.value = null
-                    _selectedClanMembers.value = emptyList()
+                    _myClanMembers.value = emptyList()
                     loadClans()
                     refreshProfile()
                     onDone()
@@ -2177,7 +2199,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = NetworkClient.supabaseDbApi.kickMember(mapOf("p_clan_id" to clanId, "p_user_id" to userId), getAuthHeader(), SUPABASE_ANON_KEY)
-                if (response.isSuccessful) loadClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal kick member"
+                if (response.isSuccessful) loadMyClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal kick member"
             } catch (e: Exception) {
                 _clanActionError.value = e.message ?: "Gagal kick member"
             }
@@ -2189,6 +2211,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
             try {
                 val response = NetworkClient.supabaseDbApi.deleteClan(mapOf("p_clan_id" to clanId), getAuthHeader(), SUPABASE_ANON_KEY)
                 if (response.isSuccessful) {
+                    _myClanMembers.value = emptyList()
                     loadMyClanMembership()
                     loadClans()
                     onDone()

@@ -57,6 +57,7 @@ fun ClanScreen(
     val topClans by viewModel.topClans.collectAsState()
     val myClan by viewModel.myClanDetail.collectAsState()
     val myMembership by viewModel.myClanMembership.collectAsState()
+    val myClanMembers by viewModel.myClanMembers.collectAsState()
     val selectedClanMembers by viewModel.selectedClanMembers.collectAsState()
     val clanActionError by viewModel.clanActionError.collectAsState()
     val isClanLoading by viewModel.isClanLoading.collectAsState()
@@ -92,7 +93,7 @@ fun ClanScreen(
     }
 
     LaunchedEffect(myClan) {
-        myClan?.let { viewModel.loadClanMembers(it.id) }
+        myClan?.let { viewModel.loadMyClanMembers(it.id) }
     }
 
     Scaffold(
@@ -129,67 +130,86 @@ fun ClanScreen(
                 }
             }
 
-            if (myClan != null) {
-                item {
-                    MyClanCard(
-                        clan = myClan!!,
-                        members = selectedClanMembers,
-                        isLeader = isLeader,
-                        isUploadingIcon = isUploadingIcon,
-                        currentUserId = session.userId,
-                        onContribute = { showContributeDialog = true },
-                        onManage = { showManageDialog = true },
-                        onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
-                        onLeave = { viewModel.leaveClan() },
-                        onIconClick = {
-                            if (isLeader) iconPickerLauncher.launch("image/*")
-                        }
-                    )
-                }
-            } else {
-                item {
-                    ClanHeroInvite(totalClans = topClans.size, totalXp = topClans.sumOf { it.total_xp ?: 0 })
-                }
-
-                item {
-                    CreateClanSection(
-                        showCreateForm = showCreateForm,
-                        onShowForm = { showCreateForm = true },
-                        clanName = clanName,
-                        onNameChange = { clanName = it },
-                        clanTag = clanTag,
-                        onTagChange = { if (it.length <= 6) clanTag = it.uppercase() },
-                        isLoading = isClanLoading,
-                        onCreate = { viewModel.createClan(clanName, clanTag) }
-                    )
-                }
-            }
-
-            // Daftar Clan & Leaderboard, tetep muncul walaupun user udah punya clan sendiri
+            // 3 tab: Clan Saya, Daftar Clan, Leaderboard
             item {
                 ClanTabRow(selectedIndex = clanTabIndex, onSelect = { clanTabIndex = it })
             }
 
-            if (topClans.isEmpty()) {
-                item { EmptyLeaderboardState() }
-            } else {
-                val displayedClans = if (clanTabIndex == 0) {
-                    topClans.sortedBy { it.name.lowercase() }
-                } else {
-                    topClans.sortedByDescending { it.total_xp ?: 0 }
-                }
-
-                itemsIndexed(displayedClans, key = { _, c -> "${clanTabIndex}_${c.id}" }) { index, clan ->
-                    ClanLeaderboardRow(
-                        clan = clan,
-                        rank = index + 1,
-                        index = index,
-                        showRank = clanTabIndex == 1,
-                        onClick = {
-                            selectedClan = clan
-                            viewModel.loadClanMembers(clan.id)
+            when (clanTabIndex) {
+                0 -> {
+                    if (myClan != null) {
+                        item {
+                            MyClanCard(
+                                clan = myClan!!,
+                                members = myClanMembers,
+                                isLeader = isLeader,
+                                isUploadingIcon = isUploadingIcon,
+                                currentUserId = session.userId,
+                                onContribute = { showContributeDialog = true },
+                                onManage = { showManageDialog = true },
+                                onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
+                                onLeave = { viewModel.leaveClan() },
+                                onIconClick = {
+                                    if (isLeader) iconPickerLauncher.launch("image/*")
+                                }
+                            )
                         }
-                    )
+                    } else {
+                        item {
+                            ClanHeroInvite(totalClans = topClans.size, totalXp = topClans.sumOf { it.total_xp ?: 0 })
+                        }
+
+                        item {
+                            CreateClanSection(
+                                showCreateForm = showCreateForm,
+                                onShowForm = { showCreateForm = true },
+                                clanName = clanName,
+                                onNameChange = { clanName = it },
+                                clanTag = clanTag,
+                                onTagChange = { if (it.length <= 6) clanTag = it.uppercase() },
+                                isLoading = isClanLoading,
+                                onCreate = { viewModel.createClan(clanName, clanTag) }
+                            )
+                        }
+                    }
+                }
+                1 -> {
+                    if (topClans.isEmpty()) {
+                        item { EmptyLeaderboardState() }
+                    } else {
+                        val displayedClans = topClans.sortedBy { it.name.lowercase() }
+                        itemsIndexed(displayedClans, key = { _, c -> "daftar_${c.id}" }) { index, clan ->
+                            ClanLeaderboardRow(
+                                clan = clan,
+                                rank = index + 1,
+                                index = index,
+                                showRank = false,
+                                onClick = {
+                                    selectedClan = clan
+                                    viewModel.loadClanMembers(clan.id)
+                                }
+                            )
+                        }
+                    }
+                }
+                2 -> {
+                    if (topClans.isEmpty()) {
+                        item { EmptyLeaderboardState() }
+                    } else {
+                        val displayedClans = topClans.sortedByDescending { it.total_xp ?: 0 }
+                        itemsIndexed(displayedClans, key = { _, c -> "lb_${c.id}" }) { index, clan ->
+                            ClanLeaderboardRow(
+                                clan = clan,
+                                rank = index + 1,
+                                index = index,
+                                showRank = true,
+                                onClick = {
+                                    selectedClan = clan
+                                    viewModel.loadClanMembers(clan.id)
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -571,7 +591,11 @@ private fun CreateClanSection(
 
 @Composable
 private fun ClanTabRow(selectedIndex: Int, onSelect: (Int) -> Unit) {
-    val tabs = listOf("Daftar Clan" to Icons.Default.Groups, "Leaderboard" to Icons.Default.EmojiEvents)
+    val tabs = listOf(
+        "Clan Saya" to Icons.Default.Shield,
+        "Daftar Clan" to Icons.Default.Groups,
+        "Leaderboard" to Icons.Default.EmojiEvents
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -587,18 +611,19 @@ private fun ClanTabRow(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     .clip(RoundedCornerShape(50))
                     .background(if (selected) Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color(0xFF2FA8BF))) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)))
                     .clickable { onSelect(index) }
-                    .padding(vertical = 9.dp),
+                    .padding(vertical = 9.dp, horizontal = 2.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     icon, contentDescription = null,
                     tint = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(14.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    label, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
@@ -644,7 +669,13 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, showRank: B
                 Box(
                     modifier = Modifier.size(34.dp).clip(CircleShape).background(rankColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
-                ) { Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = rankColor, modifier = Modifier.size(16.dp)) }
+                ) {
+                    if (effectiveRank == 1) {
+                        ClanCrownIcon(modifier = Modifier.size(17.dp), tint = rankColor)
+                    } else {
+                        RankMedalIcon(rank = effectiveRank, tint = rankColor, modifier = Modifier.size(22.dp))
+                    }
+                }
             } else if (showRank) {
                 Text("#$rank", fontWeight = FontWeight.Bold, color = rankColor, modifier = Modifier.width(34.dp), fontSize = 13.sp)
             } else {
@@ -892,6 +923,30 @@ private fun EmptyLeaderboardState() {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
+    }
+}
+
+// Icon medali buat rank #2 dan #3 di leaderboard, digambar manual pakai Canvas (bukan emoji)
+@Composable
+private fun RankMedalIcon(rank: Int, tint: Color, modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val w = size.width
+            val h = size.height
+            val ribbonPath = androidx.compose.ui.graphics.Path().apply {
+                moveTo(w * 0.30f, 0f)
+                lineTo(w * 0.46f, h * 0.5f)
+                lineTo(w * 0.30f, h * 0.5f)
+                close()
+                moveTo(w * 0.70f, 0f)
+                lineTo(w * 0.54f, h * 0.5f)
+                lineTo(w * 0.70f, h * 0.5f)
+                close()
+            }
+            drawPath(ribbonPath, color = tint.copy(alpha = 0.55f))
+            drawCircle(color = tint, radius = w * 0.32f, center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.64f))
+        }
+        Text("$rank", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black.copy(alpha = 0.7f))
     }
 }
 
