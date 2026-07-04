@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -138,6 +139,7 @@ fun ClanScreen(
                         onContribute = { showContributeDialog = true },
                         onManage = { showManageDialog = true },
                         onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
+                        onLeave = { viewModel.leaveClan() },
                         onIconClick = {
                             if (isLeader) iconPickerLauncher.launch("image/*")
                         }
@@ -160,28 +162,29 @@ fun ClanScreen(
                         onCreate = { viewModel.createClan(clanName, clanTag) }
                     )
                 }
+            }
 
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                        Text("TOP CLANS", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFFD700), letterSpacing = 1.sp)
+            // Leaderboard clan lain, tetep muncul walaupun user udah punya clan sendiri
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Text("TOP CLANS", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFFFFD700), letterSpacing = 1.sp)
+                }
+            }
+
+            if (topClans.isEmpty()) {
+                item { EmptyLeaderboardState() }
+            }
+
+            itemsIndexed(topClans, key = { _, c -> c.id }) { index, clan ->
+                ClanLeaderboardRow(
+                    clan = clan,
+                    rank = index + 1,
+                    index = index,
+                    onClick = {
+                        selectedClan = clan
+                        viewModel.loadClanMembers(clan.id)
                     }
-                }
-
-                if (topClans.isEmpty()) {
-                    item { EmptyLeaderboardState() }
-                }
-
-                itemsIndexed(topClans, key = { _, c -> c.id }) { index, clan ->
-                    ClanLeaderboardRow(
-                        clan = clan,
-                        rank = index + 1,
-                        index = index,
-                        onClick = {
-                            selectedClan = clan
-                            viewModel.loadClanMembers(clan.id)
-                        }
-                    )
-                }
+                )
             }
         }
     }
@@ -265,15 +268,17 @@ fun ClanScreen(
             },
             buttons = {
                 TextButton(onClick = { selectedClan = null }) { Text("Tutup", color = Color.White.copy(alpha = 0.6f)) }
-                Spacer(modifier = Modifier.width(4.dp))
-                Button(
-                    onClick = {
-                        if (clan.is_private == true) viewModel.requestJoinClan(clan.id) else viewModel.joinClan(clan.id)
-                        selectedClan = null
-                    },
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
-                ) { Text(if (clan.is_private == true) "Minta Gabung" else "Gabung Clan Ini", fontWeight = FontWeight.Bold) }
+                if (myClan == null) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Button(
+                        onClick = {
+                            if (clan.is_private == true) viewModel.requestJoinClan(clan.id) else viewModel.joinClan(clan.id)
+                            selectedClan = null
+                        },
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
+                    ) { Text(if (clan.is_private == true) "Minta Gabung" else "Gabung Clan Ini", fontWeight = FontWeight.Bold) }
+                }
             }
         )
     }
@@ -360,8 +365,10 @@ private fun MyClanCard(
     onContribute: () -> Unit,
     onManage: () -> Unit,
     onKick: (String) -> Unit,
+    onLeave: () -> Unit,
     onIconClick: () -> Unit
 ) {
+    var showLeaveConfirm by remember { mutableStateOf(false) }
     val xpIntoLevel = (clan.total_xp ?: 0) % 1000
     val progress = xpIntoLevel / 1000f
     val animatedProgress by animateFloatAsState(progress, tween(700, easing = FastOutSlowInEasing), label = "xp_progress")
@@ -475,6 +482,29 @@ private fun MyClanCard(
                         IconButton(onClick = { onKick(member.user_id) }, modifier = Modifier.size(24.dp)) {
                             Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
                         }
+                    }
+                }
+            }
+
+            if (!isLeader) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(10.dp))
+                if (!showLeaveConfirm) {
+                    TextButton(onClick = { showLeaveConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Keluar Clan", color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Text("Yakin mau keluar dari clan ini?", fontSize = 12.sp, color = Color(0xFFE57373))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row {
+                        Button(onClick = onLeave, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                            Text("Ya, Keluar")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { showLeaveConfirm = false }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
                     }
                 }
             }

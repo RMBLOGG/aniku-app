@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -66,6 +68,9 @@ fun UserProfileScreen(
 
     val banStatusMessage by viewModel.banStatusMessage.collectAsState()
     var hasMounted by remember { mutableStateOf(false) }
+    var showClanMembers by remember { mutableStateOf(false) }
+    val clanMembersForDialog by viewModel.selectedClanMembers.collectAsState()
+    val clanForDialog by viewModel.viewedProfileClan.collectAsState()
 
     LaunchedEffect(userId) {
         viewModel.loadPublicUserProfile(userId)
@@ -352,6 +357,10 @@ fun UserProfileScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF16414D))))
                             .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .clickable {
+                                viewModel.loadClanMembers(clan.id)
+                                showClanMembers = true
+                            }
                             .padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -534,6 +543,65 @@ fun UserProfileScreen(
                                 )
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showClanMembers) {
+        val clan = clanForDialog
+        Dialog(onDismissRequest = { showClanMembers = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF2A1B3D), Color(0xFF16414D))))
+                    .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+            ) {
+                Column(modifier = Modifier.padding(22.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            clan?.let { "${it.name} [${it.tag}]" } ?: "Member Clan",
+                            fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("${clanMembersForDialog.size} member", fontSize = 12.sp, color = Color.White.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(14.dp))
+                    if (clanMembersForDialog.isEmpty()) {
+                        Text("Memuat member...", fontSize = 13.sp, color = Color.White.copy(alpha = 0.5f))
+                    } else {
+                        clanMembersForDialog.forEach { member ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!member.avatar_url.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = member.avatar_url, contentDescription = "Avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(30.dp).clip(CircleShape)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.size(30.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(member.username ?: "?", fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f))
+                                if (member.role == "leader") {
+                                    Icon(Icons.Default.Star, contentDescription = "Leader", tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(onClick = { showClanMembers = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text("Tutup", color = Color.White.copy(alpha = 0.6f))
                     }
                 }
             }

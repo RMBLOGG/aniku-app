@@ -2149,6 +2149,30 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun leaveClan(onDone: () -> Unit = {}) {
+        _clanActionError.value = null
+        _isClanLoading.value = true
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.leaveClan(getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) {
+                    _myClanMembership.value = null
+                    _myClanDetail.value = null
+                    _selectedClanMembers.value = emptyList()
+                    loadClans()
+                    refreshProfile()
+                    onDone()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal keluar clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal keluar clan"
+            } finally {
+                _isClanLoading.value = false
+            }
+        }
+    }
+
     fun kickMember(clanId: String, userId: String) {
         viewModelScope.launch {
             try {
