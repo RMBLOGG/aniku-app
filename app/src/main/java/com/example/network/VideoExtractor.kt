@@ -144,7 +144,21 @@ object VideoExtractor {
         resolveCache.clear()
     }
 
+    /**
+     * Beberapa sumber (mis. server GDRIVE/GDRIVE HD - gdriveplayer.to) ngasih URL
+     * "protocol-relative" (diawali "//host/path", tanpa "https:"). Di web/browser ini
+     * otomatis diwarisi scheme dari halaman yang lagi dibuka, jadi kelihatan "jalan".
+     * Tapi di sini (OkHttp & WebView Android) gak ada halaman buat diwarisi schemenya:
+     * OkHttp bakal gagal parse (exception ke-catch, jadi seolah "gagal resolve" diam-diam),
+     * dan kalau kebawa mentah-mentah ke WebView.loadUrl(), WebView nge-resolve-nya relatif
+     * jadi "file:///host/path" -> net::ERR_ACCESS_DENIED. Makanya di-normalize ke https: dulu
+     * di SETIAP titik masuk (resolve & fallback WebView) sebelum diproses lebih lanjut.
+     */
+    private fun normalizeUrl(url: String): String =
+        if (url.startsWith("//")) "https:$url" else url
+
     suspend fun resolve(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
+        val embedUrl = normalizeUrl(embedUrl)
         val key = cacheKey(embedUrl, referer)
         cacheGet(key)?.let {
             Log.d("VideoExtractor", "Cache hit: $embedUrl")
@@ -242,13 +256,15 @@ object VideoExtractor {
      * (host video/iframe asli) — baru itu yang dikasih ke WebView. Aman dipanggil untuk
      * URL apapun; kalau bukan shortlink / gak ada redirect / gagal, balikin url aslinya.
      */
-    suspend fun resolveForWebViewFallback(url: String, referer: String? = null): String =
-        withContext(Dispatchers.IO) {
+    suspend fun resolveForWebViewFallback(url: String, referer: String? = null): String {
+        val url = normalizeUrl(url)
+        return withContext(Dispatchers.IO) {
             runCatching { followRedirect(url, referer) }
                 .getOrNull()
                 ?.takeIf { it.isNotBlank() }
                 ?: url
         }
+    }
 
     private fun fetchHtml(url: String, referer: String? = null): String {
         val builder = Request.Builder()
