@@ -236,7 +236,7 @@ object VideoExtractor {
                 // JWPlayer juga (ssl.p.jwpcdn.com, provider.hlsjs.js), source video-nya
                 // di endpoint sendiri (hlsplaylist.php?s=...), jadi extractor JWPlayer
                 // generik yang udah ada di bawah ini bisa dipakai ulang.
-                host.contains("gdriveplayer") -> extractPackedJwPlayer(embedUrl, referer)
+                host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer) ?: extractPackedJwPlayer(embedUrl, referer)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -411,6 +411,79 @@ object VideoExtractor {
         val url = Regex("""id="downloadButton"[^>]*href="([^"]+)"""")
             .find(html)?.groupValues?.get(1)?.replace("&amp;", "&") ?: return null
         return ResolvedStream(url = url, isHls = false, headers = mapOf("User-Agent" to DESKTOP_UA))
+    }
+
+    // ---------------------------------------------------------------------
+    // gdriveplayer.to (server GDRIVE/GDRIVE HD) — halaman embed-nya nyimpen
+    // config JWPlayer dalam bentuk ter-obfuscate: base64 (atob) yang di-XOR
+    // pakai key sendiri, bukan packer eval(p,a,c,k,e,..) standar. Polanya
+    // (dikonfirmasi dari network trace langsung):
+    //
+    //   (function(){
+    //     var k="xxxx", b=atob("BASE64...");
+    //     var o=""; for(i=0;i<b.length;i++) o+=String.fromCharCode(b.charCodeAt(i)^k.charCodeAt(i%k.length));
+    //     (0,eval)(o);
+    //   })();
+    //
+    // `o` hasil decode-nya berisi JS biasa (kemungkinan besar `jwplayer(...).setup({sources:[{file:"..."}]})`),
+    // jadi kita gak perlu eval beneran — cukup decode manual (base64+XOR) lalu
+    // jalanin regex extractSourceFile() yang sama kayak buat packer JS lain.
+    // ---------------------------------------------------------------------
+    private fun extractGdrivePlayer(embedUrl: String, referer: String?): ResolvedStream? {
+        val html = fetchHtml(embedUrl, referer ?: embedUrl)
+
+        val kMatch = Regex("var k\\s*=\\s*\"([^\"]+)\"").find(html)
+        val bMatch = Regex("""atob\(\s*"([^"]+)"\s*\)""").find(html, kMatch?.range?.last ?: 0)
+        val k = kMatch?.groupValues?.get(1)
+        val b64 = bMatch?.groupValues?.get(1)
+        if (k.isNullOrEmpty() || b64.isNullOrEmpty()) {
+            Log.d("VideoExtractor", "gdriveplayer: pola var k=/atob(...) gak ketemu di $embedUrl")
+            return null
+        }
+
+        val decoded = runCatching {
+            val bBytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+            // atob() JS menghasilkan "binary string" (1 char = 1 byte, Latin1/ISO-8859-1),
+            // jadi kita mapping byte->char dengan cara yang sama biar charCodeAt cocok.
+            val bStr = String(bBytes, Charsets.ISO_8859_1)
+            val sb = StringBuilder(bStr.length)
+            for (i in bStr.indices) {
+                val xorCode = (bStr[i].code xor k[i % k.length].code)
+                sb.append(xorCode.toChar())
+            }
+            sb.toString()
+        }.getOrNull()
+
+        if (decoded.isNullOrBlank()) {
+            Log.d("VideoExtractor", "gdriveplayer: gagal decode base64+XOR di $embedUrl")
+            return null
+        }
+
+        val fileUrl = extractSourceFile(decoded) ?: run {
+            Log.d("VideoExtractor", "gdriveplayer: decode sukses tapi gak nemu sources/file di hasil decode-nya")
+            lastDebugSnippet = buildString {
+                appendLine("embedUrl: $embedUrl")
+                appendLine("k: $k")
+                appendLine("base64 length: ${b64.length}")
+                appendLine("decoded length: ${decoded.length}")
+                appendLine("--- hasil decode (o) ---")
+                appendLine(decoded.take(2000))
+            }
+            null
+        } ?: return null
+
+        val url = runCatching { URI(embedUrl).resolve(normalizeUrl(fileUrl)).toString() }
+            .getOrDefault(normalizeUrl(fileUrl))
+        Log.d("VideoExtractor", "gdriveplayer: berhasil decode -> $url")
+        return ResolvedStream(
+            url = url,
+            isHls = url.contains(".m3u8"),
+            headers = mapOf(
+                "Referer" to embedUrl,
+                "Origin" to originOf(embedUrl),
+                "User-Agent" to DESKTOP_UA
+            )
+        )
     }
 
     // ---------------------------------------------------------------------
