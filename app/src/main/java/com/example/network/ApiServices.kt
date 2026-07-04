@@ -245,13 +245,6 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<BlacklistedAnimeDto>
 
-    // Blacklist genre — genre yang disembunyikan dari daftar pilihan genre di Eksplor
-    @GET("rest/v1/blacklisted_genres")
-    suspend fun getBlacklistedGenres(
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String
-    ): List<BlacklistedGenreDto>
-
     @GET("rest/v1/profiles")
     suspend fun getProfiles(
         @Header("Authorization") authHeader: String,
@@ -474,21 +467,6 @@ interface SupabaseDbApi {
 
     @DELETE("rest/v1/blacklisted_anime")
     suspend fun deleteBlacklistedAnime(
-        @Query("id") idQuery: String,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String
-    ): retrofit2.Response<Unit>
-
-    @POST("rest/v1/blacklisted_genres")
-    suspend fun insertBlacklistedGenre(
-        @Body data: Map<String, @JvmSuppressWildcards Any?>,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "return=representation"
-    ): List<BlacklistedGenreDto>
-
-    @DELETE("rest/v1/blacklisted_genres")
-    suspend fun deleteBlacklistedGenre(
         @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
