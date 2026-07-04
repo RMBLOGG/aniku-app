@@ -480,8 +480,13 @@ object VideoExtractor {
             return null
         }
 
-        val fileUrl = extractSourceFile(decoded) ?: run {
-            Log.d("VideoExtractor", "gdriveplayer: decode sukses tapi gak nemu sources/file di hasil decode-nya")
+        // Format aslinya BUKAN "sources: [{file: ...}]" ala JWPlayer biasa, tapi
+        // variabel JS sendiri: HLS="hlsplaylist.php?s=...&idhls=....m3u8"
+        // (dikonfirmasi dari hasil decode asli). Cek ini duluan, baru fallback
+        // ke extractSourceFile generik buat jaga-jaga kalau formatnya berubah.
+        val hlsVar = Regex("HLS\\s*=\\s*\"([^\"]+)\"").find(decoded)?.groupValues?.get(1)
+        val fileUrl = hlsVar ?: extractSourceFile(decoded) ?: run {
+            Log.d("VideoExtractor", "gdriveplayer: decode sukses tapi gak nemu HLS=/sources/file di hasil decode-nya")
             lastDebugSnippet = buildString {
                 appendLine("embedUrl: $embedUrl")
                 appendLine("k: $k")
