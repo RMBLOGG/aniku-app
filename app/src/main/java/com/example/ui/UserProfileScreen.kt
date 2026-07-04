@@ -39,6 +39,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.example.R
 import com.example.network.AnikuViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -381,13 +387,32 @@ fun UserProfileScreen(
                                 showClanMembers = true
                             }
                     ) {
-                        Box(
+                        val sparkleComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.sparkle_shine))
+                        val sparkleProgress by animateLottieCompositionAsState(
+                            sparkleComposition, iterations = LottieConstants.IterateForever
+                        )
+                        LottieAnimation(
+                            composition = sparkleComposition,
+                            progress = { sparkleProgress },
                             modifier = Modifier
                                 .size(90.dp)
                                 .align(Alignment.TopEnd)
-                                .offset(x = 25.dp, y = (-25).dp)
-                                .background(rankColor.copy(alpha = 0.12f), CircleShape)
+                                .offset(x = 20.dp, y = (-20).dp)
                         )
+
+                        if (memberRank == 1) {
+                            val confettiComposition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.confetti_burst))
+                            val confettiProgress by animateLottieCompositionAsState(
+                                confettiComposition, iterations = 1
+                            )
+                            LottieAnimation(
+                                composition = confettiComposition,
+                                progress = { confettiProgress },
+                                modifier = Modifier
+                                    .matchParentSize()
+                            )
+                        }
+
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
