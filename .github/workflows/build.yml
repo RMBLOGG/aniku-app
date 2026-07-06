@@ -31,9 +31,19 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: Aniku-debug
           path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+      - name: Build Perf APK (release-optimized, for scroll/performance testing)
+        run: gradle assemblePerf --no-daemon
+
+      - name: Upload Perf APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aniku-perf
+          path: app/build/outputs/apk/perf/*.apk
           retention-days: 7

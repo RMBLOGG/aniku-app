@@ -155,6 +155,12 @@ fun AnimeCard(
         label = "card_scale"
     )
     val context = LocalContext.current
+    // Dulu ImageRequest dibikin ulang tiap recomposition (tiap card recompose gara-gara
+    // viewerCounts/bookmark berubah) → alokasi objek sia-sia tiap kali. Sekarang di-remember,
+    // cuma dibikin ulang kalau URL poster-nya beneran ganti.
+    val posterRequest = remember(anime.poster) {
+        ImageRequest.Builder(context).data(anime.poster).crossfade(300).build()
+    }
 
     // corner radius berdasarkan style
     val cornerRadius = when (cardStyle) {
@@ -181,7 +187,7 @@ fun AnimeCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                    model = posterRequest,
                     contentDescription = anime.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -236,7 +242,7 @@ fun AnimeCard(
                 .clickable(interactionSource = interactionSource, indication = null) { onClick() }
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                model = posterRequest,
                 contentDescription = anime.title, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -299,7 +305,7 @@ fun AnimeCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(context).data(anime.poster).crossfade(300).build(),
+                model = posterRequest,
                 contentDescription = anime.title, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )

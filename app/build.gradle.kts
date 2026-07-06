@@ -48,6 +48,17 @@ android {
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
     }
+    // Build type khusus buat testing performa: optimized kayak release (isDebuggable = false,
+    // R8 minify nyala) tapi sign pakai debug.keystore biar CI gak butuh secrets keystore
+    // production. applicationIdSuffix beda biar bisa install bareng sama versi debug tanpa bentrok.
+    create("perf") {
+      initWith(getByName("release"))
+      isDebuggable = false
+      isMinifyEnabled = true
+      signingConfig = signingConfigs.getByName("debugConfig")
+      applicationIdSuffix = ".perf"
+      versionNameSuffix = "-perf"
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
