@@ -767,7 +767,9 @@ data class SamehadakuServerLinkData(
 data class AnimekompiPagination(
     val has_next: Boolean? = null,
     val prev_page: Boolean? = null,
-    val current_page: Int? = null
+    val current_page: Int? = null,
+    val next_page: Int? = null,
+    val max_page: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

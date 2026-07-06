@@ -54,7 +54,8 @@ interface AnimeApi {
     @GET("animasu/search/{keyword}")
     suspend fun search(
         @Path("keyword") keyword: String,
-        @Query("apikey") apiKey: String = "planaai"
+        @Query("apikey") apiKey: String = "planaai",
+        @Query("page") page: Int? = null
     ): AnimesListResponse
 
     @GET("animasu/animelist")

@@ -2832,6 +2832,8 @@ fun SearchScreen(
     val results by viewModel.searchResults.collectAsState()
     val popularList by viewModel.searchPopular.collectAsState()
     val isLoading by viewModel.isSearchLoading.collectAsState()
+    val isLoadingMore by viewModel.isSearchLoadingMore.collectAsState()
+    val hasNext by viewModel.searchHasNext.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
@@ -2942,8 +2944,28 @@ fun SearchScreen(
             }
         } else {
             // Live Search Query results
+            val searchGridState = rememberLazyGridState()
+            val searchListState = rememberLazyListState()
+
+            val shouldLoadMoreSearch = remember {
+                derivedStateOf {
+                    val gridTotal = searchGridState.layoutInfo.totalItemsCount
+                    val gridLastVisible = searchGridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    val listTotal = searchListState.layoutInfo.totalItemsCount
+                    val listLastVisible = searchListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    (gridTotal > 0 && gridLastVisible >= gridTotal - 2) || (listTotal > 0 && listLastVisible >= listTotal - 2)
+                }
+            }
+
+            LaunchedEffect(shouldLoadMoreSearch.value, query) {
+                if (shouldLoadMoreSearch.value && hasNext && !isLoading && !isLoadingMore) {
+                    viewModel.loadNextSearchPage()
+                }
+            }
+
             if (gridLayout == "List") {
                 LazyColumn(
+                    state = searchListState,
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
@@ -2959,10 +2981,18 @@ fun SearchScreen(
                             onLoginRequired = onLoginRequired
                         )
                     }
+                    if (isLoadingMore) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                    }
                 }
             } else {
                 val columns = if (gridLayout == "3") 3 else 2
                 LazyVerticalGrid(
+                    state = searchGridState,
                     columns = GridCells.Fixed(columns),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -2981,6 +3011,13 @@ fun SearchScreen(
                             onLoginRequired = onLoginRequired,
                             cardStyle = cardStyle
                         )
+                    }
+                    if (isLoadingMore) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+                            }
+                        }
                     }
                 }
             }

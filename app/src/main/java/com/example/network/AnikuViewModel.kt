@@ -184,6 +184,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _isSearchLoading = MutableStateFlow(false)
     val isSearchLoading: StateFlow<Boolean> = _isSearchLoading.asStateFlow()
 
+    private val _isSearchLoadingMore = MutableStateFlow(false)
+    val isSearchLoadingMore: StateFlow<Boolean> = _isSearchLoadingMore.asStateFlow()
+
+    private val _searchPage = MutableStateFlow(1)
+    private val _searchHasNext = MutableStateFlow(false)
+    val searchHasNext: StateFlow<Boolean> = _searchHasNext.asStateFlow()
+
     // Explore state
     private val _exploreTab = MutableStateFlow("Ongoing") // Ongoing | Completed | Movie | Latest
     val exploreTab: StateFlow<String> = _exploreTab.asStateFlow()
@@ -766,6 +773,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
+        _searchPage.value = 1
+        _searchHasNext.value = false
         if (query.isBlank()) {
             _searchResults.value = emptyList()
             return
@@ -776,23 +785,59 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
         viewModelScope.launch {
             try {
-                if (dataSource.value == "Dayynime-v2") {
-                    val res = retryIO { samehadakuApi.search(query) }
-                    _searchResults.value = (res.data?.animeList ?: emptyList())
-                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
-                } else if (dataSource.value == "Dayynime-v3") {
-                    val res = retryIO { animekompiApi.search(keyword = query) }
-                    _searchResults.value = (res.data ?: emptyList())
-                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
-                } else {
-                    val res = retryIO { animeApi.search(query) }
-                    _searchResults.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
-                }
+                val (items, hasNext) = fetchSearchPage(query, page = 1)
+                _searchResults.value = items
+                _searchHasNext.value = hasNext
                 _isSearchLoading.value = false
             } catch (e: Exception) {
                 _searchResults.value = emptyList()
+                _searchHasNext.value = false
                 _isSearchLoading.value = false
                 Log.e("AnikuVM", "Failed searching keywords: $query", e)
+            }
+        }
+    }
+
+    fun loadNextSearchPage() {
+        val query = _searchQuery.value
+        if (query.isBlank() || _isSearchLoading.value || _isSearchLoadingMore.value || !_searchHasNext.value) return
+        val nextPage = _searchPage.value + 1
+        _isSearchLoadingMore.value = true
+        viewModelScope.launch {
+            try {
+                val (items, hasNext) = fetchSearchPage(query, page = nextPage)
+                _searchPage.value = nextPage
+                _searchResults.value = _searchResults.value + items
+                _searchHasNext.value = hasNext
+                _isSearchLoadingMore.value = false
+            } catch (e: Exception) {
+                _searchHasNext.value = false
+                _isSearchLoadingMore.value = false
+                Log.e("AnikuVM", "Failed loading next search page for: $query", e)
+            }
+        }
+    }
+
+    private suspend fun fetchSearchPage(query: String, page: Int): Pair<List<AnimeRaw>, Boolean> {
+        val blacklist = _blacklistedSlugs.value
+        return retryIO {
+            if (dataSource.value == "Dayynime-v2") {
+                val res = samehadakuApi.search(query, page = page)
+                val items = (res.data?.animeList ?: emptyList())
+                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                val hasNext = res.pagination?.hasNextPage ?: false
+                Pair(items, hasNext)
+            } else if (dataSource.value == "Dayynime-v3") {
+                val res = animekompiApi.search(keyword = query, page = page)
+                val items = (res.data ?: emptyList())
+                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                val hasNext = res.pagination?.has_next ?: false
+                Pair(items, hasNext)
+            } else {
+                val res = animeApi.search(query, page = page)
+                val items = (res.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
+                val hasNext = res.pagination?.hasNext ?: false
+                Pair(items, hasNext)
             }
         }
     }
