@@ -890,10 +890,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun loadExplorePage() {
         _isExploreLoading.value = true
+        val page = _explorePage.value
         viewModelScope.launch {
             try {
                 val blacklist = _blacklistedSlugs.value
-                val page = _explorePage.value
 
                 // If a genre is selected, retrieve genre anime list
                 val response = retryIO {
