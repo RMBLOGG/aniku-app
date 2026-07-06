@@ -49,13 +49,18 @@ android {
     debug {
       signingConfig = signingConfigs.getByName("debugConfig")
     }
-    // Build type khusus buat testing performa: optimized kayak release (isDebuggable = false,
-    // R8 minify nyala) tapi sign pakai debug.keystore biar CI gak butuh secrets keystore
-    // production. applicationIdSuffix beda biar bisa install bareng sama versi debug tanpa bentrok.
+    // Build type "perf": optimized kayak release (isDebuggable = false, R8 minify nyala).
+    // Sign pakai debug.keystore (bukan production) biar tetep "update" lanjutan dari APK
+    // lama yang beredar ke user (semua APK yang udah disebar sejauh ini pakai debug.keystore).
+    // CATATAN RISIKO: debug.keystore ada di source code & passwordnya default "android" —
+    // siapapun yang pegang source ini bisa resign APK "update" palsu ke user asli. Kalau
+    // suatu saat mau migrasi ke keystore production sendiri, user existing bakal perlu
+    // uninstall+install ulang (data lokal ilang, data akun di server tetap aman).
     create("perf") {
       initWith(getByName("release"))
       isDebuggable = false
       isMinifyEnabled = true
+      isShrinkResources = true
       signingConfig = signingConfigs.getByName("debugConfig")
       versionNameSuffix = "-perf"
     }
