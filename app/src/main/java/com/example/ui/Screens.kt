@@ -1469,6 +1469,7 @@ fun HomeScreen(
                             .clickable(enabled = !isActive) {
                                 viewModel.changeDataSource(key)
                                 viewModel.loadHomeData()
+                                viewModel.loadSearchPopular()
                             }
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -9521,6 +9522,7 @@ fun SumberDataScreen(
                         .clickable {
                             viewModel.changeDataSource(sourceKey)
                             viewModel.loadHomeData()
+                            viewModel.loadSearchPopular()
                         }
                 ) {
                     Row(
@@ -9545,6 +9547,7 @@ fun SumberDataScreen(
                             onCheckedChange = {
                                 viewModel.changeDataSource(sourceKey)
                                 viewModel.loadHomeData()
+                                viewModel.loadSearchPopular()
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,

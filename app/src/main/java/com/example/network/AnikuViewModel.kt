@@ -750,7 +750,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    private fun loadSearchPopular() {
+    fun loadSearchPopular() {
         viewModelScope.launch {
             try {
                 if (dataSource.value == "Dayynime-v2") {
@@ -949,7 +949,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _exploreHasNext.value = response.second
                 _isExploreLoading.value = false
             } catch (e: Exception) {
-                _exploreAnimes.value = emptyList()
+                if (page <= 1) {
+                    _exploreAnimes.value = emptyList()
+                }
                 _exploreHasNext.value = false
                 _isExploreLoading.value = false
                 Log.e("AnikuVM", "Failed load explore page", e)
