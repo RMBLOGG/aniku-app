@@ -56,7 +56,6 @@ android {
       isDebuggable = false
       isMinifyEnabled = true
       signingConfig = signingConfigs.getByName("debugConfig")
-      applicationIdSuffix = ".perf"
       versionNameSuffix = "-perf"
     }
   }
