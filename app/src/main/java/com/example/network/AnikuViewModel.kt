@@ -24,6 +24,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val settingsStore = SettingsStore(appContext)
     val bookmarkManager = BookmarkManager(appContext)
     val watchHistoryManager = WatchHistoryManager(appContext)
+    val downloadsManager = DownloadsManager(appContext)
     val remoteConfigManager = RemoteConfigManager()
 
     init {
@@ -45,6 +46,70 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun refreshWatchHistory() {
         _watchHistory.value = watchHistoryManager.getHistory()
+    }
+
+    // ── Downloads (offline, per-user) ──────────────────────────────────
+    private val _downloads = MutableStateFlow<List<DownloadRecord>>(emptyList())
+    val downloads: StateFlow<List<DownloadRecord>> = _downloads.asStateFlow()
+
+    /** Refresh list download milik user yang lagi login. Kalau belum login, list dikosongin. */
+    fun refreshDownloads() {
+        val userId = session.value.userId
+        if (userId.isNullOrBlank()) {
+            _downloads.value = emptyList()
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            downloadsManager.refreshPendingStatuses()
+            val list = downloadsManager.getForUser(userId)
+            _downloads.value = list
+        }
+    }
+
+    /**
+     * Mulai download episode yang lagi diputer via ExoPlayer (direct stream hasil resolve).
+     * Cuma jalan kalau user udah login — dipanggil dari WatchScreen yang udah nge-gate
+     * lewat isLoggedIn/onLoginRequired sebelum manggil ini.
+     */
+    fun startEpisodeDownload(
+        url: String,
+        headers: Map<String, String>,
+        animeSlug: String,
+        animeTitle: String,
+        animePoster: String,
+        episodeSlug: String,
+        episodeTitle: String
+    ): Boolean {
+        val userId = session.value.userId ?: return false
+        val fileName = VideoDownloadManager.buildFileName(animeTitle, episodeTitle, url)
+        val downloadId = VideoDownloadManager.enqueueDownload(
+            context = appContext,
+            url = url,
+            headers = headers,
+            fileName = fileName
+        ) ?: return false
+        downloadsManager.addRecord(
+            DownloadRecord(
+                downloadId = downloadId,
+                userId = userId,
+                animeSlug = animeSlug,
+                animeTitle = animeTitle,
+                animePoster = animePoster,
+                episodeSlug = episodeSlug,
+                episodeTitle = episodeTitle,
+                fileName = fileName,
+                status = DownloadStatus.PENDING.name
+            )
+        )
+        refreshDownloads()
+        return true
+    }
+
+    fun deleteDownload(record: DownloadRecord) {
+        viewModelScope.launch(Dispatchers.IO) {
+            downloadsManager.removeRecord(record)
+            withContext(Dispatchers.Main) { refreshDownloads() }
+        }
     }
 
     fun addToWatchHistory(

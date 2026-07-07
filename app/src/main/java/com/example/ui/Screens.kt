@@ -4669,12 +4669,14 @@ fun WatchScreen(
     animeTitle: String,
     viewModel: AnikuViewModel,
     onBack: () -> Unit,
-    autoJoinRoomCode: String? = null
+    autoJoinRoomCode: String? = null,
+    onLoginRequired: () -> Unit = {}
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
     val session by viewModel.session.collectAsState()
+    val isLoggedIn = session.token != null
     val streams by viewModel.streams.collectAsState()
     val activeStreamUrl by viewModel.activeStreamUrl.collectAsState()
     val isDirectStream by viewModel.isDirectStream.collectAsState()
@@ -4973,6 +4975,40 @@ fun WatchScreen(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(Icons.Default.Groups, contentDescription = "Nobar")
+                    }
+                }
+
+                // Tombol download cuma auto-muncul kalau stream lagi ExoPlayer (direct link
+                // hasil resolve VideoExtractor), bukan WebView fallback, dan bukan HLS (.m3u8) —
+                // lihat VideoDownloadManager buat penjelasan lengkapnya.
+                val canDownload = isDirectStream && com.example.network.VideoDownloadManager.isDownloadableUrl(activeStreamUrl)
+                if (canDownload) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    FilledTonalIconButton(
+                        onClick = {
+                            if (!isLoggedIn) {
+                                onLoginRequired()
+                                return@FilledTonalIconButton
+                            }
+                            val started = viewModel.startEpisodeDownload(
+                                url = activeStreamUrl!!,
+                                headers = resolvedHeaders,
+                                animeSlug = currentAnimeSlug,
+                                animeTitle = animeTitle,
+                                animePoster = detail?.poster ?: "",
+                                episodeSlug = currentEpisodeSlug,
+                                episodeTitle = episodeTitle ?: currentEpisodeSlug
+                            )
+                            coroutineScope.launch {
+                                nobarSnackbarHostState.showSnackbar(
+                                    if (started) "Download dimulai, cek notifikasi."
+                                    else "Gagal memulai download."
+                                )
+                            }
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Download episode")
                     }
                 }
             }

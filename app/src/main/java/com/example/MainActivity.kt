@@ -369,6 +369,7 @@ class MainActivity : FragmentActivity() {
                     Triple("feed", "Feed", Icons.Default.GridView),
                     Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
+                    Triple("downloads", "Unduhan", Icons.Default.Download),
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                     Triple("user_list", "Pengguna", Icons.Default.People),
                     Triple("clans", "Clan", Icons.Default.Diamond),
@@ -412,6 +413,7 @@ class MainActivity : FragmentActivity() {
                             "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
                             "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
                             "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
+                            "downloads" to Triple(0xFF1a2430, 0xFF42a5f5, "Episode yang udah didownload"),
                             "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
                             "user_list" to Triple(0xFF241a2e, 0xFFba68c8, "Cari & lihat profil pengguna"),
                             "clans" to Triple(0xFF0D3B4F, 0xFF4FD8E8, "Buat clan & kumpulin Diamond"),
@@ -667,7 +669,8 @@ class MainActivity : FragmentActivity() {
                                 animeTitle = title,
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
-                                autoJoinRoomCode = joinRoomCode
+                                autoJoinRoomCode = joinRoomCode,
+                                onLoginRequired = { navController.navigate("auth") }
                             )
                         }
                         composable("nobar_list") {
@@ -825,6 +828,32 @@ class MainActivity : FragmentActivity() {
                                 onNavigateToDetail = { slug -> navController.navigate("detail/$slug") },
                                 onBack = { navController.popBackStack() }
                             )
+                        }
+                        composable("downloads") {
+                            com.example.ui.DownloadsScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onPlayOffline = { record ->
+                                    navController.navigate("offline_player/${record.downloadId}")
+                                },
+                                onLoginRequired = { navController.navigate("auth") }
+                            )
+                        }
+                        composable(
+                            route = "offline_player/{downloadId}",
+                            arguments = listOf(navArgument("downloadId") { type = NavType.LongType })
+                        ) { backStackEntry ->
+                            val downloadId = backStackEntry.arguments?.getLong("downloadId") ?: -1L
+                            val downloads by viewModel.downloads.collectAsState()
+                            val record = downloads.firstOrNull { it.downloadId == downloadId }
+                            if (record != null) {
+                                com.example.ui.OfflinePlayerScreen(
+                                    record = record,
+                                    onBack = { navController.popBackStack() }
+                                )
+                            } else {
+                                navController.popBackStack()
+                            }
                         }
                     }
                 }
