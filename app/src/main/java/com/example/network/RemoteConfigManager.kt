@@ -21,6 +21,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * - chat_image_upload_enabled
  * - feed_enabled
  * - comment_enabled
+ * - download_enabled
+ * - maintenance_mode
+ * - maintenance_message
  */
 class RemoteConfigManager {
 
@@ -39,7 +42,10 @@ class RemoteConfigManager {
                     KEY_NOBAR to true,
                     KEY_CHAT_IMAGE_UPLOAD to true,
                     KEY_FEED to true,
-                    KEY_COMMENT to true
+                    KEY_COMMENT to true,
+                    KEY_DOWNLOAD to true,
+                    KEY_MAINTENANCE_MODE to false,
+                    KEY_MAINTENANCE_MESSAGE to "Aniku lagi maintenance sebentar, balik lagi nanti ya!"
                 )
             )
         }
@@ -59,6 +65,15 @@ class RemoteConfigManager {
 
     private val _commentsEnabled = MutableStateFlow(true)
     val commentsEnabled: StateFlow<Boolean> = _commentsEnabled.asStateFlow()
+
+    private val _downloadEnabled = MutableStateFlow(true)
+    val downloadEnabled: StateFlow<Boolean> = _downloadEnabled.asStateFlow()
+
+    private val _maintenanceMode = MutableStateFlow(false)
+    val maintenanceMode: StateFlow<Boolean> = _maintenanceMode.asStateFlow()
+
+    private val _maintenanceMessage = MutableStateFlow("")
+    val maintenanceMessage: StateFlow<String> = _maintenanceMessage.asStateFlow()
 
     /** Fetch nilai terbaru dari server lalu update semua flag. Panggil pas app start. */
     fun fetchAndApply() {
@@ -95,6 +110,9 @@ class RemoteConfigManager {
         _chatImageUploadEnabled.value = remoteConfig.getBoolean(KEY_CHAT_IMAGE_UPLOAD)
         _feedEnabled.value = remoteConfig.getBoolean(KEY_FEED)
         _commentsEnabled.value = remoteConfig.getBoolean(KEY_COMMENT)
+        _downloadEnabled.value = remoteConfig.getBoolean(KEY_DOWNLOAD)
+        _maintenanceMode.value = remoteConfig.getBoolean(KEY_MAINTENANCE_MODE)
+        _maintenanceMessage.value = remoteConfig.getString(KEY_MAINTENANCE_MESSAGE)
     }
 
     companion object {
@@ -103,5 +121,8 @@ class RemoteConfigManager {
         private const val KEY_CHAT_IMAGE_UPLOAD = "chat_image_upload_enabled"
         private const val KEY_FEED = "feed_enabled"
         private const val KEY_COMMENT = "comment_enabled"
+        private const val KEY_DOWNLOAD = "download_enabled"
+        private const val KEY_MAINTENANCE_MODE = "maintenance_mode"
+        private const val KEY_MAINTENANCE_MESSAGE = "maintenance_message"
     }
 }

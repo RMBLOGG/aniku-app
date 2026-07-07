@@ -194,6 +194,8 @@ class MainActivity : FragmentActivity() {
                 textScale = textSizeScale,
                 themePreset = themePreset
             ) {
+                val maintenanceMode by viewModel.remoteConfigManager.maintenanceMode.collectAsState()
+                val maintenanceMessage by viewModel.remoteConfigManager.maintenanceMessage.collectAsState()
                 val appLockEnabled by viewModel.appLockEnabled.collectAsState()
                 val appLockType by viewModel.appLockType.collectAsState()
                 val appPin by viewModel.appPin.collectAsState()
@@ -210,7 +212,11 @@ class MainActivity : FragmentActivity() {
                     onDispose { lifecycle.removeObserver(observer) }
                 }
 
-                if (appLockEnabled && !isUnlocked) {
+                if (maintenanceMode) {
+                    // Kill-switch paling atas — begitu nyala di Firebase Console, semua user
+                    // langsung ke-block di sini real-time, gak peduli lagi login/lock/dimana.
+                    com.example.ui.MaintenanceScreen(message = maintenanceMessage)
+                } else if (appLockEnabled && !isUnlocked) {
                     LockScreen(
                         lockType = appLockType,
                         savedPin = appPin,

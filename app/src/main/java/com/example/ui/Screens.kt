@@ -4982,7 +4982,9 @@ fun WatchScreen(
                 // Tombol download cuma auto-muncul kalau stream lagi ExoPlayer (direct link
                 // hasil resolve VideoExtractor), bukan WebView fallback, dan bukan HLS (.m3u8) —
                 // lihat VideoDownloadManager buat penjelasan lengkapnya.
-                val canDownload = isDirectStream && com.example.network.VideoDownloadManager.isDownloadableUrl(activeStreamUrl)
+                val downloadFeatureEnabled by viewModel.remoteConfigManager.downloadEnabled.collectAsState()
+                val canDownload = downloadFeatureEnabled && isDirectStream &&
+                    com.example.network.VideoDownloadManager.isDownloadableUrl(activeStreamUrl)
                 if (canDownload) {
                     Spacer(modifier = Modifier.width(8.dp))
                     FilledTonalIconButton(
