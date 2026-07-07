@@ -765,19 +765,44 @@ private fun TopLeaderboardCard(
 ) {
     if (topUsers.isEmpty()) return
 
+    // Dibagi per halaman isi 5 (podium: #4 #2 #1 #3 #5). Ini beneran dipecah dari
+    // `topUsers` asli (bukan placeholder statis) — jadi begitu sumber datanya ganti
+    // (season lain, server lain, dst) carousel-nya otomatis ikut ke-refresh karena
+    // key `remember(topUsers)` di bawah ini.
+    val pages = remember(topUsers) { topUsers.chunked(5) }
+    val pagerState = rememberPagerState(pageCount = { pages.size })
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.linearGradient(
-                    colors = listOf(Color(0xFF0B1B33), Color(0xFF122A4D), Color(0xFF0A1626))
+                    colors = listOf(Color(0xFF1B1330), Color(0xFF14213F), Color(0xFF0A0E1A))
                 )
             )
-            .border(1.dp, Color(0x334FC3F7), RoundedCornerShape(20.dp))
-            .padding(vertical = 16.dp, horizontal = 18.dp)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(Color(0x55FFD54F), Color(0x334FC3F7), Color(0x22FFD54F))
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
     ) {
-        Column {
+        // Radial glow lembut di belakang podium biar kesan premium, bukan flat.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .size(220.dp)
+                .offset(y = (-60).dp)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0x33FFD54F), Color.Transparent)
+                    )
+                )
+        )
+
+        Column(modifier = Modifier.padding(vertical = 16.dp, horizontal = 18.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -791,244 +816,191 @@ private fun TopLeaderboardCard(
                 ) {
                     CrownIcon(
                         modifier = Modifier.size(15.dp),
-                        tint = Color(0xFFFFC107)
+                        tint = Color(0xFFFFD54F)
                     )
                     Text(
                         text = "TOP LEADERBOARD",
-                        color = Color(0xFFFFC107),
+                        style = androidx.compose.ui.text.TextStyle(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Color(0xFFFFE082), Color(0xFFFFC107))
+                            )
+                        ),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         letterSpacing = 0.8.sp
                     )
                 }
-                Text(
-                    text = "›",
-                    color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Lihat Semua",
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "  ›",
+                        color = Color.White.copy(alpha = 0.4f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-                    .clipToBounds()
-            ) {
-                topUsers.getOrNull(2)?.let { user ->
-                    ClusterAvatar(
-                        user = user,
-                        size = 40.dp,
-                        ringColor = Color(0xFFCE8B5B),
-                        alpha = 0.65f,
-                        floatDurationMs = 2600,
-                        floatDelayMs = 0,
-                        onClick = { onUserClick(user) },
-                        modifier = Modifier.align(Alignment.CenterStart).offset(x = 4.dp, y = 18.dp)
-                    )
-                }
-                topUsers.getOrNull(1)?.let { user ->
-                    ClusterAvatar(
-                        user = user,
-                        size = 46.dp,
-                        ringColor = Color(0xFFB0BEC5),
-                        alpha = 0.85f,
-                        floatDurationMs = 3100,
-                        floatDelayMs = 300,
-                        onClick = { onUserClick(user) },
-                        modifier = Modifier.align(Alignment.CenterStart).offset(x = 46.dp, y = -8.dp)
-                    )
-                }
-                topUsers.getOrNull(3)?.let { user ->
-                    ClusterAvatar(
-                        user = user,
-                        size = 40.dp,
-                        ringColor = Color.White.copy(alpha = 0.3f),
-                        alpha = 0.5f,
-                        floatDurationMs = 2900,
-                        floatDelayMs = 500,
-                        onClick = { onUserClick(user) },
-                        modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-6).dp, y = 20.dp)
-                    )
-                }
-                topUsers.getOrNull(4)?.let { user ->
-                    ClusterAvatar(
-                        user = user,
-                        size = 34.dp,
-                        ringColor = Color.White.copy(alpha = 0.25f),
-                        alpha = 0.35f,
-                        floatDurationMs = 2400,
-                        floatDelayMs = 800,
-                        onClick = { onUserClick(user) },
-                        modifier = Modifier.align(Alignment.CenterEnd).offset(x = 4.dp, y = -18.dp)
-                    )
-                }
-
-                // rank #1 — big, centered, featured, floating + breathing
-                topUsers.getOrNull(0)?.let { user ->
-                    val infinite = rememberInfiniteTransition(label = "rank1")
-                    val floatY by infinite.animateFloat(
-                        initialValue = -5f,
-                        targetValue = 5f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(2800, easing = FastOutSlowInEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "rank1Float"
-                    )
-                    val scale by infinite.animateFloat(
-                        initialValue = 1f,
-                        targetValue = 1.06f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1600, easing = FastOutSlowInEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "rank1Scale"
-                    )
-                    val glow by infinite.animateFloat(
-                        initialValue = 0.35f,
-                        targetValue = 0.85f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1600, easing = FastOutSlowInEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "rank1Glow"
-                    )
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .offset(y = floatY.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CrownIcon(
-                            modifier = Modifier.size(16.dp),
-                            tint = Color(0xFFFFD54F)
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .graphicsLayer { scaleX = scale; scaleY = scale }
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.06f))
-                                .border(3.dp, Color(0xFF4FC3F7).copy(alpha = glow), CircleShape)
-                                .clickable { onUserClick(user) }
-                        ) {
-                            AsyncImage(
-                                model = user.avatar_url,
-                                contentDescription = user.username,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
-                            )
-                        }
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth()
+            ) { page ->
+                // Efek swipe: halaman yang lagi di-scroll keluar mengecil & memudar,
+                // halaman aktif full scale & full alpha — kesan carousel modern.
+                val pageOffset = pagerState.currentPage - page + pagerState.currentPageOffsetFraction
+                val distance = if (pageOffset < 0) -pageOffset else pageOffset
+                val clamped = distance.coerceIn(0f, 1f)
+                LeaderboardPodiumPage(
+                    users = pages[page],
+                    startRank = page * 5 + 1,
+                    onUserClick = onUserClick,
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = 1f - (0.14f * clamped)
+                        scaleY = 1f - (0.14f * clamped)
+                        alpha = 1f - (0.65f * clamped)
                     }
-                }
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (pages.size > 1) {
+                Spacer(modifier = Modifier.height(10.dp))
+                PageIndicatorDots(
+                    pageCount = pages.size,
+                    currentPage = pagerState.currentPage,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            }
+        }
+    }
+}
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                topUsers.take(2).forEachIndexed { idx, user ->
-                    RankMiniRow(
-                        rank = idx + 1,
-                        user = user,
-                        value = "${user.season_xp ?: 0} XP",
-                        onClick = { onUserClick(user) }
-                    )
-                }
-                if (topUsers.size > 2) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        topUsers.drop(2).take(3).forEachIndexed { i, user ->
-                            RankMiniRowCompact(
-                                rank = i + 3,
-                                user = user,
-                                onClick = { onUserClick(user) }
-                            )
-                        }
-                    }
-                }
+// Satu halaman podium leaderboard: rank #1 di tengah (paling besar + mahkota),
+// diapit #2/#3, lalu #4/#5 di ujung — susunan visual kek referensi "Top 5 Level".
+@Composable
+private fun LeaderboardPodiumPage(
+    users: List<ProfileDto>,
+    startRank: Int,
+    onUserClick: (ProfileDto) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // urutan slot kiri→kanan berdasarkan offset rank dari startRank: #4 #2 #1 #3 #5
+    val slotOffsets = listOf(3, 1, 0, 2, 4)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(122.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        slotOffsets.forEachIndexed { i, offset ->
+            val user = users.getOrNull(offset)
+            if (user != null) {
+                val rank = startRank + offset
+                PodiumAvatar(
+                    rank = rank,
+                    user = user,
+                    size = when (offset) {
+                        0 -> 60.dp
+                        1, 2 -> 50.dp
+                        else -> 42.dp
+                    },
+                    // Muncul bergantian dari luar ke dalam biar berasa hidup tiap
+                    // halaman carousel di-render — bukan langsung nongol semua.
+                    entranceDelayMs = when (offset) {
+                        0 -> 150
+                        1, 2 -> 80
+                        else -> 0
+                    },
+                    entranceKey = "$startRank-$rank",
+                    onClick = { onUserClick(user) }
+                )
+            } else {
+                Spacer(modifier = Modifier.width(58.dp))
             }
         }
     }
 }
 
 @Composable
-private fun ClusterAvatar(
-    user: ProfileDto,
-    size: androidx.compose.ui.unit.Dp,
-    ringColor: Color,
-    alpha: Float,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    floatDurationMs: Int = 2800,
-    floatDelayMs: Int = 0
-) {
-    val infinite = rememberInfiniteTransition(label = "cluster")
-    val floatY by infinite.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(floatDurationMs, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-            initialStartOffset = StartOffset(floatDelayMs)
-        ),
-        label = "clusterFloat"
-    )
-    Box(
-        modifier = modifier
-            .offset(y = floatY.dp)
-            .size(size)
-            .clip(CircleShape)
-            .alpha(alpha)
-            .background(Color.White.copy(alpha = 0.06f))
-            .border(1.5.dp, ringColor, CircleShape)
-            .clickable(onClick = onClick)
-    ) {
-        AsyncImage(
-            model = user.avatar_url,
-            contentDescription = user.username,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().clip(CircleShape)
-        )
-    }
-}
-
-@Composable
-private fun RankMiniRow(
+private fun PodiumAvatar(
     rank: Int,
     user: ProfileDto,
-    value: String,
-    onClick: () -> Unit
+    size: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+    entranceDelayMs: Int = 0,
+    entranceKey: Any? = null
 ) {
-    val ringColor = when (rank) {
-        1 -> Color(0xFFFFD54F)
-        2 -> Color(0xFFB0BEC5)
-        else -> Color(0xFFCE8B5B)
+    val ringBrush = when (rank) {
+        1 -> Brush.linearGradient(colors = listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFFFD54F)))
+        2 -> Brush.linearGradient(colors = listOf(Color(0xFFECEFF1), Color(0xFF90A4AE)))
+        3 -> Brush.linearGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
+        else -> Brush.linearGradient(colors = listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.12f)))
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(30))
-            .background(Color.White.copy(alpha = 0.05f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    val chipBrush = when (rank) {
+        1 -> Brush.horizontalGradient(colors = listOf(Color(0xFFFFE082), Color(0xFFFFB300)))
+        2 -> Brush.horizontalGradient(colors = listOf(Color(0xFFECEFF1), Color(0xFF90A4AE)))
+        3 -> Brush.horizontalGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
+        else -> Brush.horizontalGradient(colors = listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.10f)))
+    }
+
+    // Entrance: fade + scale-in bertahap
+    var visible by remember(entranceKey) { mutableStateOf(false) }
+    LaunchedEffect(entranceKey) {
+        visible = false
+        delay(entranceDelayMs.toLong())
+        visible = true
+    }
+
+    // Pulse lembut khusus rank #1 — mahkota & ring "bernapas"
+    val infinite = rememberInfiniteTransition(label = "podiumPulse")
+    val pulse by infinite.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "podiumPulseAlpha"
+    )
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(320)) + scaleIn(initialScale = 0.7f, animationSpec = tween(320))
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        Column(
+            modifier = Modifier.width(64.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (rank == 1) {
+                CrownIcon(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { alpha = pulse },
+                    tint = Color(0xFFFFD54F)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+            } else {
+                Spacer(modifier = Modifier.height(20.dp))
+            }
+
             Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(size)
+                    .then(
+                        if (rank == 1) Modifier.graphicsLayer { alpha = 0.85f + (0.15f * pulse) }
+                        else Modifier
+                    )
                     .clip(CircleShape)
-                    .border(1.5.dp, ringColor, CircleShape)
                     .background(Color.White.copy(alpha = 0.06f))
+                    .border(if (rank == 1) 3.dp else 2.dp, ringBrush, CircleShape)
+                    .clickable(onClick = onClick)
             ) {
                 AsyncImage(
                     model = user.avatar_url,
@@ -1037,51 +1009,79 @@ private fun RankMiniRow(
                     modifier = Modifier.fillMaxSize().clip(CircleShape)
                 )
             }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
             Text(
-                text = "#$rank ${user.username ?: "Anonim"}",
-                color = if (rank == 1) ringColor else Color.White.copy(alpha = 0.85f),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.SemiBold,
+                text = user.username ?: "Anonim",
+                color = if (rank == 1) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.85f),
+                fontSize = if (rank == 1) 11.5.sp else 10.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(62.dp)
             )
+            Text(
+                text = "Lv. ${user.season_level ?: 1}",
+                color = Color(0xFF4FC3F7),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(chipBrush)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$rank",
+                    color = if (rank <= 3) Color(0xFF1B1330) else Color.White.copy(alpha = 0.85f),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
-        Text(
-            text = value,
-            color = Color(0xFFFFC107),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
     }
 }
 
+// Titik indikator halaman untuk carousel podium — dot aktif melebar jadi pill
+// gradasi gold, mirip indikator "Top 5 Level" di referensi.
 @Composable
-private fun RankMiniRowCompact(
-    rank: Int,
-    user: ProfileDto,
-    onClick: () -> Unit
+private fun PageIndicatorDots(
+    pageCount: Int,
+    currentPage: Int,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.clickable(onClick = onClick)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "#$rank",
-            color = Color.White.copy(alpha = 0.4f),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = user.username ?: "Anonim",
-            color = Color.White.copy(alpha = 0.75f),
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        repeat(pageCount) { i ->
+            val active = i == currentPage
+            val width by animateDpAsState(
+                targetValue = if (active) 18.dp else 6.dp,
+                animationSpec = tween(250),
+                label = "dotWidth"
+            )
+            Box(
+                modifier = Modifier
+                    .height(6.dp)
+                    .width(width)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(
+                        brush = if (active)
+                            Brush.horizontalGradient(colors = listOf(Color(0xFFFFD54F), Color(0xFF4FC3F7)))
+                        else
+                            Brush.horizontalGradient(colors = listOf(Color.White.copy(alpha = 0.2f), Color.White.copy(alpha = 0.2f)))
+                    )
+            )
+        }
     }
 }
 
@@ -1863,7 +1863,7 @@ fun HomeScreen(
 
                     // ── Top Leaderboard Card ──
                     val topUsers = remember(userDirectory) {
-                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(6)
+                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
                     }
 
                     if (topUsers.isNotEmpty()) {
