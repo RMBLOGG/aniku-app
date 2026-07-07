@@ -4664,6 +4664,47 @@ private fun EpisodeCommentRow(
 // 7. WATCH / STREAMING SCREEN
 // ================================================================
 
+// Tombol aksi player (Layar Penuh / Nobar / Download): icon di atas, label di bawah,
+// dibungkus card pill rounded — dipakai di action row bawah player biar tampilannya
+// senada sama aplikasi streaming profesional, bukan icon kecil numpuk di title bar.
+@Composable
+fun PlayerActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    highlighted: Boolean = false,
+    onLongClick: (() -> Unit)? = null
+) {
+    Surface(
+        modifier = modifier
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .height(56.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (highlighted) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+        }
+    }
+}
+
 @Composable
 fun WatchScreen(
     episodeSlug: String,
@@ -4918,26 +4959,10 @@ fun WatchScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                // Cuma nampilin badge status kompak di title bar kalau room Nobar lagi aktif.
+                // Aksi utama (mulai Nobar / Download) dipindah ke action bar di bawah player
+                // biar nggak numpuk kecil-kecil di pojok atas.
                 if (nobarRoom != null) {
-                    // Salin kode room — aksi terpisah dari badge (yang dipakai untuk keluar room)
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(nobarRoom?.roomCode ?: ""))
-                            coroutineScope.launch {
-                                nobarSnackbarHostState.showSnackbar("Kode room disalin: ${nobarRoom?.roomCode}")
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "Salin kode room",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(2.dp))
-                    // Status room aktif: tampilkan kode + jumlah member, tap untuk keluar room
                     AssistChip(
                         onClick = { viewModel.leaveNobarRoom() },
                         label = {
@@ -4961,59 +4986,6 @@ fun WatchScreen(
                         ),
                         border = null
                     )
-                } else {
-                    FilledTonalIconButton(
-                        onClick = {
-                            if (isDirectStream) {
-                                showNobarDialog = true
-                            } else {
-                                coroutineScope.launch {
-                                    nobarSnackbarHostState.showSnackbar(
-                                        "Nobar belum bisa dipakai di server ini. Coba pindah ke server lain dulu."
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Default.Groups, contentDescription = "Nobar")
-                    }
-                }
-
-                // Tombol download cuma auto-muncul kalau stream lagi ExoPlayer (direct link
-                // hasil resolve VideoExtractor), bukan WebView fallback, dan bukan HLS (.m3u8) —
-                // lihat VideoDownloadManager buat penjelasan lengkapnya.
-                val downloadFeatureEnabled by viewModel.remoteConfigManager.downloadEnabled.collectAsState()
-                val canDownload = downloadFeatureEnabled && isDirectStream &&
-                    com.example.network.VideoDownloadManager.isDownloadableUrl(activeStreamUrl)
-                if (canDownload) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    FilledTonalIconButton(
-                        onClick = {
-                            if (!isLoggedIn) {
-                                onLoginRequired()
-                                return@FilledTonalIconButton
-                            }
-                            val started = viewModel.startEpisodeDownload(
-                                url = activeStreamUrl!!,
-                                headers = resolvedHeaders,
-                                animeSlug = currentAnimeSlug,
-                                animeTitle = animeTitle,
-                                animePoster = detail?.poster ?: "",
-                                episodeSlug = currentEpisodeSlug,
-                                episodeTitle = episodeTitle ?: currentEpisodeSlug
-                            )
-                            coroutineScope.launch {
-                                nobarSnackbarHostState.showSnackbar(
-                                    if (started) "Download dimulai, cek notifikasi."
-                                    else "Gagal memulai download."
-                                )
-                            }
-                        },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = "Download episode")
-                    }
                 }
             }
         }
@@ -5823,22 +5795,87 @@ fun WatchScreen(
             }
         }
 
-        // Fullscreen enter button (shown below video when not fullscreen)
+        // Action bar di bawah player: Layar Penuh, Nobar, Download — dipindah ke sini
+        // (dulu numpuk kecil di pojok kanan atas) biar layoutnya rapi kayak aplikasi
+        // streaming profesional (Netflix/Crunchyroll style row of actions).
         if (!isFullscreen) {
-            Box(
+            val downloadFeatureEnabled by viewModel.remoteConfigManager.downloadEnabled.collectAsState()
+            val canDownload = downloadFeatureEnabled && isDirectStream &&
+                com.example.network.VideoDownloadManager.isDownloadableUrl(activeStreamUrl)
+
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(end = 16.dp, top = 8.dp),
-                contentAlignment = Alignment.CenterEnd
+                    .padding(horizontal = 16.dp, top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                FilledTonalButton(
-                    onClick = { isFullscreen = true },
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Layar Penuh", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                PlayerActionButton(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.Fullscreen,
+                    label = "Layar Penuh",
+                    onClick = { isFullscreen = true }
+                )
+
+                if (nobarRoom != null) {
+                    PlayerActionButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Groups,
+                        label = "${nobarRoom?.roomCode} · ${nobarRoom?.memberCount}",
+                        highlighted = true,
+                        onClick = { viewModel.leaveNobarRoom() },
+                        onLongClick = {
+                            clipboardManager.setText(AnnotatedString(nobarRoom?.roomCode ?: ""))
+                            coroutineScope.launch {
+                                nobarSnackbarHostState.showSnackbar("Kode room disalin: ${nobarRoom?.roomCode}")
+                            }
+                        }
+                    )
+                } else {
+                    PlayerActionButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Groups,
+                        label = "Nobar",
+                        onClick = {
+                            if (isDirectStream) {
+                                showNobarDialog = true
+                            } else {
+                                coroutineScope.launch {
+                                    nobarSnackbarHostState.showSnackbar(
+                                        "Nobar belum bisa dipakai di server ini. Coba pindah ke server lain dulu."
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
+
+                if (canDownload) {
+                    PlayerActionButton(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Download,
+                        label = "Unduh",
+                        onClick = {
+                            if (!isLoggedIn) {
+                                onLoginRequired()
+                                return@PlayerActionButton
+                            }
+                            val started = viewModel.startEpisodeDownload(
+                                url = activeStreamUrl!!,
+                                headers = resolvedHeaders,
+                                animeSlug = currentAnimeSlug,
+                                animeTitle = animeTitle,
+                                animePoster = detail?.poster ?: "",
+                                episodeSlug = currentEpisodeSlug,
+                                episodeTitle = episodeTitle ?: currentEpisodeSlug
+                            )
+                            coroutineScope.launch {
+                                nobarSnackbarHostState.showSnackbar(
+                                    if (started) "Download dimulai, cek notifikasi."
+                                    else "Gagal memulai download."
+                                )
+                            }
+                        }
+                    )
                 }
             }
         }
