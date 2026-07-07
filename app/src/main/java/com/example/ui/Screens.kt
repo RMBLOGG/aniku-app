@@ -4667,6 +4667,7 @@ private fun EpisodeCommentRow(
 // Tombol aksi player (Layar Penuh / Nobar / Download): icon di atas, label di bawah,
 // dibungkus card pill rounded — dipakai di action row bawah player biar tampilannya
 // senada sama aplikasi streaming profesional, bukan icon kecil numpuk di title bar.
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PlayerActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -5806,7 +5807,7 @@ fun WatchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, top = 10.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 PlayerActionButton(
