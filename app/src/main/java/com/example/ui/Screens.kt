@@ -4878,6 +4878,7 @@ fun WatchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .let { if (!isFullscreen) it.verticalScroll(rememberScrollState()) else it }
     ) {
         // App controls Header row — Material3 surface app bar
         if (!isFullscreen) Surface(
@@ -6107,15 +6108,15 @@ fun WatchScreen(
                 }
             }
 
-            Surface(
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+            )
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 1.dp
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     // Header
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
@@ -6334,7 +6335,6 @@ fun WatchScreen(
                         }
                     }
                 }
-            }
 
             if (deleteTargetId != null) {
                 AlertDialog(
