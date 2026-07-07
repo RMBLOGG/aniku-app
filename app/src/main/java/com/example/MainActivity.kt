@@ -15,9 +15,16 @@ import androidx.activity.ComponentActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,8 +35,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -393,106 +402,207 @@ class MainActivity : FragmentActivity() {
                 val isSheetRouteActive = currentRoute in sheetRoutes
 
                 if (showMoreSheet) {
+                    var sheetContentVisible by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(40)
+                        sheetContentVisible = true
+                    }
+
                     ModalBottomSheet(
                         onDismissRequest = { showMoreSheet = false },
                         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
                         containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
                         dragHandle = {
-                            androidx.compose.foundation.layout.Box(
-                                modifier = androidx.compose.ui.Modifier
-                                    .padding(vertical = 10.dp)
-                                    .size(width = 32.dp, height = 3.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                            Box(
+                                modifier = Modifier
+                                    .padding(vertical = 12.dp)
+                                    .size(width = 36.dp, height = 4.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                             )
                         }
                     ) {
-                        Text(
-                            text = "Menu Lainnya",
-                            fontSize = 11.sp,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            letterSpacing = 1.sp,
-                            modifier = androidx.compose.ui.Modifier.padding(start = 18.dp, bottom = 6.dp)
-                        )
-                        val sheetItemColors = mapOf(
-                            "chat" to Triple(0xFF1a2233, 0xFF5b9cf6, "Ngobrol bareng komunitas"),
-                            "feed" to Triple(0xFF2a1a1a, 0xFFe53935, "Postingan dari pengguna"),
-                            "schedule" to Triple(0xFF1a2a1a, 0xFF4caf50, "Jadwal tayang anime"),
-                            "downloads" to Triple(0xFF1a2430, 0xFF42a5f5, "Episode yang udah didownload"),
-                            "top_supporter" to Triple(0xFF2a2000, 0xFFFFD700, "Daftar donatur terbaik Aniku"),
-                            "user_list" to Triple(0xFF241a2e, 0xFFba68c8, "Cari & lihat profil pengguna"),
-                            "clans" to Triple(0xFF0D3B4F, 0xFF4FD8E8, "Buat clan & kumpulin Diamond"),
-                            "request_anime" to Triple(0xFF1a2620, 0xFF26c281, "Anime hasil request user"),
-                        )
-                        sheetNavItems.forEach { (route, label, icon) ->
-                            val meta = sheetItemColors[route]
-                            val bgColor = Color(meta?.first ?: 0xFF1e1e1e)
-                            val iconColor = Color(meta?.second ?: 0xFFaaaaaa)
-                            val desc = meta?.third ?: ""
-                            val isActive = currentRoute == route
-                            androidx.compose.foundation.layout.Row(
-                                modifier = androidx.compose.ui.Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        showMoreSheet = false
-                                        navController.navigate(route) {
-                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                    .background(if (isActive) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f) else Color.Transparent)
-                                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                            ) {
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = androidx.compose.ui.Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(bgColor),
-                                    contentAlignment = androidx.compose.ui.Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = label,
-                                        tint = iconColor,
-                                        modifier = androidx.compose.ui.Modifier.size(22.dp)
-                                    )
-                                    if (route == "chat" && hasUnreadChat) {
-                                        androidx.compose.foundation.layout.Box(
-                                            modifier = androidx.compose.ui.Modifier
-                                                .size(10.dp)
-                                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                                .background(MaterialTheme.colorScheme.error)
-                                                .align(androidx.compose.ui.Alignment.TopEnd)
-                                                .offset(x = 2.dp, y = (-2).dp)
-                                        )
-                                    }
-                                }
-                                androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(14.dp))
-                                androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 15.sp,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                                        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = desc,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                                    modifier = androidx.compose.ui.Modifier.size(20.dp)
+                        // ── Header ──
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .padding(bottom = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Menu Lainnya",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Semua fitur Aniku dalam satu tempat",
+                                    fontSize = 12.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
-                        androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+
+                        // ── Palet warna M3 tonal, konsisten sama tema (dark/light & dynamic color) ──
+                        data class MenuTone(val container: Color, val onContainer: Color)
+                        val tones = listOf(
+                            MenuTone(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer),
+                            MenuTone(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer),
+                            MenuTone(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer),
+                            MenuTone(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.onErrorContainer),
+                        )
+                        val sheetDescriptions = mapOf(
+                            "chat" to "Ngobrol bareng komunitas",
+                            "feed" to "Postingan dari pengguna",
+                            "nobar_list" to "Nonton bareng, real-time",
+                            "schedule" to "Jadwal tayang anime",
+                            "downloads" to "Episode yang udah didownload",
+                            "top_supporter" to "Daftar donatur terbaik Aniku",
+                            "user_list" to "Cari & lihat profil pengguna",
+                            "clans" to "Buat clan & kumpulin Diamond",
+                            "request_anime" to "Anime hasil request user",
+                        )
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 520.dp)
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp)
+                        ) {
+                            items(sheetNavItems.size) { index ->
+                                val (route, label, icon) = sheetNavItems[index]
+                                val tone = tones[index % tones.size]
+                                val desc = sheetDescriptions[route] ?: ""
+                                val isActive = currentRoute == route
+
+                                AnimatedVisibility(
+                                    visible = sheetContentVisible,
+                                    enter = fadeIn(
+                                        animationSpec = tween(durationMillis = 260, delayMillis = index * 35)
+                                    ) + slideInVertically(
+                                        initialOffsetY = { it / 3 },
+                                        animationSpec = tween(durationMillis = 320, delayMillis = index * 35, easing = FastOutSlowInEasing)
+                                    ) + scaleIn(
+                                        initialScale = 0.9f,
+                                        animationSpec = tween(durationMillis = 320, delayMillis = index * 35, easing = FastOutSlowInEasing)
+                                    )
+                                ) {
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isPressed by interactionSource.collectIsPressedAsState()
+                                    val scale by animateFloatAsState(
+                                        targetValue = if (isPressed) 0.94f else 1f,
+                                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
+                                        label = "menuItemScale"
+                                    )
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .graphicsLayer(scaleX = scale, scaleY = scale)
+                                            .clickable(
+                                                interactionSource = interactionSource,
+                                                indication = LocalIndication.current,
+                                                onClick = {
+                                                    showMoreSheet = false
+                                                    navController.navigate(route) {
+                                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                }
+                                            ),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isActive)
+                                                tone.container
+                                            else
+                                                MaterialTheme.colorScheme.surfaceContainerHigh
+                                        ),
+                                        elevation = CardDefaults.cardElevation(
+                                            defaultElevation = if (isActive) 3.dp else 0.dp
+                                        ),
+                                        border = if (isActive) BorderStroke(1.5.dp, tone.onContainer.copy(alpha = 0.25f)) else null
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(46.dp)
+                                                        .clip(RoundedCornerShape(14.dp))
+                                                        .background(tone.container),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = icon,
+                                                        contentDescription = label,
+                                                        tint = tone.onContainer,
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                    if (route == "chat" && hasUnreadChat) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(11.dp)
+                                                                .clip(CircleShape)
+                                                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                                                .align(Alignment.TopEnd)
+                                                                .offset(x = 4.dp, y = (-4).dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(7.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(MaterialTheme.colorScheme.error)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                if (isActive) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .clip(CircleShape)
+                                                            .background(tone.onContainer)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(
+                                                text = label,
+                                                fontSize = 14.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = desc,
+                                                fontSize = 11.5.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                lineHeight = 14.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
