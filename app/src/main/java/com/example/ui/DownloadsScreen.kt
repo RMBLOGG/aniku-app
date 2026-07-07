@@ -28,7 +28,6 @@ import kotlinx.coroutines.delay
 @Composable
 fun DownloadsScreen(
     viewModel: AnikuViewModel,
-    onBack: () -> Unit,
     onPlayOffline: (DownloadRecord) -> Unit,
     onLoginRequired: () -> Unit = {}
 ) {
@@ -84,12 +83,9 @@ fun DownloadsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
-            }
             Column(modifier = Modifier.weight(1f)) {
                 Text("Unduhan", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onBackground)
                 if (isLoggedIn && downloads.isNotEmpty()) {

@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -32,8 +33,34 @@ fun OfflinePlayerScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? android.app.Activity
     val localPath = record.localPath
     val fileExists = remember(localPath) { localPath != null && File(localPath).exists() }
+
+    // Player video ini emang khusus buat nonton, jadi langsung dipaksa landscape +
+    // immersive (system bar disembunyiin) begitu layar dibuka — sama kayak mode
+    // fullscreen di WatchScreen utama, gak perlu ada mode portrait dulu.
+    DisposableEffect(Unit) {
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        @Suppress("DEPRECATION")
+        activity?.window?.decorView?.systemUiVisibility = (
+            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        )
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            @Suppress("DEPRECATION")
+            activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+
+    BackHandler {
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onBack()
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (!fileExists) {
@@ -77,9 +104,12 @@ fun OfflinePlayerScreen(
         }
 
         FilledTonalIconButton(
-            onClick = onBack,
+            onClick = {
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                onBack()
+            },
             modifier = Modifier
-                .padding(top = 40.dp, start = 12.dp)
+                .padding(top = 16.dp, start = 16.dp)
                 .align(Alignment.TopStart)
         ) {
             Icon(Icons.Default.ArrowBack, contentDescription = "Back")

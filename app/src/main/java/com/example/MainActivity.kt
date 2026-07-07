@@ -245,7 +245,7 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "feed", "user_list", "request_anime", "clans", "diamond_topup")
+                val bottomRoutes = listOf("home", "search", "explore", "bookmark", "schedule", "feed", "user_list", "request_anime", "clans", "diamond_topup", "downloads")
                 val showBottomBar = currentRoute in bottomRoutes
                 var showMoreSheet by remember { mutableStateOf(false) }
                 val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
@@ -832,7 +832,6 @@ class MainActivity : FragmentActivity() {
                         composable("downloads") {
                             com.example.ui.DownloadsScreen(
                                 viewModel = viewModel,
-                                onBack = { navController.popBackStack() },
                                 onPlayOffline = { record ->
                                     navController.navigate("offline_player/${record.downloadId}")
                                 },
