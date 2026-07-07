@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - nobar_enabled
  * - chat_image_upload_enabled
  * - feed_enabled
+ * - comment_enabled
  */
 class RemoteConfigManager {
 
@@ -37,7 +38,8 @@ class RemoteConfigManager {
                     KEY_CHAT_ROOM to true,
                     KEY_NOBAR to true,
                     KEY_CHAT_IMAGE_UPLOAD to true,
-                    KEY_FEED to true
+                    KEY_FEED to true,
+                    KEY_COMMENT to true
                 )
             )
         }
@@ -54,6 +56,9 @@ class RemoteConfigManager {
 
     private val _feedEnabled = MutableStateFlow(true)
     val feedEnabled: StateFlow<Boolean> = _feedEnabled.asStateFlow()
+
+    private val _commentsEnabled = MutableStateFlow(true)
+    val commentsEnabled: StateFlow<Boolean> = _commentsEnabled.asStateFlow()
 
     /** Fetch nilai terbaru dari server lalu update semua flag. Panggil pas app start. */
     fun fetchAndApply() {
@@ -89,6 +94,7 @@ class RemoteConfigManager {
         _nobarEnabled.value = remoteConfig.getBoolean(KEY_NOBAR)
         _chatImageUploadEnabled.value = remoteConfig.getBoolean(KEY_CHAT_IMAGE_UPLOAD)
         _feedEnabled.value = remoteConfig.getBoolean(KEY_FEED)
+        _commentsEnabled.value = remoteConfig.getBoolean(KEY_COMMENT)
     }
 
     companion object {
@@ -96,5 +102,6 @@ class RemoteConfigManager {
         private const val KEY_NOBAR = "nobar_enabled"
         private const val KEY_CHAT_IMAGE_UPLOAD = "chat_image_upload_enabled"
         private const val KEY_FEED = "feed_enabled"
+        private const val KEY_COMMENT = "comment_enabled"
     }
 }

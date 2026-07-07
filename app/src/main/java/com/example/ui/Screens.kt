@@ -1191,6 +1191,7 @@ fun HomeScreen(
     val viewerCounts by viewModel.viewerCounts.collectAsState()
     val myClanDetail by viewModel.myClanDetail.collectAsState()
     val recentComments by viewModel.recentComments.collectAsState()
+    val commentsEnabled by viewModel.remoteConfigManager.commentsEnabled.collectAsState()
     val clanTagMap by viewModel.clanTagMap.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -2253,7 +2254,7 @@ fun HomeScreen(
             }
 
             // Section 2.5: Komentar Terbaru — widget ringkas, horizontal-scroll biar gak makan tempat
-            if (recentComments.isNotEmpty()) {
+            if (commentsEnabled && recentComments.isNotEmpty()) {
                 item {
                     Row(
                         modifier = Modifier
@@ -6079,7 +6080,8 @@ fun WatchScreen(
         } // end if (!isFullscreen)
 
         // ── Komentar Episode (Material3) ────────────────────────
-        if (!isFullscreen) {
+        val commentsEnabled by viewModel.remoteConfigManager.commentsEnabled.collectAsState()
+        if (!isFullscreen && commentsEnabled) {
             val episodeComments by viewModel.episodeComments.collectAsState()
             val isCommentsLoading by viewModel.isEpisodeCommentsLoading.collectAsState()
             val isPostingComment by viewModel.isPostingEpisodeComment.collectAsState()
