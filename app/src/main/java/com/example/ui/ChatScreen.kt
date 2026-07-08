@@ -208,6 +208,8 @@ fun ChatScreen(
     val chatRoomEnabled by viewModel.remoteConfigManager.chatRoomEnabled.collectAsState()
     val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
     val clanTagMap by viewModel.clanTagMap.collectAsState()
+    val typingUsers by viewModel.typingUsers.collectAsState()
+    val chatReads by viewModel.chatReads.collectAsState()
 
     val isLoggedIn = !session.token.isNullOrEmpty()
     val currentUserId = session.userId
@@ -240,7 +242,18 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll ke bawah saat ada pesan baru
+    // Typing indicator & read receipt: mulai polling pas chat dibuka, stop pas keluar
+    DisposableEffect(Unit) {
+        viewModel.startTypingPolling()
+        viewModel.startChatReadsPolling()
+        onDispose {
+            viewModel.stopTypingPolling()
+            viewModel.stopChatReadsPolling()
+            if (isLoggedIn) viewModel.clearTyping()
+        }
+    }
+
+    // Auto-scroll ke bawah saat ada pesan baru + update read receipt ke pesan terakhir
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             if (isInitialLoad) {
@@ -250,6 +263,7 @@ fun ChatScreen(
             } else {
                 listState.animateScrollToItem(messages.size - 1)
             }
+            if (isLoggedIn) viewModel.markChatReadReceipt(messages.last().id)
         }
     }
 
@@ -325,6 +339,48 @@ fun ChatScreen(
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
+                AnimatedVisibility(
+                    visible = typingUsers.isNotEmpty(),
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val dotProgress = rememberGlossyShimmer(durationMillis = 900)
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            repeat(3) { i ->
+                                val alpha = (kotlin.math.sin((dotProgress * 6.28f) - i * 1.2f) + 1f) / 2f
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(
+                                            Color(0xFFFF6B6B).copy(alpha = 0.35f + alpha * 0.65f),
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
+                        val typingText = when (typingUsers.size) {
+                            1 -> "${typingUsers[0].username} sedang mengetik..."
+                            2 -> "${typingUsers[0].username} dan ${typingUsers[1].username} sedang mengetik..."
+                            else -> "${typingUsers[0].username} dan ${typingUsers.size - 1} lainnya sedang mengetik..."
+                        }
+                        Text(
+                            text = typingText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
@@ -448,7 +504,10 @@ fun ChatScreen(
                         }
                         OutlinedTextField(
                             value = inputText,
-                            onValueChange = { if (it.length <= 300) inputText = it },
+                            onValueChange = {
+                                if (it.length <= 300) inputText = it
+                                if (it.isNotBlank()) viewModel.notifyTyping()
+                            },
                             placeholder = {
                                 Text(if (replyTarget != null) "Balas ${replyTarget!!.username}..." else "Ketik pesan...")
                             },
@@ -488,6 +547,7 @@ fun ChatScreen(
                                     }
                                     inputText = ""
                                     replyTarget = null
+                                    viewModel.clearTyping()
                                     coroutineScope.launch {
                                         delay(300)
                                         if (messages.isNotEmpty()) {
@@ -625,8 +685,75 @@ fun ChatScreen(
                                     { viewModel.deleteChatMessage(message.id) }
                                 } else null
                             )
+                            val readers = remember(chatReads, message.id, currentUserId) {
+                                chatReads.filter {
+                                    it.last_read_message_id == message.id && it.user_id != currentUserId
+                                }
+                            }
+                            if (readers.isNotEmpty()) {
+                                ReadReceiptRow(readers = readers, isOwnMessage = isOwn)
+                            }
                         }
                         item { Spacer(modifier = Modifier.height(4.dp)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Baris avatar kecil ber-stack (kayak Discord/Slack) yang muncul di bawah pesan,
+ * nunjukin user mana aja yang last-read-nya udah nyampe pesan ini.
+ */
+@Composable
+private fun ReadReceiptRow(
+    readers: List<com.example.network.ChatReadStatus>,
+    isOwnMessage: Boolean
+) {
+    val shown = readers.take(5)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = if (isOwnMessage) 0.dp else 8.dp,
+                end = if (isOwnMessage) 8.dp else 0.dp,
+                top = 1.dp,
+                bottom = 2.dp
+            ),
+        horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
+    ) {
+        Row {
+            shown.forEachIndexed { index, reader ->
+                Box(
+                    modifier = Modifier
+                        .offset(x = (-6 * index).dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.background, CircleShape)
+                        .zIndex((shown.size - index).toFloat())
+                ) {
+                    if (!reader.avatar_url.isNullOrBlank()) {
+                        AsyncImage(
+                            model = reader.avatar_url,
+                            contentDescription = reader.username,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(defaultNameGradientColors.first()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = reader.username.take(1).uppercase(),
+                                fontSize = 7.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

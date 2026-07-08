@@ -587,6 +587,46 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // ─── Typing indicator chat room ───
+    @GET("rest/v1/chat_typing")
+    suspend fun getTypingUsers(
+        @Query("updated_at") updatedAtFilter: String,
+        @Query("select") select: String = "user_id,username,updated_at",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<TypingStatus>
+
+    @POST("rest/v1/chat_typing")
+    suspend fun upsertTyping(
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
+    @DELETE("rest/v1/chat_typing")
+    suspend fun removeTyping(
+        @Query("user_id") userId: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    // ─── Read receipt chat room ───
+    @GET("rest/v1/chat_reads")
+    suspend fun getChatReads(
+        @Query("select") select: String = "user_id,username,avatar_url,last_read_message_id,updated_at",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ChatReadStatus>
+
+    @POST("rest/v1/chat_reads")
+    suspend fun upsertChatRead(
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
     @GET("rest/v1/posts")
     suspend fun getPosts(
         @Query("order") order: String = "created_at.desc",

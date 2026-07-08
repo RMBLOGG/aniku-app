@@ -442,6 +442,24 @@ data class ChatMessageRequest(
     val image_url: String? = null
 )
 
+// Typing indicator chat room ("sedang mengetik...")
+@JsonClass(generateAdapter = true)
+data class TypingStatus(
+    val user_id: String,
+    val username: String,
+    val updated_at: String? = null
+)
+
+// Read receipt chat room (avatar "dilihat oleh")
+@JsonClass(generateAdapter = true)
+data class ChatReadStatus(
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val last_read_message_id: String? = null,
+    val updated_at: String? = null
+)
+
 // Referensi anime yang dibagikan ke feed (dipakai di CreatePostScreen)
 @JsonClass(generateAdapter = true)
 data class SharedAnimeRef(
