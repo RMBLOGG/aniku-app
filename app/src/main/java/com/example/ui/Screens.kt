@@ -46,7 +46,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
+import com.example.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -6847,17 +6849,22 @@ fun AuthScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(84.dp)
+                        .size(96.dp)
                         .graphicsLayer { scaleX = logoScale; scaleY = logoScale }
-                        .shadow(16.dp, CircleShape, spotColor = accentColor)
-                        .background(
-                            Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.65f))),
-                            CircleShape
-                        )
-                        .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape),
+                        .shadow(18.dp, CircleShape, spotColor = accentColor, ambientColor = accentColor)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(2.dp, Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.4f))), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher_round),
+                        contentDescription = "Aniku",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
                 }
             }
 
