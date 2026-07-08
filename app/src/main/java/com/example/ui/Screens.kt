@@ -5889,6 +5889,204 @@ fun WatchScreen(
             }
         }
 
+        // ── Info Anime: poster, judul, badge, sinopsis, statistik & progres ──
+        if (!isFullscreen) detail?.let { d ->
+            var isSynopsisExpanded by remember { mutableStateOf(false) }
+            val eps = d.episodes ?: emptyList()
+            val currentIdx = eps.indexOfFirst { it.slug == currentEpisodeSlug }
+            val epNumLabel = eps.getOrNull(currentIdx)?.name
+                ?.replace(Regex("[^0-9]"), "")
+                ?.ifEmpty { null }
+                ?: (if (currentIdx >= 0) "${currentIdx + 1}" else "-")
+            val seriesProgress = if (eps.isNotEmpty() && currentIdx >= 0) {
+                // Episode list biasanya urut descending (terbaru duluan)
+                ((eps.size - currentIdx).toFloat() / eps.size.toFloat()).coerceIn(0f, 1f)
+            } else 0f
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+                // Poster + judul + badge
+                Row(verticalAlignment = Alignment.Top) {
+                    AsyncImage(
+                        model = d.poster,
+                        contentDescription = d.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 84.dp, height = 112.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = d.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Episode $epNumLabel",
+                            color = accentColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(d.rating ?: "0.0", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Text(
+                                    d.type ?: "TV",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                Text(
+                                    d.status ?: "Ongoing",
+                                    color = Color(0xFF4CAF50),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            d.genres?.take(4)?.forEach { g ->
+                                Surface(shape = RoundedCornerShape(6.dp), color = accentColor.copy(alpha = 0.15f)) {
+                                    Text(
+                                        g.name,
+                                        color = accentColor,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Sinopsis
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Description, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "SINOPSIS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = d.synopsis ?: "Tidak ada sinopsis.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    maxLines = if (isSynopsisExpanded) Int.MAX_VALUE else 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                )
+                if ((d.synopsis?.length ?: 0) > 120) {
+                    Text(
+                        text = if (isSynopsisExpanded) "Sembunyikan" else "Baca Selengkapnya...",
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clickable { isSynopsisExpanded = !isSynopsisExpanded }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Statistik ringkas: total eps, tipe, episode berjalan
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val stats = listOf(
+                        "${eps.size}" to "TOTAL EPS",
+                        (d.type ?: "TV") to "TIPE",
+                        epNumLabel to "EPISODE"
+                    )
+                    stats.forEach { (value, label) ->
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(value, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(label, fontSize = 10.sp, letterSpacing = 0.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Progres menonton (berdasarkan posisi episode dalam series)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "PROGRES MENONTON",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        "${(seriesProgress * 100).toInt()}%",
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { seriesProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = accentColor,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+        }
+
         // Horizontal server/quality selection
         if (!isFullscreen && streams.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 16.dp, end = 16.dp)) {
