@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import com.example.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -6857,14 +6859,30 @@ fun AuthScreen(
                         .border(2.dp, Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.4f))), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.mipmap.ic_launcher_round),
-                        contentDescription = "Aniku",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                    )
+                    val appIconBitmap = remember {
+                        val ctx = context
+                        runCatching {
+                            val drawable = ctx.packageManager.getApplicationIcon(ctx.packageName)
+                            drawable.toBitmap(width = 192, height = 192).asImageBitmap()
+                        }.getOrNull()
+                    }
+                    if (appIconBitmap != null) {
+                        Image(
+                            bitmap = appIconBitmap,
+                            contentDescription = "Aniku",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Aniku",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
                 }
             }
 
