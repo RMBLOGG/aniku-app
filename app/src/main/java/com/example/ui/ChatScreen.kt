@@ -209,6 +209,11 @@ fun ChatScreen(
     val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
     val clanTagMap by viewModel.clanTagMap.collectAsState()
     val typingUsers by viewModel.typingUsers.collectAsState()
+    // Snapshot list terakhir yang masih ada isinya. AnimatedVisibility tetap
+    // ngerender content-nya pas lagi animasi keluar (fade out), padahal
+    // typingUsers udah keburu kosong -> pake snapshot ini biar ga IndexOutOfBounds.
+    var lastTypingUsers by remember { mutableStateOf<List<com.example.network.TypingStatus>>(emptyList()) }
+    if (typingUsers.isNotEmpty()) lastTypingUsers = typingUsers
     val chatReads by viewModel.chatReads.collectAsState()
 
     val isLoggedIn = !session.token.isNullOrEmpty()
@@ -366,10 +371,10 @@ fun ChatScreen(
                                 )
                             }
                         }
-                        val typingText = when (typingUsers.size) {
-                            1 -> "${typingUsers[0].username} sedang mengetik..."
-                            2 -> "${typingUsers[0].username} dan ${typingUsers[1].username} sedang mengetik..."
-                            else -> "${typingUsers[0].username} dan ${typingUsers.size - 1} lainnya sedang mengetik..."
+                        val typingText = when (lastTypingUsers.size) {
+                            1 -> "${lastTypingUsers[0].username} sedang mengetik..."
+                            2 -> "${lastTypingUsers[0].username} dan ${lastTypingUsers[1].username} sedang mengetik..."
+                            else -> "${lastTypingUsers.getOrNull(0)?.username ?: ""} dan ${(lastTypingUsers.size - 1).coerceAtLeast(0)} lainnya sedang mengetik..."
                         }
                         Text(
                             text = typingText,
