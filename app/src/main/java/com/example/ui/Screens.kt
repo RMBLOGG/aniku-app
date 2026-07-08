@@ -6853,10 +6853,9 @@ fun AuthScreen(
                     modifier = Modifier
                         .size(96.dp)
                         .graphicsLayer { scaleX = logoScale; scaleY = logoScale }
-                        .shadow(18.dp, CircleShape, spotColor = accentColor, ambientColor = accentColor)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(2.dp, Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.4f))), CircleShape),
+                        .shadow(18.dp, RoundedCornerShape(24.dp), spotColor = accentColor, ambientColor = accentColor)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     val appIconBitmap = remember {
@@ -6870,10 +6869,10 @@ fun AuthScreen(
                         Image(
                             bitmap = appIconBitmap,
                             contentDescription = "Aniku",
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(CircleShape)
+                                .clip(RoundedCornerShape(24.dp))
                         )
                     } else {
                         Icon(

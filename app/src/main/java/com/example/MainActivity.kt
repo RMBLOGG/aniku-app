@@ -221,7 +221,15 @@ class MainActivity : FragmentActivity() {
                     onDispose { lifecycle.removeObserver(observer) }
                 }
 
-                if (maintenanceMode) {
+                var showSplash by remember { mutableStateOf(true) }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(2200)
+                    showSplash = false
+                }
+
+                if (showSplash) {
+                    com.example.ui.SplashScreen()
+                } else if (maintenanceMode) {
                     // Kill-switch paling atas — begitu nyala di Firebase Console, semua user
                     // langsung ke-block di sini real-time, gak peduli lagi login/lock/dimana.
                     com.example.ui.MaintenanceScreen(message = maintenanceMessage)
