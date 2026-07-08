@@ -1527,6 +1527,45 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
 
+                // Cek apakah ini akun BARU (baru aja kebuat oleh handle_new_user trigger),
+                // bukan login biasa dari user Google yang udah lama punya akun.
+                // signInWithIdToken dipakai buat login DAN sign-up pertama kali sekaligus,
+                // jadi IP guard cuma boleh jalan sekali pas akun baru pertama kali dibuat.
+                val isNewAccount = try {
+                    val createdAtStr = profile?.created_at
+                    if (createdAtStr != null) {
+                        val createdInstant = java.time.OffsetDateTime.parse(createdAtStr).toInstant()
+                        val ageMs = java.time.Duration.between(createdInstant, java.time.Instant.now()).toMillis()
+                        ageMs in 0..20000 // baru dibuat dalam 20 detik terakhir
+                    } else {
+                        false
+                    }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "Gagal parse created_at buat cek akun baru Google", e)
+                    false
+                }
+
+                if (isNewAccount) {
+                    // Cek IP guard: kalau kedeteksi >2 akun dari IP yang sama,
+                    // edge function bakal auto-ban IP + akun ini juga.
+                    try {
+                        val guardRes = NetworkClient.supabaseFunctionsApi.checkIpGuard(
+                            request = IpGuardRequest(user_id = uId, email = emailFromRes),
+                            apiKey = SUPABASE_ANON_KEY,
+                            authHeader = "Bearer $SUPABASE_ANON_KEY"
+                        )
+                        if (guardRes.banned == true) {
+                            _authError.value = "Pendaftaran ditolak: terdeteksi lebih dari 2 akun dari jaringan/IP yang sama. Akun ini otomatis di-ban."
+                            _authLoading.value = false
+                            return@launch
+                        }
+                    } catch (e: Exception) {
+                        // Kalau edge function gagal dipanggil (mis. lagi maintenance),
+                        // jangan blokir user biasa yang lagi daftar normal.
+                        Log.e("AnikuVM", "IP guard check (Google) failed, lanjut tanpa cek", e)
+                    }
+                }
+
                 val activeSession = UserSession(
                     token = token,
                     refreshToken = res.refresh_token,
