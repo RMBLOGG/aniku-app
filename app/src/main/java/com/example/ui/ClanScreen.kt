@@ -46,6 +46,7 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.R
 import com.example.network.AnikuViewModel
+import com.example.util.orDefault
 import com.example.network.ClanDto
 import com.example.network.ClanMemberDto
 import kotlinx.coroutines.delay
@@ -314,7 +315,7 @@ fun ClanScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 selectedClanMembers.forEach { member ->
                     Text(
-                        "\u2022 " + (member.username ?: "?") + if (member.role == "leader") " (Leader)" else "",
+                        "\u2022 " + (member.username.orDefault("?")) + if (member.role == "leader") " (Leader)" else "",
                         fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
@@ -574,7 +575,7 @@ private fun MyClanCard(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        member.username ?: "?",
+                        member.username.orDefault("?"),
                         fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f, fill = false)
                     )
                     if (member.role == "leader") {
@@ -887,7 +888,7 @@ private fun ManageClanDialog(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(req.username ?: "?", fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f))
+                            Text(req.username.orDefault("?"), fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f))
                             TextButton(onClick = { onApproveRequest(req.id) }) { Text("Terima", color = Color(0xFF2FA8BF)) }
                             TextButton(onClick = { onRejectRequest(req.id) }) { Text("Tolak", color = Color(0xFFE57373)) }
                         }

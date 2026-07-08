@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.example.util.orDefault
 import androidx.work.*
 import com.example.network.NetworkClient
 import com.example.network.SUPABASE_ANON_KEY
@@ -72,7 +73,7 @@ class FeedNotificationWorker(
                     if (it == -1) posts.size else it
                 }
 
-                sendNotification(latestPost.username ?: "Seseorang", newPostsCount)
+                sendNotification(latestPost.username.orDefault("Seseorang"), newPostsCount)
                 prefs.edit().putString(KEY_LAST_POST_ID, latestPost.id).apply()
             }
 

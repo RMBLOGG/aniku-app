@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import com.example.network.AnikuViewModel
 import com.example.network.ProfileDto
+import com.example.util.orDefault
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -228,7 +229,7 @@ private fun UserDirectoryRow(
                 Spacer(modifier = Modifier.height(1.dp))
             }
             Text(
-                user.username ?: "Tanpa nama",
+                user.username.orDefault("Tanpa nama"),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
             )

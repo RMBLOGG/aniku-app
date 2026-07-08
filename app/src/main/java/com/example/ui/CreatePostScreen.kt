@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
+import com.example.util.orDefault
+import com.example.util.nullIfBlank
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,14 +132,14 @@ fun CreatePostScreen(
                 // Avatar
                 AvatarCircle(
                     avatarUrl = session.avatarUrl,
-                    username = session.username ?: "A",
+                    username = session.username.orDefault("A"),
                     size = 42.dp
                 )
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = session.username ?: session.email?.substringBefore("@") ?: "Kamu",
+                        text = session.username.nullIfBlank() ?: session.email?.substringBefore("@") ?: "Kamu",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = MaterialTheme.colorScheme.onSurface

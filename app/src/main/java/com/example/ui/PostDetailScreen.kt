@@ -21,6 +21,8 @@ import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.Post
 import com.example.network.PostComment
+import com.example.util.orDefault
+import com.example.util.nullIfBlank
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -141,7 +143,7 @@ fun PostDetailScreen(
                     ) {
                         AvatarCircle(
                             avatarUrl = session.avatarUrl,
-                            username = session.username ?: "A",
+                            username = session.username.orDefault("A"),
                             size = 32.dp
                         )
                         Spacer(modifier = Modifier.width(8.dp))

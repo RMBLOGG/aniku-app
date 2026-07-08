@@ -178,6 +178,15 @@ interface AnimekompiApi {
     suspend fun getEpisode(@Path("slug") slug: String): AnimekompiEpisodeResponse
 }
 
+interface SupabaseFunctionsApi {
+    @POST("functions/v1/register-ip-guard")
+    suspend fun checkIpGuard(
+        @Body request: IpGuardRequest,
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authHeader: String
+    ): IpGuardResponse
+}
+
 interface SupabaseAuthApi {
     @POST("auth/v1/signup")
     suspend fun signUp(
@@ -893,6 +902,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(SupabaseAuthApi::class.java)
+    }
+
+    val supabaseFunctionsApi: SupabaseFunctionsApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
+            .client(defaultOkHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(SupabaseFunctionsApi::class.java)
     }
 
     val supabaseDbApi: SupabaseDbApi by lazy {

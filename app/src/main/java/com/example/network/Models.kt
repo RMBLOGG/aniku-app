@@ -141,6 +141,19 @@ data class SignUpData(
 )
 
 @JsonClass(generateAdapter = true)
+data class IpGuardRequest(
+    val user_id: String,
+    val email: String
+)
+
+@JsonClass(generateAdapter = true)
+data class IpGuardResponse(
+    val banned: Boolean?,
+    val reason: String?,
+    val error: String?
+)
+
+@JsonClass(generateAdapter = true)
 data class SignInRequest(
     val email: String,
     val password: String

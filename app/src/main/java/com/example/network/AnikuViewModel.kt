@@ -7,6 +7,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.ui.theme.SettingsStore
+import com.example.util.orDefault
+import com.example.util.nullIfBlank
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -1458,7 +1460,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     refreshToken = res.refresh_token,
                     userId = uId,
                     email = email,
-                    username = profile?.username ?: (res.user?.user_metadata?.get("username")?.toString() ?: email.substringBefore("@")),
+                    username = profile?.username.nullIfBlank() ?: (res.user?.user_metadata?.get("username")?.toString() ?: email.substringBefore("@")),
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
@@ -1577,6 +1579,25 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
                 val uId = res.user?.id ?: ""
 
+                // Cek IP guard: kalau kedeteksi >2 akun dari IP yang sama,
+                // edge function bakal auto-ban IP + akun ini juga.
+                try {
+                    val guardRes = NetworkClient.supabaseFunctionsApi.checkIpGuard(
+                        request = IpGuardRequest(user_id = uId, email = email),
+                        apiKey = SUPABASE_ANON_KEY,
+                        authHeader = "Bearer $SUPABASE_ANON_KEY"
+                    )
+                    if (guardRes.banned == true) {
+                        _authError.value = "Pendaftaran ditolak: terdeteksi lebih dari 2 akun dari jaringan/IP yang sama. Akun ini otomatis di-ban."
+                        _authLoading.value = false
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    // Kalau edge function gagal dipanggil (mis. lagi maintenance),
+                    // jangan blokir user biasa yang lagi daftar normal.
+                    Log.e("AnikuVM", "IP guard check failed, lanjut tanpa cek", e)
+                }
+
                 // Sleep briefly to let handle_new_user trigger execute
                 kotlinx.coroutines.delay(1500)
 
@@ -1594,7 +1615,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     refreshToken = res.refresh_token,
                     userId = uId,
                     email = email,
-                    username = profile?.username ?: username,
+                    username = profile?.username.nullIfBlank() ?: username,
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
@@ -1648,7 +1669,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     refreshToken = refreshToken,
                     userId = uId,
                     email = email,
-                    username = profile?.username ?: email.substringBefore("@"),
+                    username = profile?.username.nullIfBlank() ?: email.substringBefore("@"),
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
@@ -1668,12 +1689,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     fun updateProfileUsername(newUsername: String, onComplete: () -> Unit) {
+        val trimmed = newUsername.trim()
+        if (trimmed.isBlank()) {
+            _authError.value = "Nama pengguna tidak boleh kosong"
+            return
+        }
         val sess = session.value
         val token = sess.token ?: return
         val uId = sess.userId ?: return
         viewModelScope.launch {
             try {
-                val updateFields = mapOf("username" to newUsername)
+                val updateFields = mapOf("username" to trimmed)
                 NetworkClient.supabaseDbApi.updateProfile(
                     idQuery = "eq.$uId",
                     profile = updateFields,
@@ -1681,7 +1707,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     apiKey = SUPABASE_ANON_KEY
                 )
                 val updatedSession = sess.copy(
-                    username = newUsername,
+                    username = trimmed,
                     avatarUrl = sess.avatarUrl
                 )
                 settingsStore.saveSession(updatedSession)
@@ -2888,7 +2914,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     data = EpisodeCommentRequest(
                         episode_slug = episodeSlug,
                         user_id = currentSession.userId ?: "",
-                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "User",
+                        username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "User",
                         avatar_url = currentSession.avatarUrl,
                         role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                         is_admin = currentSession.isAdmin,
@@ -3082,7 +3108,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     data = WatchChatRequest(
                         episode_slug = episodeSlug,
                         user_id = currentSession.userId ?: "",
-                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "User",
+                        username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "User",
                         avatar_url = currentSession.avatarUrl,
                         message = trimmed
                     ),
@@ -3171,7 +3197,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     NetworkClient.supabaseDbApi.insertChatMessage(
                         data = ChatMessageRequest(
                             user_id = currentSession.userId ?: "",
-                            username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                            username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
                             avatar_url = currentSession.avatarUrl,
                             role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                             is_admin = currentSession.isAdmin,
@@ -3508,7 +3534,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     NetworkClient.supabaseDbApi.insertPost(
                         data = PostRequest(
                             user_id = currentSession.userId ?: "",
-                            username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                            username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
                             avatar_url = currentSession.avatarUrl,
                             role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; else -> "user" },
                             is_admin = currentSession.isAdmin,
@@ -3625,7 +3651,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     data = PostCommentRequest(
                         post_id = postId,
                         user_id = currentSession.userId ?: "",
-                        username = currentSession.username ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                        username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
                         avatar_url = currentSession.avatarUrl,
                         message = trimmed,
                         reply_to_id = replyToId,
@@ -3735,7 +3761,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         onResult: (roomCode: String?) -> Unit
     ) {
         val userId = session.value.userId
-        val username = session.value.username ?: "Host"
+        val username = session.value.username.orDefault("Host")
         if (userId == null) {
             _nobarError.value = "Kamu harus login untuk membuat room Nobar."
             onResult(null)
@@ -3766,7 +3792,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun joinNobarRoom(roomCode: String, onResult: (success: Boolean) -> Unit) {
         val userId = session.value.userId
-        val username = session.value.username ?: "Guest"
+        val username = session.value.username.orDefault("Guest")
         if (userId == null) {
             _nobarError.value = "Kamu harus login untuk join room Nobar."
             onResult(false)

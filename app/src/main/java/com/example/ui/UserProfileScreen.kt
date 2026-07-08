@@ -46,6 +46,7 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.R
 import com.example.network.AnikuViewModel
+import com.example.util.orDefault
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -251,7 +252,7 @@ fun UserProfileScreen(
 
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        p.username ?: "Pengguna",
+                        p.username.orDefault("Pengguna"),
                         fontSize = 21.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
@@ -676,7 +677,7 @@ fun UserProfileScreen(
                                     ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Text(member.username ?: "?", fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f))
+                                Text(member.username.orDefault("?"), fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f))
                                 if (member.role == "leader") {
                                     Icon(Icons.Default.Star, contentDescription = "Leader", tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
                                 }

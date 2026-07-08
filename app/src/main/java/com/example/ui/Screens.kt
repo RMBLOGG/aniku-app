@@ -51,6 +51,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import com.example.R
+import com.example.util.orDefault
+import com.example.util.nullIfBlank
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -1027,7 +1029,7 @@ private fun PodiumAvatar(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = user.username ?: "Anonim",
+                text = user.username.orDefault("Anonim"),
                 color = if (rank == 1) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.85f),
                 fontSize = if (rank == 1) 11.sp else 10.sp,
                 fontWeight = FontWeight.Bold,
@@ -1151,7 +1153,7 @@ private fun TopUserRow(
             Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = user.username ?: "Anonim",
+                    text = user.username.orDefault("Anonim"),
                     color = Color.White,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1571,7 +1573,7 @@ fun HomeScreen(
                         // Username + level pill + ID pill
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = session.username ?: "Otaku",
+                                text = session.username.orDefault("Otaku"),
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
@@ -7552,7 +7554,7 @@ fun ProfileScreen(
                 Column(modifier = Modifier.padding(bottom = 8.dp)) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = sess.username ?: "-",
+                            text = sess.username.orDefault("-"),
                             color = MaterialTheme.colorScheme.onBackground,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -7706,8 +7708,12 @@ fun ProfileScreen(
 
             Button(
                 onClick = {
-                    viewModel.updateProfileUsername(usernameEditor) {
-                        Toast.makeText(context, "Username berhasil diubah!", Toast.LENGTH_SHORT).show()
+                    if (usernameEditor.isBlank()) {
+                        Toast.makeText(context, "Nama pengguna tidak boleh kosong", Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.updateProfileUsername(usernameEditor) {
+                            Toast.makeText(context, "Username berhasil diubah!", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = accentColor),
@@ -8019,7 +8025,7 @@ fun AdminPanelScreen(
                                         ) {
                                             AvatarCircle(
                                                 avatarUrl = usr.avatar_url,
-                                                username = usr.username ?: "?",
+                                                username = usr.username.orDefault("?"),
                                                 size = 44.dp
                                             )
                                         }
@@ -8029,7 +8035,7 @@ fun AdminPanelScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = usr.username ?: "Tamu",
+                                                    text = usr.username.orDefault("Tamu"),
                                                     color = MaterialTheme.colorScheme.onSurface,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 15.sp
@@ -8223,7 +8229,7 @@ fun AdminPanelScreen(
                                             var dmAmount by remember { mutableStateOf("") }
                                             AlertDialog(
                                                 onDismissRequest = { showAddDmDialog = false },
-                                                title = { Text("Tambah Diamond \u2014 ${usr.username ?: "User"}") },
+                                                title = { Text("Tambah Diamond \u2014 ${usr.username.orDefault("User")}") },
                                                 text = {
                                                     Column {
                                                         Text("Saldo saat ini: ${usr.diamond_balance ?: 0} DM", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -8905,7 +8911,7 @@ fun SettingsScreen(
                                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Text(
-                                                text = sess.username ?: sess.email ?: "Pengguna",
+                                                text = sess.username.nullIfBlank() ?: sess.email ?: "Pengguna",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 16.sp,
                                                 color = MaterialTheme.colorScheme.onSurface

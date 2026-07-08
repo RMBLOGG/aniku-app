@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.*
 import com.example.network.AnikuViewModel
+import com.example.util.nullIfBlank
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -236,7 +237,7 @@ fun SecurityScreen(
                     SessionInfoRow(
                         icon = Icons.Default.AccountCircle,
                         label = "Akun",
-                        value = session.email ?: session.username ?: "-",
+                        value = session.email.nullIfBlank() ?: session.username.nullIfBlank() ?: "-",
                         tint = accentColor
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
