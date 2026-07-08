@@ -1534,9 +1534,35 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val isNewAccount = try {
                     val createdAtStr = profile?.created_at
                     if (createdAtStr != null) {
-                        val createdInstant = java.time.OffsetDateTime.parse(createdAtStr).toInstant()
-                        val ageMs = java.time.Duration.between(createdInstant, java.time.Instant.now()).toMillis()
-                        ageMs in 0..20000 // baru dibuat dalam 20 detik terakhir
+                        // Normalisasi string Postgres timestamptz ("...Z" atau "...+00:00",
+                        // fractional seconds bisa 0-6 digit) jadi format yang bisa diparse
+                        // SimpleDateFormat (aman dari API 1, gak butuh java.time/desugaring
+                        // yang gak tersedia native di minSdk 24 tanpa coreLibraryDesugaring).
+                        var normalized = createdAtStr.trim()
+                        if (normalized.endsWith("Z")) {
+                            normalized = normalized.dropLast(1) + "+00:00"
+                        }
+                        normalized = if (normalized.contains(".")) {
+                            normalized.replace(Regex("""\.(\d+)""")) { m ->
+                                "." + m.groupValues[1].padEnd(3, '0').take(3)
+                            }
+                        } else {
+                            // Sisipin fractional seconds ".000" sebelum tanda offset (+/-)
+                            val offsetIdx = normalized.indexOfLast { it == '+' || it == '-' }
+                            if (offsetIdx > 10) {
+                                normalized.substring(0, offsetIdx) + ".000" + normalized.substring(offsetIdx)
+                            } else {
+                                normalized
+                            }
+                        }
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US)
+                        val createdMillis = sdf.parse(normalized)?.time
+                        if (createdMillis != null) {
+                            val ageMs = System.currentTimeMillis() - createdMillis
+                            ageMs in 0..20000 // baru dibuat dalam 20 detik terakhir
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
