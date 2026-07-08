@@ -205,6 +205,7 @@ fun ChatScreen(
     val isChatLoading by viewModel.isChatLoading.collectAsState()
     val chatError by viewModel.chatError.collectAsState()
     val chatNotifEnabled by viewModel.chatNotifEnabled.collectAsState()
+    val onlineCount by viewModel.onlineCount.collectAsState()
     val chatRoomEnabled by viewModel.remoteConfigManager.chatRoomEnabled.collectAsState()
     val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
     val clanTagMap by viewModel.clanTagMap.collectAsState()
@@ -310,12 +311,12 @@ fun ChatScreen(
                                         modifier = Modifier
                                             .size(7.dp)
                                             .background(
-                                                color = if (isLoggedIn) Color(0xFF4CAF50) else Color(0xFF9E9E9E),
+                                                color = Color(0xFF4CAF50),
                                                 shape = CircleShape
                                             )
                                     )
                                     Text(
-                                        if (isLoggedIn) "Online sebagai ${session.username}" else "Mode tamu \u2014 hanya lihat",
+                                        if (onlineCount > 0) "$onlineCount user online" else "Menghitung user online...",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                     )

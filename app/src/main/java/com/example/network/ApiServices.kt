@@ -587,6 +587,23 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // ─── Presence: total user online di seluruh aplikasi ───
+    @GET("rest/v1/user_presence")
+    suspend fun getOnlinePresence(
+        @Query("last_seen") lastSeenFilter: String,
+        @Query("select") select: String = "user_id",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<Map<String, String>>
+
+    @POST("rest/v1/user_presence")
+    suspend fun upsertPresence(
+        @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
     // ─── Typing indicator chat room ───
     @GET("rest/v1/chat_typing")
     suspend fun getTypingUsers(

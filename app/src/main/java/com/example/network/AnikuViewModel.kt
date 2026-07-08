@@ -33,6 +33,56 @@ class AnikuViewModel(context: Context) : ViewModel() {
         remoteConfigManager.fetchAndApply()
     }
 
+    // ── Presence: total user online di seluruh aplikasi (bukan cuma di chat room) ──
+    private val _onlineCount = MutableStateFlow(0)
+    val onlineCount: StateFlow<Int> = _onlineCount.asStateFlow()
+
+    // Kirim "kabar hidup" tiap 45 detik selama app kebuka & user login,
+    // ga peduli lagi di layar mana. Dianggap offline kalau ga heartbeat >90 detik.
+    private fun startAppPresenceHeartbeat() {
+        viewModelScope.launch {
+            while (true) {
+                val currentSession = session.value
+                val userId = currentSession.userId
+                val token = currentSession.token
+                if (!userId.isNullOrBlank() && !token.isNullOrBlank()) {
+                    try {
+                        val username = currentSession.username.nullIfBlank()
+                            ?: currentSession.email?.substringBefore("@") ?: "Anonymous"
+                        NetworkClient.supabaseDbApi.upsertPresence(
+                            data = mapOf(
+                                "user_id" to userId,
+                                "username" to username,
+                                "avatar_url" to currentSession.avatarUrl,
+                                "last_seen" to java.time.Instant.now().toString()
+                            ),
+                            authHeader = "Bearer $token",
+                            apiKey = SUPABASE_ANON_KEY
+                        )
+                    } catch (_: Exception) {}
+                }
+                kotlinx.coroutines.delay(45_000L)
+            }
+        }
+    }
+
+    private fun startOnlineCountPolling() {
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    val cutoff = java.time.Instant.now().minusSeconds(90).toString()
+                    val rows = NetworkClient.supabaseDbApi.getOnlinePresence(
+                        lastSeenFilter = "gte.$cutoff",
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    _onlineCount.value = rows.size
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(20_000L)
+            }
+        }
+    }
+
     // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
     private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
     private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
@@ -447,6 +497,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadSearchPopular()
         checkForUpdate()
         loadDonations()
+        // Presence: heartbeat + polling total online seluruh aplikasi
+        startAppPresenceHeartbeat()
+        startOnlineCountPolling()
         // Auto-refresh token saat app dibuka
         viewModelScope.launch {
             refreshSession()
