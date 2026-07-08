@@ -6897,14 +6897,15 @@ fun AuthScreen(
                     Text(
                         text = "Aniku",
                         color = accentColor,
-                        fontWeight = FontWeight.Black,
-                        fontSize = 44.sp,
-                        letterSpacing = 2.sp
+                        fontFamily = com.example.ui.theme.ComicDisplayFont,
+                        fontSize = 52.sp,
+                        letterSpacing = 1.sp
                     )
                     Text(
                         text = "Cinema-grade Anime Portal",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                        fontFamily = com.example.ui.theme.ComicBodyFont,
+                        fontSize = 13.sp,
                         letterSpacing = 0.5.sp
                     )
                 }
