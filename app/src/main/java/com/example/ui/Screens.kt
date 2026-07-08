@@ -40,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
@@ -54,6 +56,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.buildAnnotatedString
@@ -6790,156 +6793,285 @@ fun AuthScreen(
         }
     }
 
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "auth_ambient")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.12f,
+        targetValue = 0.28f,
+        animationSpec = infiniteRepeatable(tween(3200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "glowAlpha"
+    )
+    val logoScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.07f,
+        animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "logoScale"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        // ── Ambient glow blobs (dekorasi latar, tidak flat) ──
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset(x = (-70).dp, y = 20.dp)
+                .size(220.dp)
+                .blur(90.dp)
+                .background(accentColor.copy(alpha = glowAlpha), CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = 60.dp, y = 180.dp)
+                .size(180.dp)
+                .blur(80.dp)
+                .background(accentColor.copy(alpha = glowAlpha * 0.7f), CircleShape)
+        )
+
         Column(
             modifier = Modifier
+                .align(Alignment.Center)
                 .padding(24.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Stylized Cinematic Logo
-            Text(
-                text = "Aniku",
-                color = accentColor,
-                fontWeight = FontWeight.Black,
-                fontSize = 44.sp,
-                letterSpacing = 2.sp
-            )
-            Text(
-                text = "Cinema-grade Anime Portal",
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                fontSize = 12.sp
-            )
+            // Logo icon dengan pulsing glow + gradient
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(500)) + scaleIn(initialScale = 0.6f, animationSpec = tween(550, easing = EaseOutBack))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(84.dp)
+                        .graphicsLayer { scaleX = logoScale; scaleY = logoScale }
+                        .shadow(16.dp, CircleShape, spotColor = accentColor)
+                        .background(
+                            Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.65f))),
+                            CircleShape
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
+                }
+            }
 
-            Spacer(modifier = Modifier.height(44.dp))
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Stylized Cinematic Logo
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(500, delayMillis = 100)) +
+                        slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(500, delayMillis = 100, easing = EaseOutCubic))
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Aniku",
+                        color = accentColor,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 44.sp,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        text = "Cinema-grade Anime Portal",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(40.dp))
 
             // Card Form
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(550, delayMillis = 180)) +
+                        slideInVertically(initialOffsetY = { it / 5 }, animationSpec = tween(550, delayMillis = 180, easing = EaseOutCubic))
+            ) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(accentColor.copy(alpha = 0.25f), Color.Transparent)
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    // Segment control Tab
-                    Row(
+                    // Segment control Tab dengan indikator geser animasi
+                    BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surface)
                             .padding(4.dp)
                     ) {
+                        val tabWidth = maxWidth / 2
+                        val indicatorOffset by animateDpAsState(
+                            targetValue = if (isLoginTab) 0.dp else tabWidth,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                            label = "tabIndicator"
+                        )
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isLoginTab) accentColor else Color.Transparent)
-                                .clickable { isLoginTab = true }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Masuk", color = if (isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (!isLoginTab) accentColor else Color.Transparent)
-                                .clickable { isLoginTab = false }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Daftar", color = if (!isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                .offset(x = indicatorOffset)
+                                .width(tabWidth)
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(Brush.horizontalGradient(listOf(accentColor, accentColor.copy(alpha = 0.85f))))
+                        )
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { isLoginTab = true }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val color by animateColorAsState(if (isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), label = "loginTabColor")
+                                Text("Masuk", color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) { isLoginTab = false }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val color by animateColorAsState(if (!isLoginTab) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), label = "daftarTabColor")
+                                Text("Daftar", color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    authError?.let { err ->
-                        Text(text = err, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
+                    AnimatedVisibility(visible = authError != null) {
+                        Text(text = authError ?: "", color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(bottom = 12.dp))
                     }
 
                     // Email Field
                     Text("Email", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    TextField(
+                    OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         modifier = Modifier.fillMaxWidth().testTag("auth_email"),
-                        colors = TextFieldDefaults.colors(
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(20.dp)) },
+                        colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedIndicatorColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = accentColor,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Username field (only in signup)
-                    if (!isLoginTab) {
-                        Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        TextField(
-                            value = username,
-                            onValueChange = { username = it },
-                            modifier = Modifier.fillMaxWidth().testTag("auth_username"),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
+                    // Username field (only in signup) dengan animasi tampil/hilang
+                    AnimatedVisibility(
+                        visible = !isLoginTab,
+                        enter = fadeIn(tween(300)) + expandVertically(animationSpec = tween(300, easing = EaseOutCubic)),
+                        exit = fadeOut(tween(200)) + shrinkVertically(animationSpec = tween(200))
+                    ) {
+                        Column {
+                            Text("Username", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = username,
+                                onValueChange = { username = it },
+                                modifier = Modifier.fillMaxWidth().testTag("auth_username"),
+                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(20.dp)) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedBorderColor = Color.Transparent,
+                                    focusedBorderColor = accentColor,
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
                     }
 
                     // Password Field
+                    var passwordVisible by remember { mutableStateOf(false) }
                     Text("Sandi", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    TextField(
+                    OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         modifier = Modifier.fillMaxWidth().testTag("auth_password"),
-                        visualTransformation = PasswordVisualTransformation(),
-                        colors = TextFieldDefaults.colors(
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), modifier = Modifier.size(20.dp)) },
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedIndicatorColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedBorderColor = accentColor,
                             focusedTextColor = MaterialTheme.colorScheme.onSurface,
                             unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
 
-                    if (isLoginTab) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TextButton(
-                            onClick = {
-                                forgotEmail = email.trim()
-                                forgotResultMessage = null
-                                showForgotPasswordDialog = true
-                            },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Lupa Password?", color = accentColor, fontSize = 13.sp)
+                    AnimatedVisibility(visible = isLoginTab) {
+                        Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            TextButton(
+                                onClick = {
+                                    forgotEmail = email.trim()
+                                    forgotResultMessage = null
+                                    showForgotPasswordDialog = true
+                                },
+                                modifier = Modifier.align(Alignment.End)
+                            ) {
+                                Text("Lupa Password?", color = accentColor, fontSize = 13.sp)
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Submission action
+                    // Submission action — gradient button dengan animasi tekan
+                    val submitInteractionSource = remember { MutableInteractionSource() }
+                    val isPressed by submitInteractionSource.collectIsPressedAsState()
+                    val submitScale by animateFloatAsState(if (isPressed) 0.97f else 1f, animationSpec = tween(120), label = "submitScale")
                     Button(
                         onClick = {
                             if (isLoginTab) {
@@ -6948,15 +7080,31 @@ fun AuthScreen(
                                 viewModel.register(email.trim(), password.trim(), username.trim(), onAuthSuccess)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(48.dp).testTag("auth_submit"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        interactionSource = submitInteractionSource,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .graphicsLayer { scaleX = submitScale; scaleY = submitScale }
+                            .testTag("auth_submit"),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
                         enabled = !authLoading
                     ) {
-                        if (authLoading) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                        } else {
-                            Text(if (isLoginTab) "Masuk" else "Daftar", fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.horizontalGradient(listOf(accentColor, accentColor.copy(alpha = 0.8f)))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AnimatedContent(targetState = authLoading, label = "submitContent") { loading ->
+                                if (loading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                                } else {
+                                    Text(if (isLoginTab) "Masuk" else "Daftar", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
                         }
                     }
 
@@ -6981,35 +7129,45 @@ fun AuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         enabled = !authLoading && !googleLoading
                     ) {
-                        if (googleLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        } else {
-                            Text(
-                                "G",
-                                fontWeight = FontWeight.Black,
-                                fontSize = 16.sp,
-                                color = accentColor
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Lanjutkan dengan Google", fontWeight = FontWeight.SemiBold)
+                        AnimatedContent(targetState = googleLoading, label = "googleContent") { loading ->
+                            if (loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "G",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 16.sp,
+                                        color = accentColor
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Lanjutkan dengan Google", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
                     }
                 }
+            }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Guest Mode link
-            TextButton(onClick = onGuestMode) {
-                Text(
-                    text = "Gunakan Mode Tamu",
-                    color = accentColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(500, delayMillis = 260))
+            ) {
+                TextButton(onClick = onGuestMode) {
+                    Text(
+                        text = "Gunakan Mode Tamu",
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
