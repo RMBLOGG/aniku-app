@@ -893,9 +893,13 @@ private fun LeaderboardPodiumPage(
     // urutan slot kiri→kanan berdasarkan offset rank dari startRank: #4 #2 #1 #3 #5
     val slotOffsets = listOf(3, 1, 0, 2, 4)
     Row(
+        // Tinggi 150dp — dihitung dari konten paling tinggi (rank #1: mahkota 18 + avatar
+        // 60 + nama + level + badge ≈ 135dp) + buffer. HorizontalPager butuh tinggi pasti
+        // per halaman (dia dipanggil di dalam LazyColumn yang scrollable), makanya nggak
+        // bisa dibikin wrap-content — tapi angkanya sekarang cukup, nggak kepotong lagi.
         modifier = modifier
             .fillMaxWidth()
-            .height(122.dp),
+            .height(150.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom
     ) {
@@ -943,12 +947,15 @@ private fun PodiumAvatar(
         3 -> Brush.linearGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
         else -> Brush.linearGradient(colors = listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.12f)))
     }
-    val chipBrush = when (rank) {
-        1 -> Brush.horizontalGradient(colors = listOf(Color(0xFFFFE082), Color(0xFFFFB300)))
-        2 -> Brush.horizontalGradient(colors = listOf(Color(0xFFECEFF1), Color(0xFF90A4AE)))
-        3 -> Brush.horizontalGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
-        else -> Brush.horizontalGradient(colors = listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.10f)))
+    // Solid, bukan gradient tipis — biar angka rank di dalamnya PASTI kebaca,
+    // bukan cuma pill kosong kayak sebelumnya.
+    val chipColor = when (rank) {
+        1 -> Color(0xFFFFC107)
+        2 -> Color(0xFFCFD8DC)
+        3 -> Color(0xFFCE8B5B)
+        else -> Color.White.copy(alpha = 0.22f)
     }
+    val chipTextColor = if (rank <= 3) Color(0xFF1B1330) else Color.White
 
     // Entrance: fade + scale-in bertahap
     var visible by remember(entranceKey) { mutableStateOf(false) }
@@ -975,7 +982,7 @@ private fun PodiumAvatar(
         enter = fadeIn(tween(320)) + scaleIn(initialScale = 0.7f, animationSpec = tween(320))
     ) {
         Column(
-            modifier = Modifier.width(64.dp),
+            modifier = Modifier.width(66.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (rank == 1) {
@@ -985,9 +992,9 @@ private fun PodiumAvatar(
                         .graphicsLayer { alpha = pulse },
                     tint = Color(0xFFFFD54F)
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(3.dp))
             } else {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(21.dp))
             }
 
             Box(
@@ -1015,12 +1022,12 @@ private fun PodiumAvatar(
             Text(
                 text = user.username ?: "Anonim",
                 color = if (rank == 1) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.85f),
-                fontSize = if (rank == 1) 11.5.sp else 10.sp,
+                fontSize = if (rank == 1) 11.sp else 10.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.width(62.dp)
+                modifier = Modifier.width(64.dp)
             )
             Text(
                 text = "Lv. ${user.season_level ?: 1}",
@@ -1035,14 +1042,15 @@ private fun PodiumAvatar(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(chipBrush)
+                    .background(chipColor)
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = "$rank",
-                    color = if (rank <= 3) Color(0xFF1B1330) else Color.White.copy(alpha = 0.85f),
+                    text = "#$rank",
+                    color = chipTextColor,
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
                 )
             }
         }
