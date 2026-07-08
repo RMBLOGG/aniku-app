@@ -133,13 +133,6 @@ fun SplashScreen() {
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Aniku",
-                        color = accentColor,
-                        fontFamily = com.example.ui.theme.ComicDisplayFont,
-                        fontSize = 48.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
                         text = "Cinema-grade Anime Portal",
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                         fontFamily = com.example.ui.theme.ComicBodyFont,
