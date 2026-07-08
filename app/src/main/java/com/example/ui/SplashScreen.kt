@@ -31,9 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -89,14 +89,22 @@ fun SplashScreen() {
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
-        // Glow blob di belakang karakter
+        // Glow blob di belakang karakter — radial gradient fade ke transparan,
+        // bukan blur di dalam kotak (itu penyebab keliatan kotak merah kemarin)
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .offset(y = (-20).dp)
-                .size(320.dp)
-                .blur(110.dp)
-                .background(accentColor.copy(alpha = glowAlpha), CircleShape)
+                .size(420.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            accentColor.copy(alpha = glowAlpha),
+                            accentColor.copy(alpha = glowAlpha * 0.35f),
+                            Color.Transparent
+                        )
+                    )
+                )
         )
 
         Column(
