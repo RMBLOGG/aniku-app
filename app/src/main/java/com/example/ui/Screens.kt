@@ -10283,6 +10283,7 @@ fun TopSupporterScreen(
     onBack: () -> Unit
 ) {
     val donations by viewModel.donations.collectAsState()
+    val scope = rememberCoroutineScope()
 
     // Group by supporter_name dan jumlahkan total_amount
     val leaderboard = donations
@@ -10290,8 +10291,21 @@ fun TopSupporterScreen(
         .map { (name, list) -> name to list.sumOf { it.total_amount ?: 0 } }
         .sortedByDescending { it.second }
 
+    var isRefreshing by remember { mutableStateOf(false) }
+    var hasLoadedOnce by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.loadDonations()
+        hasLoadedOnce = true
+    }
+
+    fun refresh() {
+        scope.launch {
+            isRefreshing = true
+            viewModel.loadDonations()
+            delay(450)
+            isRefreshing = false
+        }
     }
 
     // Palet warna "perkamen emas" sesuai referensi redesign
@@ -10309,6 +10323,37 @@ fun TopSupporterScreen(
     val goldGradient = Brush.linearGradient(listOf(goldSoft, gold))
     val silverGradient = Brush.linearGradient(listOf(Color(0xFFD8D2C2), pewter))
     val bronzeGradient = Brush.linearGradient(listOf(Color(0xFFC98A5E), copper))
+
+    // Trigger buat staggered entrance animation begitu data pertama kali landing
+    var contentVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(leaderboard.isNotEmpty()) {
+        if (leaderboard.isNotEmpty()) {
+            contentVisible = false
+            delay(40)
+            contentVisible = true
+        }
+    }
+
+    // Trophy melayang pelan + glow napas di hero
+    val heroTransition = rememberInfiniteTransition(label = "hero")
+    val trophyFloat by heroTransition.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "trophyFloat"
+    )
+    val heroGlowAlpha by heroTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "heroGlow"
+    )
 
     Scaffold(
         containerColor = bg0,
@@ -10337,212 +10382,325 @@ fun TopSupporterScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 40.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(62.dp)
-                            .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
-                        contentAlignment = Alignment.Center
+                if (!hasLoadedOnce) {
+                    CircularProgressIndicator(color = gold, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 40.dp)
                     ) {
-                        Text("🏆", fontSize = 30.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(62.dp)
+                                .graphicsLayer { translationY = trophyFloat }
+                                .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🏆", fontSize = 30.sp)
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            "Belum ada supporter",
+                            color = ivory,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            "Jadilah yang pertama support Aniku!",
+                            color = ivoryDim,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "Belum ada supporter",
-                        color = ivory,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 17.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        "Jadilah yang pertama support Aniku!",
-                        color = ivoryDim,
-                        fontSize = 12.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
                 }
             }
         } else {
             val top3 = leaderboard.take(3)
             val rest = leaderboard.drop(3)
 
-            LazyColumn(
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { refresh() },
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(bg0)
                     .padding(padding),
-                contentPadding = PaddingValues(bottom = 28.dp)
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        isRefreshing = isRefreshing,
+                        state = rememberPullToRefreshState(),
+                        containerColor = Color(0xFF231D29),
+                        color = gold
+                    )
+                }
             ) {
-                // ===== Hero =====
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 10.dp, bottom = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(68.dp)
-                                .background(Brush.linearGradient(listOf(goldSoft, brass)), shape = CircleShape),
-                            contentAlignment = Alignment.Center
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(bg0),
+                    contentPadding = PaddingValues(bottom = 28.dp)
+                ) {
+                    // ===== Hero =====
+                    item {
+                        AnimatedVisibility(
+                            visible = contentVisible,
+                            enter = fadeIn(tween(500)) + slideInVertically(
+                                initialOffsetY = { -it / 3 },
+                                animationSpec = tween(500, easing = FastOutSlowInEasing)
+                            )
                         ) {
-                            Text("🏆", fontSize = 32.sp)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp)
+                                    .padding(top = 10.dp, bottom = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    // Glow napas di belakang trophy
+                                    Box(
+                                        modifier = Modifier
+                                            .size(96.dp)
+                                            .background(
+                                                Brush.radialGradient(
+                                                    listOf(gold.copy(alpha = heroGlowAlpha), Color.Transparent)
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(68.dp)
+                                            .graphicsLayer { translationY = trophyFloat }
+                                            .background(
+                                                Brush.linearGradient(listOf(goldSoft, brass)),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🏆", fontSize = 32.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    "Hall of Fame",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 26.sp,
+                                    color = gold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Terima kasih sudah support Aniku!",
+                                    fontSize = 12.5.sp,
+                                    color = ivoryDim
+                                )
+                                Spacer(modifier = Modifier.height(14.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .border(1.dp, lineGold, shape = RoundedCornerShape(50))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        "TOTAL DUKUNGAN TERBESAR",
+                                        fontSize = 9.5.sp,
+                                        letterSpacing = 0.06.em,
+                                        color = brass
+                                    )
+                                }
+                            }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "Hall of Fame",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 26.sp,
-                            color = gold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            "Terima kasih sudah support Aniku!",
-                            fontSize = 12.5.sp,
-                            color = ivoryDim
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+
+                    // ===== Podium rank 1-3 =====
+                    item {
+                        AnimatedVisibility(
+                            visible = contentVisible,
+                            enter = fadeIn(tween(550, delayMillis = 120)) + scaleIn(
+                                initialScale = 0.85f,
+                                animationSpec = tween(550, delayMillis = 120, easing = FastOutSlowInEasing)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp)
+                                    .padding(top = 26.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                // Silver (kiri)
+                                if (top3.size > 1) {
+                                    PodiumPlaque(
+                                        modifier = Modifier.weight(1f),
+                                        rank = 2,
+                                        name = top3[1].first ?: "Anonim",
+                                        amountValue = top3[1].second,
+                                        rankGradient = silverGradient,
+                                        avatarGradient = silverGradient,
+                                        borderColor = lineDim,
+                                        nameColor = ivory,
+                                        amountColor = ivoryDim,
+                                        isGold = false,
+                                        countDelay = 260
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+
+                                // Gold (tengah, lebih besar, dengan glow pulse)
+                                PodiumPlaque(
+                                    modifier = Modifier.weight(1.15f),
+                                    rank = 1,
+                                    name = top3[0].first ?: "Anonim",
+                                    amountValue = top3[0].second,
+                                    rankGradient = goldGradient,
+                                    avatarGradient = goldGradient,
+                                    borderColor = gold.copy(alpha = 0.45f),
+                                    nameColor = goldSoft,
+                                    amountColor = gold,
+                                    isGold = true,
+                                    countDelay = 180
+                                )
+
+                                // Bronze (kanan)
+                                if (top3.size > 2) {
+                                    PodiumPlaque(
+                                        modifier = Modifier.weight(1f),
+                                        rank = 3,
+                                        name = top3[2].first ?: "Anonim",
+                                        amountValue = top3[2].second,
+                                        rankGradient = bronzeGradient,
+                                        avatarGradient = bronzeGradient,
+                                        borderColor = lineDim,
+                                        nameColor = ivory,
+                                        amountColor = ivoryDim,
+                                        isGold = false,
+                                        countDelay = 340
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+
+                    // Garis dasar podium
+                    item {
                         Box(
                             modifier = Modifier
-                                .border(1.dp, lineGold, shape = RoundedCornerShape(50))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .fillMaxWidth()
+                                .padding(horizontal = 22.dp)
+                                .padding(top = 4.dp, bottom = 18.dp)
+                                .height(2.dp)
+                                .background(
+                                    Brush.verticalGradient(listOf(lineGold, Color.Transparent))
+                                )
+                        )
+                    }
+
+                    // ===== Sisa daftar (rank 4+), muncul satu-satu (staggered) =====
+                    itemsIndexed(rest, key = { _, item -> item.first ?: "anon-$it" }) { idx, (name, total) ->
+                        var rowVisible by remember(name, idx) { mutableStateOf(false) }
+                        LaunchedEffect(contentVisible) {
+                            if (contentVisible) {
+                                delay(220L + idx * 55L)
+                                rowVisible = true
+                            }
+                        }
+                        AnimatedVisibility(
+                            visible = rowVisible,
+                            enter = fadeIn(tween(320)) + slideInHorizontally(
+                                initialOffsetX = { it / 5 },
+                                animationSpec = tween(320, easing = FastOutSlowInEasing)
+                            )
+                        ) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 3.5.dp),
+                                shape = RoundedCornerShape(13.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.025f)),
+                                border = BorderStroke(1.dp, lineDim),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "${idx + 4}",
+                                        fontSize = 12.5.sp,
+                                        color = Color(0xFF736A82),
+                                        modifier = Modifier.width(20.dp)
+                                    )
+                                    Text(
+                                        name ?: "Anonim",
+                                        fontSize = 12.5.sp,
+                                        color = Color(0xFFCFC7DA),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    AnimatedRupiahText(
+                                        target = total,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = Color(0xFF9D93AB),
+                                        delayMillis = 220 + idx * 55
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        AnimatedVisibility(
+                            visible = contentVisible,
+                            enter = fadeIn(tween(400, delayMillis = 260 + rest.size * 55))
                         ) {
                             Text(
-                                "TOTAL DUKUNGAN TERBESAR",
-                                fontSize = 9.5.sp,
-                                letterSpacing = 0.06.em,
-                                color = brass
+                                "— akhir daftar —",
+                                fontSize = 10.5.sp,
+                                color = ivoryDim.copy(alpha = 0.45f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 14.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                         }
                     }
-                }
-
-                // ===== Podium rank 1-3 =====
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp)
-                            .padding(top = 26.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        // Silver (kiri)
-                        if (top3.size > 1) {
-                            PodiumPlaque(
-                                modifier = Modifier.weight(1f),
-                                rank = 2,
-                                name = top3[1].first ?: "Anonim",
-                                amount = formatRupiah(top3[1].second),
-                                rankGradient = silverGradient,
-                                avatarGradient = silverGradient,
-                                borderColor = lineDim,
-                                nameColor = ivory,
-                                amountColor = ivoryDim,
-                                isGold = false
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-
-                        // Gold (tengah, lebih besar)
-                        PodiumPlaque(
-                            modifier = Modifier.weight(1.15f),
-                            rank = 1,
-                            name = top3[0].first ?: "Anonim",
-                            amount = formatRupiah(top3[0].second),
-                            rankGradient = goldGradient,
-                            avatarGradient = goldGradient,
-                            borderColor = gold.copy(alpha = 0.45f),
-                            nameColor = goldSoft,
-                            amountColor = gold,
-                            isGold = true
-                        )
-
-                        // Bronze (kanan)
-                        if (top3.size > 2) {
-                            PodiumPlaque(
-                                modifier = Modifier.weight(1f),
-                                rank = 3,
-                                name = top3[2].first ?: "Anonim",
-                                amount = formatRupiah(top3[2].second),
-                                rankGradient = bronzeGradient,
-                                avatarGradient = bronzeGradient,
-                                borderColor = lineDim,
-                                nameColor = ivory,
-                                amountColor = ivoryDim,
-                                isGold = false
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                // Garis dasar podium
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 22.dp)
-                            .padding(top = 4.dp, bottom = 18.dp)
-                            .height(2.dp)
-                            .background(
-                                Brush.verticalGradient(listOf(lineGold, Color.Transparent))
-                            )
-                    )
-                }
-
-                // ===== Sisa daftar (rank 4+) =====
-                itemsIndexed(rest) { idx, (name, total) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 18.dp, vertical = 3.5.dp)
-                            .background(Color.White.copy(alpha = 0.025f), shape = RoundedCornerShape(13.dp))
-                            .border(1.dp, lineDim, shape = RoundedCornerShape(13.dp))
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "${idx + 4}",
-                            fontSize = 12.5.sp,
-                            color = Color(0xFF736A82),
-                            modifier = Modifier.width(20.dp)
-                        )
-                        Text(
-                            name ?: "Anonim",
-                            fontSize = 12.5.sp,
-                            color = Color(0xFFCFC7DA),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            formatRupiah(total),
-                            fontSize = 12.5.sp,
-                            color = Color(0xFF9D93AB)
-                        )
-                    }
-                }
-
-                item {
-                    Text(
-                        "— akhir daftar —",
-                        fontSize = 10.5.sp,
-                        color = ivoryDim.copy(alpha = 0.45f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 14.dp),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
                 }
             }
         }
     }
+}
+
+/** Text angka rupiah yang animasi "ngitung naik" dari 0 ke nilai aslinya. */
+@Composable
+private fun AnimatedRupiahText(
+    target: Int,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight,
+    color: Color,
+    modifier: Modifier = Modifier,
+    delayMillis: Int = 0
+) {
+    val animated = remember { Animatable(0f) }
+    LaunchedEffect(target) {
+        delay(delayMillis.toLong())
+        animated.animateTo(
+            targetValue = target.toFloat(),
+            animationSpec = tween(durationMillis = 850, easing = FastOutSlowInEasing)
+        )
+    }
+    Text(
+        text = formatRupiah(animated.value.toInt()),
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        color = color,
+        modifier = modifier
+    )
 }
 
 @Composable
@@ -10550,75 +10708,119 @@ private fun PodiumPlaque(
     modifier: Modifier = Modifier,
     rank: Int,
     name: String,
-    amount: String,
+    amountValue: Int,
     rankGradient: Brush,
     avatarGradient: Brush,
     borderColor: Color,
     nameColor: Color,
     amountColor: Color,
-    isGold: Boolean
+    isGold: Boolean,
+    countDelay: Int = 0
 ) {
     val avatarSize = if (isGold) 50.dp else 42.dp
     val rankSize = if (isGold) 26.dp else 22.dp
-    Column(
-        modifier = modifier
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.045f), Color.White.copy(alpha = 0.015f))
-                ),
-                shape = RoundedCornerShape(18.dp)
-            )
-            .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
-            .padding(
-                top = if (isGold) 18.dp else 14.dp,
-                bottom = if (isGold) 16.dp else 12.dp,
-                start = 6.dp,
-                end = 6.dp
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
+
+    // Glow pulse cuma buat si juara satu
+    val glowTransition = rememberInfiniteTransition(label = "podiumGlow")
+    val glowScale by glowTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.28f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowScale"
+    )
+    val glowAlpha by glowTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 0.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
+
+    ElevatedCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isGold) 8.dp else 2.dp),
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(rankSize)
-                .background(rankGradient, shape = CircleShape),
-            contentAlignment = Alignment.Center
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.045f), Color.White.copy(alpha = 0.015f))
+                    )
+                )
+                .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
+                .padding(
+                    top = if (isGold) 18.dp else 14.dp,
+                    bottom = if (isGold) 16.dp else 12.dp,
+                    start = 6.dp,
+                    end = 6.dp
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(rankSize)
+                    .background(rankGradient, shape = CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "$rank",
+                    fontSize = if (isGold) 12.sp else 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF120F16)
+                )
+            }
+            Spacer(modifier = Modifier.height(9.dp))
+            Box(contentAlignment = Alignment.Center) {
+                if (isGold) {
+                    Box(
+                        modifier = Modifier
+                            .size(avatarSize * glowScale)
+                            .background(
+                                Brush.radialGradient(
+                                    listOf(Color(0xFFE9CB8E).copy(alpha = glowAlpha), Color.Transparent)
+                                ),
+                                shape = CircleShape
+                            )
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(avatarSize)
+                        .background(avatarGradient, shape = CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        name.trim().firstOrNull()?.uppercase() ?: "?",
+                        fontSize = if (isGold) 18.sp else 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF120F16)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(9.dp))
             Text(
-                "$rank",
-                fontSize = if (isGold) 12.sp else 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF120F16)
+                name,
+                fontSize = if (isGold) 13.5.sp else 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = nameColor,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            AnimatedRupiahText(
+                target = amountValue,
+                fontSize = if (isGold) 14.5.sp else 12.5.sp,
+                fontWeight = if (isGold) FontWeight.Bold else FontWeight.Normal,
+                color = amountColor,
+                delayMillis = countDelay
             )
         }
-        Spacer(modifier = Modifier.height(9.dp))
-        Box(
-            modifier = Modifier
-                .size(avatarSize)
-                .background(avatarGradient, shape = CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                name.trim().firstOrNull()?.uppercase() ?: "?",
-                fontSize = if (isGold) 18.sp else 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF120F16)
-            )
-        }
-        Spacer(modifier = Modifier.height(9.dp))
-        Text(
-            name,
-            fontSize = if (isGold) 13.5.sp else 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = nameColor,
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            amount,
-            fontSize = if (isGold) 14.5.sp else 12.5.sp,
-            fontWeight = if (isGold) FontWeight.Bold else FontWeight.Normal,
-            color = amountColor
-        )
     }
 }
