@@ -261,16 +261,17 @@ object VideoExtractor {
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") ||
                 // anichin.stream — domain embed "Premium" milik Anichin sendiri (dipakai
-                // Donghua/Dayynime-v4). Belum dikonfirmasi 100% strukturnya (histats
-                // tracker doang yang kelihatan dari fetch biasa), jadi dicoba dulu lewat
-                // extractor generic ini. Kalau gagal, cek VideoExtractor.lastDebugSnippet
-                // buat lihat kenapa & sesuaikan regex-nya.
-                host.contains("anichin.stream") ||
+                // Donghua/Dayynime-v4). Konfigurasi JWPlayer-nya packed-JS standar
+                // (eval(function(p,a,c,k,e,d){...})), sama kayak Filemoon/Vidhide dkk
+                // di atas -> extractPackedJwPlayer.
+                host.contains("anichin.stream") -> extractPackedJwPlayer(embedUrl, referer)
                 // GDRIVE/GDRIVE HD (gdriveplayer.to) — dikonfirmasi dari network trace
                 // langsung: config JWPlayer-nya disimpen ter-obfuscate (base64+XOR,
-                // lihat extractGdrivePlayer). Gak di-chain ke extractPackedJwPlayer
-                // biar diagnostik gagal-nya gak ketiban/ke-overwrite sama diagnostik
-                // extractor lain yang emang gak match buat host ini.
+                // lihat extractGdrivePlayer). BUKAN packed-JS biasa, jadi harus
+                // branch TERPISAH dari grup di atas (dulu pernah ke-gabung jadi 1
+                // kondisi `||` yang sama-sama jatuh ke extractGdrivePlayer -> semua
+                // host packed-JS di atas, termasuk anichin.stream, jadi salah rute
+                // dan gak pernah lewat extractPackedJwPlayer sama sekali).
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
                 host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
                 host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl, referer)
