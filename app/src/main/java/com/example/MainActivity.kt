@@ -19,6 +19,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,8 +35,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import kotlinx.coroutines.launch
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -299,7 +304,7 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                // Banner donasi popup
+                // Banner donasi popup — modern: animasi masuk/keluar, swipe buat nutup, progress bar countdown
                 LaunchedEffect(hasNewDonation) {
                     if (hasNewDonation) {
                         showDonationBanner = true
@@ -309,67 +314,186 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
-                // Banner donasi popup
-                if (showDonationBanner && latestDonation != null) {
-                    androidx.compose.runtime.DisposableEffect(Unit) { onDispose {} }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                            .zIndex(999f),
-                        contentAlignment = Alignment.TopCenter
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .zIndex(999f),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    AnimatedVisibility(
+                        visible = showDonationBanner && latestDonation != null,
+                        enter = fadeIn(tween(280)) + slideInVertically(
+                            initialOffsetY = { -it },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        ),
+                        exit = fadeOut(tween(220)) + slideOutVertically(
+                            targetOffsetY = { -it },
+                            animationSpec = tween(220, easing = FastOutSlowInEasing)
+                        )
                     ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    showDonationBanner = false
-                                    viewModel.markDonationSeen()
-                                },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        val donation = latestDonation
+                        if (donation != null) {
+                            val scope = rememberCoroutineScope()
+                            val offsetX = remember { Animatable(0f) }
+                            val density = LocalDensity.current
+                            val dismissThresholdPx = with(density) { 90.dp.toPx() }
+
+                            fun dismiss() {
+                                showDonationBanner = false
+                                viewModel.markDonationSeen()
+                            }
+
+                            // Progress bar countdown 5 detik, ngikutin auto-dismiss di atas
+                            val progress = remember { Animatable(1f) }
+                            LaunchedEffect(donation.id) {
+                                progress.snapTo(1f)
+                                progress.animateTo(0f, animationSpec = tween(5000, easing = LinearEasing))
+                            }
+
+                            // Icon bernapas pelan biar kerasa "hidup"
+                            val iconTransition = rememberInfiniteTransition(label = "donationIcon")
+                            val iconScale by iconTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(900, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "iconScale"
+                            )
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        translationX = offsetX.value
+                                        alpha = 1f - (kotlin.math.abs(offsetX.value) / dismissThresholdPx / 1.6f)
+                                            .coerceIn(0f, 0.85f)
+                                    }
+                                    .pointerInput(donation.id) {
+                                        detectHorizontalDragGestures(
+                                            onDragEnd = {
+                                                scope.launch {
+                                                    if (kotlin.math.abs(offsetX.value) > dismissThresholdPx) {
+                                                        val target = if (offsetX.value > 0) 1200f else -1200f
+                                                        offsetX.animateTo(target, animationSpec = tween(180))
+                                                        dismiss()
+                                                    } else {
+                                                        offsetX.animateTo(
+                                                            0f,
+                                                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        ) { change, dragAmount ->
+                                            change.consume()
+                                            scope.launch { offsetX.snapTo(offsetX.value + dragAmount) }
+                                        }
+                                    }
+                                    .clickable { dismiss() },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                                elevation = CardDefaults.cardElevation(10.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("☕", fontSize = 20.sp)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        "Support baru masuk!",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        "${latestDonation!!.supporter_name} men-support ${latestDonation!!.amount} ${latestDonation!!.unit ?: "cup"}! 🙏",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        showDonationBanner = false
-                                        viewModel.markDonationSeen()
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Tutup",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
+                                Column {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .graphicsLayer {
+                                                        scaleX = iconScale
+                                                        scaleY = iconScale
+                                                    }
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        Brush.radialGradient(
+                                                            listOf(
+                                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.28f),
+                                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                                            )
+                                                        )
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("☕", fontSize = 20.sp)
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .offset(x = 4.dp, y = (-2).dp)
+                                            ) {
+                                                Text("✨", fontSize = 11.sp)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                "Support baru masuk!",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    "${donation.supporter_name} men-support",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                                )
+                                                Spacer(modifier = Modifier.width(5.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(50))
+                                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+                                                        .padding(horizontal = 7.dp, vertical = 1.5.dp)
+                                                ) {
+                                                    Text(
+                                                        "${donation.amount} ${donation.unit ?: "cup"}",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("🙏", fontSize = 12.sp)
+                                            }
+                                        }
+                                        IconButton(
+                                            onClick = { dismiss() },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Tutup",
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                            )
+                                        }
+                                    }
+                                    // Progress bar countdown auto-dismiss
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.5.dp)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(progress.value.coerceIn(0f, 1f))
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                    }
                                 }
                             }
                         }
