@@ -724,7 +724,7 @@ interface SupabaseDbApi {
     @GET("rest/v1/donations")
     suspend fun getDonations(
         @Query("order") order: String = "created_at.desc",
-        @Query("limit") limit: Int = 10,
+        @Query("limit") limit: Int = 1000,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<Donation>
