@@ -1098,7 +1098,7 @@ private fun SupporterPodiumAvatar(
             ) {
                 if (avatarUrl.isNullOrBlank()) {
                     Text(
-                        text = name.trim().take(1).uppercase().ifBlank { "?" },
+                        text = (name.firstOrNull { it.isLetterOrDigit() }?.toString() ?: "?").uppercase(),
                         color = Color(0xFF1B1330),
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = (size.value * 0.4f).sp
