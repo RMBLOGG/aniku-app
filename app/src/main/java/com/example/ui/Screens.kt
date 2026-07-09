@@ -5311,11 +5311,17 @@ fun WatchScreen(
                             "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         )
                         val headers = if (resolvedHeaders.isNotEmpty()) resolvedHeaders else defaultHeaders
-                        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+                        // Pakai OkHttpDataSource (bukan DefaultHttpDataSource bawaan) supaya
+                        // request streaming manifest/segment ExoPlayer ikut lewat OkHttpClient
+                        // yang sama-sama punya fallback DNS-over-HTTPS kaya di VideoExtractor.
+                        // Kalau DNS domain video/CDN-nya di-block ISP user (kasus umum buat
+                        // ok.ru dkk), tanpa ini ExoPlayer bakal macet/loading-mulu karena nyoba
+                        // resolve pakai DNS sistem doang - beda sama proses extract link video
+                        // yang udah duluan fallback DoH.
+                        val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+                            com.example.network.VideoExtractor.streamingHttpClient
+                        )
                             .setDefaultRequestProperties(headers)
-                            .setConnectTimeoutMs(15000)
-                            .setReadTimeoutMs(15000)
-                            .setAllowCrossProtocolRedirects(true)
                         val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(ctx, httpDataSourceFactory)
                         val url = activeStreamUrl!!
                         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()

@@ -128,6 +128,7 @@ dependencies {
   implementation(libs.media3.exoplayer)
   implementation(libs.media3.exoplayer.hls)
   implementation(libs.media3.ui)
+  implementation(libs.media3.datasource.okhttp)
   implementation("androidx.biometric:biometric:1.1.0")
   implementation("androidx.work:work-runtime-ktx:2.9.0")
   implementation(platform("com.google.firebase:firebase-bom:33.1.0"))

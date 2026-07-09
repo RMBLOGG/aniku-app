@@ -112,6 +112,34 @@ object VideoExtractor {
         .dns(FallbackDns)
         .build()
 
+    /**
+     * OkHttpClient khusus buat ExoPlayer (streaming manifest + segment video),
+     * pakai FallbackDns yang sama kaya `client` di atas.
+     *
+     * KENAPA INI PENTING: sebelum ini, ExoPlayer pakai DefaultHttpDataSource
+     * bawaan Media3, yang resolve DNS langsung lewat sistem HP - TIDAK ikut
+     * fallback DoH kaya proses resolve/extract di atas. Akibatnya: proses
+     * extract link video bisa aja sukses (karena udah fallback DoH), tapi
+     * begitu ExoPlayer sendiri nyoba connect buat streaming manifest/segment
+     * ke domain yang sama, macet/timeout kalau DNS domain itu di-block ISP
+     * user (kejadian ini KHUSUS ke jaringan user tertentu - ok.ru misalnya
+     * sering di-block ISP Indonesia di level DNS). Gejalanya: loading muter
+     * terus tanpa error, padahal di jaringan lain (mis. punya developer)
+     * lancar-lancar aja.
+     *
+     * Timeout dibikin lebih longgar dari `client` di atas karena ini dipakai
+     * buat load segment video yang bisa lumayan gede, bukan cuma HTML/JSON kecil.
+     */
+    val streamingHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .retryOnConnectionFailure(true)
+        .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))
+        .dns(FallbackDns)
+        .build()
+
     // ---------------------------------------------------------------------
     // Cache hasil resolve (in-memory, per proses app - bukan disk) supaya
     // buka episode yang sama / gonta-ganti kualitas / balik ke episode
