@@ -238,6 +238,7 @@ object VideoExtractor {
                 // biar diagnostik gagal-nya gak ketiban/ke-overwrite sama diagnostik
                 // extractor lain yang emang gak match buat host ini.
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
+                host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -401,6 +402,70 @@ object VideoExtractor {
             url = url,
             isHls = url.contains(".m3u8"),
             headers = mapOf("User-Agent" to DESKTOP_UA)
+        )
+    }
+
+    // ---------------------------------------------------------------------
+    // OK.ru (Odnoklassniki) — halaman embed-nya nyimpen metadata video di
+    // attribute data-options pada div player (JSON ter-HTML-encode). Di
+    // dalamnya ada flashvars.metadata yang itu sendiri STRING JSON lagi
+    // (nested, di-escape sekali lagi) berisi hlsManifestUrl + daftar
+    // kualitas video satuan (name: "full"/"720"/"480"/dst + url).
+    //
+    // CATATAN: kalau WebView aja udah gagal konek ke ok.ru
+    // (net::ERR_CONNECTION_TIMED_OUT), scrape HTML di sini kemungkinan
+    // besar JUGA bakal gagal connect - client-nya udah pasang FallbackDns
+    // (DoH) jadi kalau masalahnya di-block di level DNS ISP ini bisa
+    // nolong, tapi kalau block-nya di level koneksi/IP, tetap gagal.
+    // ---------------------------------------------------------------------
+    private fun extractOkRu(embedUrl: String, referer: String?): ResolvedStream? {
+        val html = fetchHtml(embedUrl, referer ?: "https://ok.ru/")
+        val raw = Regex("""data-options="([^"]*)"""").find(html)?.groupValues?.get(1) ?: return null
+        val decoded = raw
+            .replace("&quot;", "\"")
+            .replace("&#039;", "'")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+
+        val options = org.json.JSONObject(decoded)
+        val flashvars = options.optJSONObject("flashvars") ?: return null
+        val metadataRaw = flashvars.optString("metadata").takeIf { it.isNotBlank() } ?: return null
+        val metadata = org.json.JSONObject(metadataRaw)
+
+        // Prioritas: HLS manifest (adaptif, paling stabil buat ExoPlayer).
+        val hlsUrl = metadata.optString("hlsManifestUrl").takeIf { it.isNotBlank() }
+        if (hlsUrl != null) {
+            return ResolvedStream(
+                url = hlsUrl,
+                isHls = true,
+                headers = mapOf("Referer" to "https://ok.ru/", "User-Agent" to DESKTOP_UA)
+            )
+        }
+
+        // Fallback: pilih video kualitas tertinggi yang tersedia dari daftar "videos".
+        val videos = metadata.optJSONArray("videos") ?: return null
+        val qualityOrder = listOf("full", "1080", "hd", "720", "sd", "480", "360", "low", "240", "mobile", "144")
+        var bestUrl: String? = null
+        for (wantedName in qualityOrder) {
+            for (i in 0 until videos.length()) {
+                val v = videos.getJSONObject(i)
+                if (v.optString("name").equals(wantedName, ignoreCase = true)) {
+                    bestUrl = v.optString("url").takeIf { it.isNotBlank() }
+                    break
+                }
+            }
+            if (bestUrl != null) break
+        }
+        if (bestUrl == null && videos.length() > 0) {
+            bestUrl = videos.getJSONObject(0).optString("url").takeIf { it.isNotBlank() }
+        }
+        val url = bestUrl ?: return null
+
+        return ResolvedStream(
+            url = url,
+            isHls = url.contains(".m3u8"),
+            headers = mapOf("Referer" to "https://ok.ru/", "User-Agent" to DESKTOP_UA)
         )
     }
 
