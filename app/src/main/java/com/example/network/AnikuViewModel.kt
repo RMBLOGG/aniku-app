@@ -87,6 +87,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
     private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
     private val animekompiApi: AnimekompiApi by lazy { NetworkClient.animekompiApi(appContext) }
+    private val donghuaApi: DonghuaApi by lazy { NetworkClient.donghuaApi(appContext) }
 
     // Nama hari Indonesia sesuai urutan Calendar.DAY_OF_WEEK (1=Minggu ... 7=Sabtu),
     // dipakai buat mapping jadwal tayang Animekompi (Dayynime-v3) yang sudah pakai nama hari Indonesia.
@@ -796,6 +797,47 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
                             } catch (se: Exception) { Log.e("AnikuVM", "Failed animekompi home schedule", se) }
                         }
+                    } else if (dataSource.value == "Dayynime-v4") {
+                        launch {
+                            try {
+                                val homeRes = retryIO { donghuaApi.getHome() }
+                                _homeRecent.value = (homeRes.latest_release ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homeCompleted.value = (homeRes.completed_donghua ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (he: Exception) { Log.e("AnikuVM", "Failed donghua home", he) }
+                        }
+                        launch {
+                            try {
+                                val ongoingRes = retryIO { donghuaApi.getOngoing() }
+                                _homeOngoing.value = (ongoingRes.ongoing_donghua ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (oe: Exception) { Log.e("AnikuVM", "Failed donghua ongoing", oe) }
+                        }
+                        launch {
+                            try {
+                                // Donghua nggak punya endpoint "popular" khusus, jadi pakai "latest" sebagai proxy.
+                                val latestRes = retryIO { donghuaApi.getLatest() }
+                                _homePopular.value = (latestRes.latest_donghua ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (pe: Exception) { Log.e("AnikuVM", "Failed donghua home popular", pe) }
+                        }
+                        launch {
+                            // Donghua (Anichin) nggak punya kategori "Movie" terpisah — dikosongin.
+                            _homeMovies.value = emptyList()
+                        }
+                        launch {
+                            try {
+                                val schedRes = retryIO { donghuaApi.getSchedule() }
+                                val todayDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_WEEK)
+                                val engDayNames = listOf("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday")
+                                val todayEngName = engDayNames[todayDay - 1]
+                                val todayList = (schedRes.schedule ?: emptyList())
+                                    .firstOrNull { it.day.equals(todayEngName, ignoreCase = true) }
+                                    ?.donghua_list?.map { it.toAnimeRaw() } ?: emptyList()
+                                _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
+                            } catch (se: Exception) { Log.e("AnikuVM", "Failed donghua home schedule", se) }
+                        }
                     } else {
                         launch {
                             try {
@@ -881,6 +923,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val res = retryIO { animekompiApi.getPopular(page = 1) }
                     _searchPopular.value = (res.data ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                } else if (dataSource.value == "Dayynime-v4") {
+                    val res = retryIO { donghuaApi.getLatest() }
+                    _searchPopular.value = (res.latest_donghua ?: emptyList())
+                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
                     val res = retryIO { animeApi.getPopular(page = 1) }
                     _searchPopular.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -953,6 +999,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                 val hasNext = res.pagination?.has_next ?: false
                 Pair(items, hasNext)
+            } else if (dataSource.value == "Dayynime-v4") {
+                // Endpoint search Donghua belum kelihatan support pagination, jadi cuma page 1.
+                val res = donghuaApi.search(query)
+                val items = (res.data ?: emptyList())
+                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                Pair(items, false)
             } else {
                 val res = animeApi.search(query, page = page)
                 val items = (res.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
@@ -970,6 +1022,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _genres.value = (res.data?.genreList ?: emptyList()).map { it.toGenreRaw() }
                 } else if (dataSource.value == "Dayynime-v3") {
                     val res = retryIO { animekompiApi.getGenres() }
+                    _genres.value = (res.data ?: emptyList()).map { it.toGenreRaw() }
+                        .sortedBy { it.name }
+                } else if (dataSource.value == "Dayynime-v4") {
+                    val res = retryIO { donghuaApi.getGenres() }
                     _genres.value = (res.data ?: emptyList()).map { it.toGenreRaw() }
                         .sortedBy { it.name }
                 } else {
@@ -1047,6 +1103,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         val items = (kRes.data ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                         val hasNext = kRes.pagination?.has_next ?: items.isNotEmpty()
                         Pair(items, hasNext)
+                    } else if (dataSource.value == "Dayynime-v4") {
+                        // Donghua nggak punya kategori "Movie" — di-fallback ke ongoing.
+                        if (_selectedGenreSlug.value != null) {
+                            val dRes = donghuaApi.getByGenre(slug = _selectedGenreSlug.value!!, page = page)
+                            val items = (dRes.data ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            Pair(items, items.isNotEmpty())
+                        } else {
+                            when (_exploreTab.value) {
+                                "Ongoing" -> {
+                                    val dRes = donghuaApi.getOngoing(page = page)
+                                    val items = (dRes.ongoing_donghua ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                    Pair(items, items.isNotEmpty())
+                                }
+                                "Completed" -> {
+                                    val dRes = donghuaApi.getCompleted(page = page)
+                                    val items = (dRes.completed_donghua ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                    Pair(items, items.isNotEmpty())
+                                }
+                                "Latest" -> {
+                                    val dRes = donghuaApi.getLatest(page = page)
+                                    val items = (dRes.latest_donghua ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                    Pair(items, items.isNotEmpty())
+                                }
+                                else -> {
+                                    val dRes = donghuaApi.getOngoing(page = page)
+                                    val items = (dRes.ongoing_donghua ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                    Pair(items, items.isNotEmpty())
+                                }
+                            }
+                        }
                     } else {
                         val aRes = if (_selectedGenreSlug.value != null) {
                             animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
@@ -1134,6 +1220,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     }
                     _scheduleMap.value = map
+                } else if (dataSource.value == "Dayynime-v4") {
+                    val res = retryIO { donghuaApi.getSchedule() }
+                    val dayNameMap = mapOf(
+                        "Sunday" to "Minggu", "Monday" to "Senin", "Tuesday" to "Selasa",
+                        "Wednesday" to "Rabu", "Thursday" to "Kamis", "Friday" to "Jumat", "Saturday" to "Sabtu"
+                    )
+                    val map = mutableMapOf<String, List<AnimeRaw>>()
+                    for (day in res.schedule ?: emptyList()) {
+                        val key = dayNameMap[day.day] ?: (day.day ?: "")
+                        map[key] = (day.donghua_list ?: emptyList())
+                            .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                    }
+                    _scheduleMap.value = map
                 } else {
                     val res = retryIO { animeApi.getSchedule() }
                     val sched = res.schedule
@@ -1177,6 +1276,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 } else if (dataSource.value == "Dayynime-v3") {
                     val res = retryIO { animekompiApi.getDetail(slug) }
                     _animeDetail.value = res.data?.toDetailData()
+                } else if (dataSource.value == "Dayynime-v4") {
+                    val res = retryIO { donghuaApi.getDetail(slug) }
+                    _animeDetail.value = res.toDetailData()
                 } else {
                     val res = retryIO { animeApi.getDetail(slug) }
                     _animeDetail.value = res.detail
@@ -1289,6 +1391,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val streamList = rawMirrors
                         .filter { !it.url.isNullOrBlank() }
                         .sortedByDescending { Regex("bebas iklan", RegexOption.IGNORE_CASE).containsMatchIn(it.name ?: "") }
+                        .map { StreamRaw(name = it.name ?: "Server", url = it.url!!) }
+                    _streams.value = streamList
+
+                    if (streamList.isNotEmpty()) {
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
+                            _activeStreamUrl.value = resolved.url
+                            _resolvedHeaders.value = resolved.headers
+                            _isDirectStream.value = true
+                        } else {
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                        }
+                    } else {
+                        _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                    }
+                } else if (dataSource.value == "Dayynime-v4") {
+                    val res = retryIO { donghuaApi.getEpisode(slug) }
+                    _streamEpisodeTitle.value = res.episode ?: "Tonton Tayangan"
+
+                    // Urutin server: yang namanya nggak ada "[Ads]" naik duluan (biasanya "Premium").
+                    val rawServers = res.streaming?.servers ?: emptyList()
+                    val streamList = rawServers
+                        .filter { !it.url.isNullOrBlank() }
+                        .sortedByDescending { !Regex("\\[Ads]", RegexOption.IGNORE_CASE).containsMatchIn(it.name ?: "") }
                         .map { StreamRaw(name = it.name ?: "Server", url = it.url!!) }
                     _streams.value = streamList
 
