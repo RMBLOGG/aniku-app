@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.Log
 import android.webkit.*
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.ByteArrayInputStream
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -26,6 +30,55 @@ object AbyssWebViewExtractor {
 
     private const val TAG = "AbyssWVExtractor"
     private const val TIMEOUT_MS = 20_000L
+
+    private const val DESKTOP_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+    // Client kecil khusus buat ngambil & inject ulang dokumen HTML utama abyss
+    // (dipanggil dari shouldInterceptRequest, yang udah jalan di background
+    // thread - jadi aman blocking call di sini).
+    private val docClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    /**
+     * Script yang di-inject sebelum `</body>` dokumen abyss. Manggil
+     * `jwplayer().play()` LANGSUNG begitu instance-nya siap - bypass total
+     * listener overlay/klik-iklan (`XLDniBB`) yang biasanya baru mecicil
+     * play() setelah user klik overlay + lolos cek adblock. Ini murni
+     * otomatisasi "user nge-klik play", BUKAN bongkar enkripsi/DRM - video
+     * tetap diambil lewat jalur resmi JWPlayer-nya sendiri.
+     */
+    private val AUTOPLAY_SCRIPT = """
+        <script>
+        (function() {
+            var tries = 0;
+            var iv = setInterval(function() {
+                tries++;
+                try {
+                    if (typeof jwplayer !== 'undefined') {
+                        var p = jwplayer();
+                        if (p && typeof p.play === 'function') {
+                            p.play();
+                            if (p.getState && p.getState() === 'playing') {
+                                clearInterval(iv);
+                            }
+                        }
+                    }
+                } catch (e) {}
+                if (tries > 36) clearInterval(iv); // ~18 detik @ 500ms
+            }, 500);
+        })();
+        </script>
+    """.trimIndent()
+
+    private fun injectAutoplay(html: String): String =
+        if (html.contains("</body>")) {
+            html.replaceFirst("</body>", AUTOPLAY_SCRIPT + "</body>")
+        } else {
+            html + AUTOPLAY_SCRIPT
+        }
 
     // Domain infrastruktur/iklan abyss yang HARUS diabaikan supaya gak
     // ketuker sama request video asli (semua ini kepanggil normal di
@@ -123,12 +176,15 @@ object AbyssWebViewExtractor {
                         ): Boolean = false // block semua popup/new window
                     }
 
+                    var mainDocInjected = false
+
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(
                             view: WebView?,
                             request: WebResourceRequest?
                         ): WebResourceResponse? {
                             val url = request?.url?.toString() ?: return null
+
                             if (isLikelyVideoUrl(url)) {
                                 Log.d(TAG, "Intercepted stream URL: ${url.take(120)}")
                                 timeoutJob.cancel()
@@ -142,8 +198,38 @@ object AbyssWebViewExtractor {
                                         )
                                     )
                                 )
+                                return null
                             }
-                            return null // biarin tetap load normal (biar player jalan sampai narik video)
+
+                            // Dokumen HTML utama abyss (bukan sub-resource kayak script/css) -
+                            // ambil manual & sisipin AUTOPLAY_SCRIPT sebelum dikembalikan ke
+                            // WebView, supaya JWPlayer langsung play() begitu siap tanpa perlu
+                            // klik overlay asli (yang nempel logic iklan).
+                            if (!mainDocInjected && url == abyssUrl) {
+                                mainDocInjected = true
+                                val injected = runCatching {
+                                    val reqBuilder = Request.Builder()
+                                        .url(url)
+                                        .header("User-Agent", DESKTOP_UA)
+                                        .header("Referer", referer ?: baseOrigin)
+                                    docClient.newCall(reqBuilder.build()).execute().use { resp ->
+                                        if (!resp.isSuccessful) return@runCatching null
+                                        resp.body?.string()
+                                    }
+                                }.getOrNull()
+
+                                if (!injected.isNullOrBlank()) {
+                                    Log.d(TAG, "Dokumen abyss berhasil di-fetch & di-inject autoplay script")
+                                    return WebResourceResponse(
+                                        "text/html",
+                                        "UTF-8",
+                                        ByteArrayInputStream(injectAutoplay(injected).toByteArray(Charsets.UTF_8))
+                                    )
+                                }
+                                Log.w(TAG, "Gagal fetch manual dokumen abyss, biarin WebView load normal (autoplay gak ke-inject)")
+                            }
+
+                            return null // biarin tetap load normal
                         }
 
                         override fun onReceivedError(
