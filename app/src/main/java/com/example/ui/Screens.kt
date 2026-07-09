@@ -9093,73 +9093,80 @@ fun SettingsScreen(
                     )
                 }
 
-                // ── Donation Card ────────────────────────────────────
+                // ── Donation Card (Material3, konsisten sama card Preferensi di atas) ──
                 AnimatedSettingsItem(index = 7) {
                     Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isDark) Color(0xFF0F1F10) else Color(0xFFF1F8E9)
-                        ),
-                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(18.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("☕", fontSize = 22.sp)
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(accentColor.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.VolunteerActivism, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column {
                                     Text(
                                         "Dukung Aniku",
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         fontSize = 15.sp,
-                                        color = if (isDark) Color.White else Color(0xFF2E7D32)
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         "Bantu kelangsungan aplikasi",
                                         fontSize = 12.sp,
-                                        color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047)
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
                                 }
                             }
-                            HorizontalDivider(color = Color(0xFF4CAF50).copy(alpha = 0.15f))
-                            // Saweria row
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            // Sociabuzz row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isDark) Color(0xFF1B3A1B) else Color(0xFFDCEDC8))
+                                    .background(MaterialTheme.colorScheme.surface)
                                     .clickable {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://saweria.co/Dayynime")))
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://sociabuzz.com/dayynime/tribe")))
                                     }
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("☕", fontSize = 18.sp)
+                                Icon(Icons.Default.LocalCafe, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Saweria", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (isDark) Color.White else Color(0xFF2E7D32))
-                                    Text("saweria.co/Dayynime", fontSize = 11.sp, color = if (isDark) Color(0xFF81C784) else Color(0xFF43A047))
+                                    Text("Sociabuzz", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    Text("sociabuzz.com/dayynime/tribe", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                                 }
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = accentColor.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                             }
                             // Trakteer row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isDark) Color(0xFF3A1A1A) else Color(0xFFFFE0E0))
+                                    .background(MaterialTheme.colorScheme.surface)
                                     .clickable {
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://trakteer.id/Dayynimee")))
                                     }
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("🧡", fontSize = 18.sp)
+                                Icon(Icons.Default.Favorite, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text("Trakteer", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (isDark) Color.White else Color(0xFF7D2E2E))
-                                    Text("trakteer.id/Dayynimee", fontSize = 11.sp, color = if (isDark) Color(0xFFEF9A9A) else Color(0xFFD32F2F))
+                                    Text("Trakteer", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                    Text("trakteer.id/Dayynimee", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                                 }
-                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = Color(0xFFEF5350), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = accentColor.copy(alpha = 0.6f), modifier = Modifier.size(16.dp))
                             }
                         }
                     }
