@@ -555,14 +555,22 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
-    @POST("rest/v1/watch_events")
+    // SECURITY: dulu ini insert langsung ke rest/v1/watch_events (bisa dispam pakai script
+    // asal punya token login, karena gak ada validasi server selain RLS auth.uid()=user_id).
+    // Sekarang lewat RPC log_watch_event (SECURITY DEFINER) yang validasi auth.uid() harus
+    // sama dengan user_id yang dikirim + rate limit di server. Insert langsung ke tabel
+    // watch_events dari role anon/authenticated sudah di-revoke lewat migration SQL, jadi
+    // endpoint lama otomatis ke-block walau ada yang masih coba manggilnya manual.
+    // Body request (WatchEventRequest) sengaja gak diubah field-nya biar sama persis
+    // dengan parameter RPC di database (user_id, anime_slug, episode_slug).
+    @POST("rest/v1/rpc/log_watch_event")
     suspend fun insertWatchEvent(
         @Body data: WatchEventRequest,
-        @Query("on_conflict") onConflict: String = "user_id,episode_slug",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "resolution=ignore-duplicates,return=minimal"
+        @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
+
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
