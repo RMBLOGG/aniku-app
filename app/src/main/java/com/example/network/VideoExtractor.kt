@@ -268,6 +268,25 @@ object VideoExtractor {
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
                 host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
                 host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl, referer)
+                // Abyssplayer nyimpen source video dalam bentuk terenkripsi (didekripsi
+                // oleh JS mereka sendiri di browser) - gak bisa di-regex dari HTML mentah.
+                // Sama kayak Blogger, harus lewat WebView beneran & nyadap request video
+                // asli begitu JWPlayer mulai narik manifest/segment-nya.
+                host.contains("abyssplayer") || host.contains("abyss.to") -> {
+                    if (context != null) {
+                        val stream = AbyssWebViewExtractor.resolve(context, embedUrl, referer)
+                        if (stream != null) {
+                            Log.d("VideoExtractor", "Abyss resolved via WebView: ${stream.url.take(80)}")
+                            stream
+                        } else {
+                            Log.w("VideoExtractor", "AbyssWebViewExtractor gagal, fallback WebView biasa")
+                            null
+                        }
+                    } else {
+                        Log.d("VideoExtractor", "Abyss butuh context (WebView) - belum ada, fallback WebView biasa")
+                        null
+                    }
+                }
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
