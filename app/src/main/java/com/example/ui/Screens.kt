@@ -10367,6 +10367,27 @@ fun TopSupporterScreen(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = ivory)
                     }
                 },
+                actions = {
+                    val refreshTransition = rememberInfiniteTransition(label = "refreshSpin")
+                    val continuousRotation by refreshTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(700, easing = LinearEasing)
+                        ),
+                        label = "continuousRotation"
+                    )
+                    IconButton(onClick = { refresh() }, enabled = !isRefreshing) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Muat ulang",
+                            tint = if (isRefreshing) gold else ivoryDim,
+                            modifier = Modifier.graphicsLayer {
+                                rotationZ = if (isRefreshing) continuousRotation else 0f
+                            }
+                        )
+                    }
+                },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = bg0
                 )
@@ -10419,21 +10440,10 @@ fun TopSupporterScreen(
             val top3 = leaderboard.take(3)
             val rest = leaderboard.drop(3)
 
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = { refresh() },
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
-                indicator = {
-                    PullToRefreshDefaults.Indicator(
-                        modifier = Modifier.align(Alignment.TopCenter),
-                        isRefreshing = isRefreshing,
-                        state = rememberPullToRefreshState(),
-                        containerColor = Color(0xFF231D29),
-                        color = gold
-                    )
-                }
+                    .padding(padding)
             ) {
                 LazyColumn(
                     modifier = Modifier
@@ -10600,7 +10610,7 @@ fun TopSupporterScreen(
                     }
 
                     // ===== Sisa daftar (rank 4+), muncul satu-satu (staggered) =====
-                    itemsIndexed(rest, key = { _, item -> item.first ?: "anon-$it" }) { idx, (name, total) ->
+                    itemsIndexed(rest, key = { i, item -> item.first ?: "anon-$i" }) { idx, (name, total) ->
                         var rowVisible by remember(name, idx) { mutableStateOf(false) }
                         LaunchedEffect(contentVisible) {
                             if (contentVisible) {
