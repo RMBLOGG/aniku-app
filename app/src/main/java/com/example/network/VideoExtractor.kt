@@ -239,6 +239,7 @@ object VideoExtractor {
                 // extractor lain yang emang gak match buat host ini.
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
                 host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
+                host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -467,6 +468,53 @@ object VideoExtractor {
             isHls = url.contains(".m3u8"),
             headers = mapOf("Referer" to "https://ok.ru/", "User-Agent" to DESKTOP_UA)
         )
+    }
+
+    // ---------------------------------------------------------------------
+    // Dailymotion — video id diambil dari URL embed (/video/{id} atau
+    // ?video={id} atau dai.ly/{id}), terus dipanggil ke endpoint metadata
+    // resmi player-nya buat dapetin daftar kualitas (mp4 per-resolusi +
+    // manifest HLS "auto"). Gak perlu HTML scraping, ini JSON API publik
+    // yang emang dipanggil sama web player Dailymotion sendiri.
+    // ---------------------------------------------------------------------
+    private fun extractDailymotion(embedUrl: String): ResolvedStream? {
+        val videoId = Regex("""video[/=]([a-zA-Z0-9]+)""").find(embedUrl)?.groupValues?.get(1)
+            ?: Regex("""dai\.ly/([a-zA-Z0-9]+)""").find(embedUrl)?.groupValues?.get(1)
+            ?: return null
+
+        val metaUrl = "https://www.dailymotion.com/player/metadata/video/$videoId"
+        val json = fetchHtml(metaUrl, "https://www.dailymotion.com/")
+        val meta = org.json.JSONObject(json)
+        val qualities = meta.optJSONObject("qualities") ?: return null
+
+        // Prioritas: "auto" (HLS adaptif) baru fallback ke mp4 kualitas tertinggi.
+        val autoArr = qualities.optJSONArray("auto")
+        if (autoArr != null && autoArr.length() > 0) {
+            val hlsUrl = autoArr.getJSONObject(0).optString("url").takeIf { it.isNotBlank() }
+            if (hlsUrl != null) {
+                return ResolvedStream(
+                    url = hlsUrl,
+                    isHls = true,
+                    headers = mapOf("Referer" to "https://www.dailymotion.com/", "User-Agent" to DESKTOP_UA)
+                )
+            }
+        }
+
+        val qualityOrder = listOf("1080", "720", "480", "380", "240", "144")
+        for (q in qualityOrder) {
+            val arr = qualities.optJSONArray(q) ?: continue
+            for (i in 0 until arr.length()) {
+                val url = arr.getJSONObject(i).optString("url").takeIf { it.isNotBlank() }
+                if (url != null) {
+                    return ResolvedStream(
+                        url = url,
+                        isHls = url.contains(".m3u8"),
+                        headers = mapOf("Referer" to "https://www.dailymotion.com/", "User-Agent" to DESKTOP_UA)
+                    )
+                }
+            }
+        }
+        return null
     }
 
     // ---------------------------------------------------------------------
