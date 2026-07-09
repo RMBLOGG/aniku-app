@@ -260,6 +260,12 @@ object VideoExtractor {
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") ||
+                // anichin.stream — domain embed "Premium" milik Anichin sendiri (dipakai
+                // Donghua/Dayynime-v4). Belum dikonfirmasi 100% strukturnya (histats
+                // tracker doang yang kelihatan dari fetch biasa), jadi dicoba dulu lewat
+                // extractor generic ini. Kalau gagal, cek VideoExtractor.lastDebugSnippet
+                // buat lihat kenapa & sesuaikan regex-nya.
+                host.contains("anichin.stream") ||
                 // GDRIVE/GDRIVE HD (gdriveplayer.to) — dikonfirmasi dari network trace
                 // langsung: config JWPlayer-nya disimpen ter-obfuscate (base64+XOR,
                 // lihat extractGdrivePlayer). Gak di-chain ke extractPackedJwPlayer
