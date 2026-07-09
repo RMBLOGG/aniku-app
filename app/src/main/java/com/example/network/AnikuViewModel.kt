@@ -33,6 +33,56 @@ class AnikuViewModel(context: Context) : ViewModel() {
         remoteConfigManager.fetchAndApply()
     }
 
+    // ── Presence: total user online di seluruh aplikasi (bukan cuma di chat room) ──
+    private val _onlineCount = MutableStateFlow(0)
+    val onlineCount: StateFlow<Int> = _onlineCount.asStateFlow()
+
+    // Kirim "kabar hidup" tiap 45 detik selama app kebuka & user login,
+    // ga peduli lagi di layar mana. Dianggap offline kalau ga heartbeat >90 detik.
+    private fun startAppPresenceHeartbeat() {
+        viewModelScope.launch {
+            while (true) {
+                val currentSession = session.value
+                val userId = currentSession.userId
+                val token = currentSession.token
+                if (!userId.isNullOrBlank() && !token.isNullOrBlank()) {
+                    try {
+                        val username = currentSession.username.nullIfBlank()
+                            ?: currentSession.email?.substringBefore("@") ?: "Anonymous"
+                        NetworkClient.supabaseDbApi.upsertPresence(
+                            data = mapOf(
+                                "user_id" to userId,
+                                "username" to username,
+                                "avatar_url" to currentSession.avatarUrl,
+                                "last_seen" to java.time.Instant.now().toString()
+                            ),
+                            authHeader = "Bearer $token",
+                            apiKey = SUPABASE_ANON_KEY
+                        )
+                    } catch (_: Exception) {}
+                }
+                kotlinx.coroutines.delay(45_000L)
+            }
+        }
+    }
+
+    private fun startOnlineCountPolling() {
+        viewModelScope.launch {
+            while (true) {
+                try {
+                    val cutoff = java.time.Instant.now().minusSeconds(90).toString()
+                    val rows = NetworkClient.supabaseDbApi.getOnlinePresence(
+                        lastSeenFilter = "gte.$cutoff",
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    _onlineCount.value = rows.size
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(20_000L)
+            }
+        }
+    }
+
     // Anime API dengan OkHttp Cache (50MB, 1 jam online / 7 hari offline)
     private val animeApi: AnimeApi by lazy { NetworkClient.animeApi(appContext) }
     private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
@@ -447,6 +497,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadSearchPopular()
         checkForUpdate()
         loadDonations()
+        // Presence: heartbeat + polling total online seluruh aplikasi
+        startAppPresenceHeartbeat()
+        startOnlineCountPolling()
         // Auto-refresh token saat app dibuka
         viewModelScope.launch {
             refreshSession()
@@ -2836,28 +2889,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
-    // "Sedang mengetik..." indicator via Supabase Realtime Presence
-    private val chatTypingManager = ChatTypingManager()
-    val typingUsers: StateFlow<List<TypingUser>> = chatTypingManager.typingUsers
-
-    /** Dipanggil sekali pas layar Chat Room dibuka. */
-    fun connectChatTyping() {
-        val uid = session.value.userId
-        val uname = session.value.username
-        if (!uid.isNullOrBlank() && !uname.isNullOrBlank()) {
-            chatTypingManager.connect(uid, uname)
-        }
-    }
-
-    /** Dipanggil pas layar Chat Room ditutup, biar koneksi websocket-nya beneran dilepas. */
-    fun disconnectChatTyping() = chatTypingManager.disconnect()
-
-    /** Dipanggil tiap teks input chat berubah (non-kosong). */
-    fun notifyChatTyping() = chatTypingManager.notifyTyping()
-
-    /** Dipanggil pas pesan terkirim / input dikosongin. */
-    fun stopChatTyping() = chatTypingManager.stopTyping()
-
     // Unread chat badge
     val hasUnreadChat: StateFlow<Boolean> = combine(
         _chatMessages,
@@ -2895,6 +2926,135 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val chatError: StateFlow<String?> = _chatError.asStateFlow()
 
     fun clearChatError() { _chatError.value = null }
+
+    // ── Typing indicator ("sedang mengetik...") ─────────────────
+    private val _typingUsers = MutableStateFlow<List<TypingStatus>>(emptyList())
+    val typingUsers: StateFlow<List<TypingStatus>> = _typingUsers.asStateFlow()
+
+    private var typingPollingJob: kotlinx.coroutines.Job? = null
+    private var lastTypingSentAt = 0L
+
+    // Dipanggil tiap kali teks input chat berubah. Di-throttle 2 detik
+    // biar ga spam request ke Supabase pas user ngetik cepat.
+    fun notifyTyping() {
+        val userId = session.value.userId ?: return
+        val token = session.value.token ?: return
+        val now = System.currentTimeMillis()
+        if (now - lastTypingSentAt < 2000L) return
+        lastTypingSentAt = now
+        val username = session.value.username.nullIfBlank()
+            ?: session.value.email?.substringBefore("@") ?: "Anonymous"
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.upsertTyping(
+                    data = mapOf(
+                        "user_id" to userId,
+                        "username" to username,
+                        "updated_at" to java.time.Instant.now().toString()
+                    ),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Hapus status typing sendiri, dipanggil pas kirim pesan atau keluar dari chat
+    fun clearTyping() {
+        val userId = session.value.userId ?: return
+        val token = session.value.token ?: return
+        lastTypingSentAt = 0L
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.removeTyping(
+                    userId = "eq.$userId",
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun startTypingPolling() {
+        typingPollingJob?.cancel()
+        typingPollingJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    // Cuma ambil status typing yang di-update 5 detik terakhir,
+                    // jadi otomatis "ilang" begitu user berhenti ngetik tanpa perlu delete manual.
+                    val cutoff = java.time.Instant.now().minusSeconds(5).toString()
+                    val result = NetworkClient.supabaseDbApi.getTypingUsers(
+                        updatedAtFilter = "gte.$cutoff",
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    _typingUsers.value = result.filter { it.user_id != session.value.userId }
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(2000L)
+            }
+        }
+    }
+
+    fun stopTypingPolling() {
+        typingPollingJob?.cancel()
+        typingPollingJob = null
+        _typingUsers.value = emptyList()
+    }
+
+    // ── Read receipt ("dilihat oleh" + avatar) ───────────────────
+    private val _chatReads = MutableStateFlow<List<ChatReadStatus>>(emptyList())
+    val chatReads: StateFlow<List<ChatReadStatus>> = _chatReads.asStateFlow()
+
+    private var chatReadsPollingJob: kotlinx.coroutines.Job? = null
+    private var lastMarkedReadMessageId: String? = null
+
+    // Dipanggil pas chat pertama dibuka & tiap kali ada pesan baru ke-load,
+    // upsert baris chat_reads milik user ini nunjuk ke pesan terakhir yang keliatan.
+    fun markChatReadReceipt(lastMessageId: String) {
+        if (lastMessageId == lastMarkedReadMessageId) return
+        val userId = session.value.userId ?: return
+        val token = session.value.token ?: return
+        lastMarkedReadMessageId = lastMessageId
+        val username = session.value.username.nullIfBlank()
+            ?: session.value.email?.substringBefore("@") ?: "Anonymous"
+        val avatar = session.value.avatarUrl
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.upsertChatRead(
+                    data = mapOf(
+                        "user_id" to userId,
+                        "username" to username,
+                        "avatar_url" to avatar,
+                        "last_read_message_id" to lastMessageId,
+                        "updated_at" to java.time.Instant.now().toString()
+                    ),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun startChatReadsPolling() {
+        chatReadsPollingJob?.cancel()
+        chatReadsPollingJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    _chatReads.value = NetworkClient.supabaseDbApi.getChatReads(
+                        authHeader = "Bearer $SUPABASE_ANON_KEY",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(4000L)
+            }
+        }
+    }
+
+    fun stopChatReadsPolling() {
+        chatReadsPollingJob?.cancel()
+        chatReadsPollingJob = null
+        lastMarkedReadMessageId = null
+    }
 
     // ── Watch Live Chat ──────────────────────────────────────────
     private val _watchChatMessages = MutableStateFlow<List<WatchChatMessage>>(emptyList())

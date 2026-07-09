@@ -205,9 +205,17 @@ fun ChatScreen(
     val isChatLoading by viewModel.isChatLoading.collectAsState()
     val chatError by viewModel.chatError.collectAsState()
     val chatNotifEnabled by viewModel.chatNotifEnabled.collectAsState()
+    val onlineCount by viewModel.onlineCount.collectAsState()
     val chatRoomEnabled by viewModel.remoteConfigManager.chatRoomEnabled.collectAsState()
     val chatImageUploadEnabled by viewModel.remoteConfigManager.chatImageUploadEnabled.collectAsState()
     val clanTagMap by viewModel.clanTagMap.collectAsState()
+    val typingUsers by viewModel.typingUsers.collectAsState()
+    // Snapshot list terakhir yang masih ada isinya. AnimatedVisibility tetap
+    // ngerender content-nya pas lagi animasi keluar (fade out), padahal
+    // typingUsers udah keburu kosong -> pake snapshot ini biar ga IndexOutOfBounds.
+    var lastTypingUsers by remember { mutableStateOf<List<com.example.network.TypingStatus>>(emptyList()) }
+    if (typingUsers.isNotEmpty()) lastTypingUsers = typingUsers
+    val chatReads by viewModel.chatReads.collectAsState()
 
     val isLoggedIn = !session.token.isNullOrEmpty()
     val currentUserId = session.userId
@@ -240,14 +248,18 @@ fun ChatScreen(
         }
     }
 
-    // Presence "sedang mengetik..." — connect pas layar dibuka, disconnect pas ditutup
-    DisposableEffect(isLoggedIn) {
-        if (isLoggedIn) viewModel.connectChatTyping()
-        onDispose { viewModel.disconnectChatTyping() }
+    // Typing indicator & read receipt: mulai polling pas chat dibuka, stop pas keluar
+    DisposableEffect(Unit) {
+        viewModel.startTypingPolling()
+        viewModel.startChatReadsPolling()
+        onDispose {
+            viewModel.stopTypingPolling()
+            viewModel.stopChatReadsPolling()
+            if (isLoggedIn) viewModel.clearTyping()
+        }
     }
-    val typingUsers by viewModel.typingUsers.collectAsState()
 
-    // Auto-scroll ke bawah saat ada pesan baru
+    // Auto-scroll ke bawah saat ada pesan baru + update read receipt ke pesan terakhir
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             if (isInitialLoad) {
@@ -257,6 +269,7 @@ fun ChatScreen(
             } else {
                 listState.animateScrollToItem(messages.size - 1)
             }
+            if (isLoggedIn) viewModel.markChatReadReceipt(messages.last().id)
         }
     }
 
@@ -298,12 +311,12 @@ fun ChatScreen(
                                         modifier = Modifier
                                             .size(7.dp)
                                             .background(
-                                                color = if (isLoggedIn) Color(0xFF4CAF50) else Color(0xFF9E9E9E),
+                                                color = Color(0xFF4CAF50),
                                                 shape = CircleShape
                                             )
                                     )
                                     Text(
-                                        if (isLoggedIn) "Online sebagai ${session.username}" else "Mode tamu \u2014 hanya lihat",
+                                        if (onlineCount > 0) "$onlineCount user online" else "Menghitung user online...",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                     )
@@ -332,24 +345,52 @@ fun ChatScreen(
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
+                AnimatedVisibility(
+                    visible = typingUsers.isNotEmpty(),
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val dotProgress = rememberGlossyShimmer(durationMillis = 900)
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            repeat(3) { i ->
+                                val alpha = (kotlin.math.sin((dotProgress * 6.28f) - i * 1.2f) + 1f) / 2f
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(
+                                            Color(0xFFFF6B6B).copy(alpha = 0.35f + alpha * 0.65f),
+                                            CircleShape
+                                        )
+                                )
+                            }
+                        }
+                        val typingText = when (lastTypingUsers.size) {
+                            1 -> "${lastTypingUsers[0].username} sedang mengetik..."
+                            2 -> "${lastTypingUsers[0].username} dan ${lastTypingUsers[1].username} sedang mengetik..."
+                            else -> "${lastTypingUsers.getOrNull(0)?.username ?: ""} dan ${(lastTypingUsers.size - 1).coerceAtLeast(0)} lainnya sedang mengetik..."
+                        }
+                        Text(
+                            text = typingText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                 )
-                AnimatedVisibility(visible = typingUsers.isNotEmpty()) {
-                    Text(
-                        text = when (typingUsers.size) {
-                            0 -> ""
-                            1 -> "${typingUsers[0].username} sedang mengetik..."
-                            2 -> "${typingUsers[0].username} dan ${typingUsers[1].username} sedang mengetik..."
-                            else -> "${typingUsers[0].username} dan ${typingUsers.size - 1} lainnya sedang mengetik..."
-                        },
-                        fontSize = 12.sp,
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
             }
         },
         bottomBar = {
@@ -471,7 +512,7 @@ fun ChatScreen(
                             value = inputText,
                             onValueChange = {
                                 if (it.length <= 300) inputText = it
-                                if (it.isNotBlank()) viewModel.notifyChatTyping() else viewModel.stopChatTyping()
+                                if (it.isNotBlank()) viewModel.notifyTyping()
                             },
                             placeholder = {
                                 Text(if (replyTarget != null) "Balas ${replyTarget!!.username}..." else "Ketik pesan...")
@@ -490,7 +531,6 @@ fun ChatScreen(
                                 val msg = inputText.trim()
                                 val imgUri = pendingImageUri
                                 if (msg.isNotEmpty() || imgUri != null) {
-                                    viewModel.stopChatTyping()
                                     if (imgUri != null) {
                                         // Upload foto dulu, lalu kirim pesan
                                         viewModel.uploadChatImage(context, imgUri) { imageUrl ->
@@ -513,6 +553,7 @@ fun ChatScreen(
                                     }
                                     inputText = ""
                                     replyTarget = null
+                                    viewModel.clearTyping()
                                     coroutineScope.launch {
                                         delay(300)
                                         if (messages.isNotEmpty()) {
@@ -650,8 +691,75 @@ fun ChatScreen(
                                     { viewModel.deleteChatMessage(message.id) }
                                 } else null
                             )
+                            val readers = remember(chatReads, message.id, currentUserId) {
+                                chatReads.filter {
+                                    it.last_read_message_id == message.id && it.user_id != currentUserId
+                                }
+                            }
+                            if (readers.isNotEmpty()) {
+                                ReadReceiptRow(readers = readers, isOwnMessage = isOwn)
+                            }
                         }
                         item { Spacer(modifier = Modifier.height(4.dp)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Baris avatar kecil ber-stack (kayak Discord/Slack) yang muncul di bawah pesan,
+ * nunjukin user mana aja yang last-read-nya udah nyampe pesan ini.
+ */
+@Composable
+private fun ReadReceiptRow(
+    readers: List<com.example.network.ChatReadStatus>,
+    isOwnMessage: Boolean
+) {
+    val shown = readers.take(5)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = if (isOwnMessage) 0.dp else 8.dp,
+                end = if (isOwnMessage) 8.dp else 0.dp,
+                top = 1.dp,
+                bottom = 2.dp
+            ),
+        horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
+    ) {
+        Row {
+            shown.forEachIndexed { index, reader ->
+                Box(
+                    modifier = Modifier
+                        .offset(x = (-6 * index).dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.background, CircleShape)
+                        .zIndex((shown.size - index).toFloat())
+                ) {
+                    if (!reader.avatar_url.isNullOrBlank()) {
+                        AsyncImage(
+                            model = reader.avatar_url,
+                            contentDescription = reader.username,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(defaultNameGradientColors.first()),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = reader.username.take(1).uppercase(),
+                                fontSize = 7.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
