@@ -10756,8 +10756,8 @@ private fun PodiumPlaque(
             .shadow(
                 elevation = if (isGold) 10.dp else 3.dp,
                 shape = RoundedCornerShape(18.dp),
-                ambientColor = if (isGold) gold.copy(alpha = 0.5f) else Color.Black,
-                spotColor = if (isGold) gold.copy(alpha = 0.5f) else Color.Black
+                ambientColor = if (isGold) Color(0xFFD8AD5F).copy(alpha = 0.5f) else Color.Black,
+                spotColor = if (isGold) Color(0xFFD8AD5F).copy(alpha = 0.5f) else Color.Black
             )
             .background(
                 Brush.verticalGradient(
