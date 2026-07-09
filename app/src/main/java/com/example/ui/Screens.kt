@@ -768,9 +768,11 @@ private fun HomeQuickActionCard(
 @Composable
 private fun TopLeaderboardCard(
     topUsers: List<ProfileDto>,
+    topSupporters: List<SupporterEntry> = emptyList(),
     accentColor: Color,
     onUserClick: (ProfileDto) -> Unit,
-    onSeeAllClick: () -> Unit
+    onSeeAllClick: () -> Unit,
+    onSeeAllSupportersClick: () -> Unit = onSeeAllClick
 ) {
     if (topUsers.isEmpty()) return
 
@@ -779,7 +781,12 @@ private fun TopLeaderboardCard(
     // (season lain, server lain, dst) carousel-nya otomatis ikut ke-refresh karena
     // key `remember(topUsers)` di bawah ini.
     val pages = remember(topUsers) { topUsers.chunked(5) }
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    // Slide pertama (index 0) khusus Top Supporter — cuma muncul kalau ada data donasi.
+    // Sisanya (level leaderboard) digeser +1.
+    val hasSupporterPage = topSupporters.isNotEmpty()
+    val totalPages = pages.size + if (hasSupporterPage) 1 else 0
+    val pagerState = rememberPagerState(pageCount = { totalPages })
+    val isOnSupporterPage = hasSupporterPage && pagerState.currentPage == 0
 
     Box(
         modifier = Modifier
@@ -815,7 +822,7 @@ private fun TopLeaderboardCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = onSeeAllClick),
+                    .clickable(onClick = if (isOnSupporterPage) onSeeAllSupportersClick else onSeeAllClick),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -823,12 +830,16 @@ private fun TopLeaderboardCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    CrownIcon(
-                        modifier = Modifier.size(15.dp),
-                        tint = Color(0xFFFFD54F)
-                    )
+                    if (isOnSupporterPage) {
+                        Text(text = "🏆", fontSize = 13.sp)
+                    } else {
+                        CrownIcon(
+                            modifier = Modifier.size(15.dp),
+                            tint = Color(0xFFFFD54F)
+                        )
+                    }
                     Text(
-                        text = "TOP LEADERBOARD",
+                        text = if (isOnSupporterPage) "TOP SUPPORTER" else "TOP LEADERBOARD",
                         style = androidx.compose.ui.text.TextStyle(
                             brush = Brush.linearGradient(
                                 colors = listOf(Color(0xFFFFE082), Color(0xFFFFC107))
@@ -866,22 +877,32 @@ private fun TopLeaderboardCard(
                 val pageOffset = pagerState.currentPage - page + pagerState.currentPageOffsetFraction
                 val distance = if (pageOffset < 0) -pageOffset else pageOffset
                 val clamped = distance.coerceIn(0f, 1f)
-                LeaderboardPodiumPage(
-                    users = pages[page],
-                    startRank = page * 5 + 1,
-                    onUserClick = onUserClick,
-                    modifier = Modifier.graphicsLayer {
-                        scaleX = 1f - (0.14f * clamped)
-                        scaleY = 1f - (0.14f * clamped)
-                        alpha = 1f - (0.65f * clamped)
-                    }
-                )
+                val pageModifier = Modifier.graphicsLayer {
+                    scaleX = 1f - (0.14f * clamped)
+                    scaleY = 1f - (0.14f * clamped)
+                    alpha = 1f - (0.65f * clamped)
+                }
+
+                if (hasSupporterPage && page == 0) {
+                    SupporterPodiumPage(
+                        supporters = topSupporters.take(5),
+                        modifier = pageModifier
+                    )
+                } else {
+                    val levelPageIndex = if (hasSupporterPage) page - 1 else page
+                    LeaderboardPodiumPage(
+                        users = pages[levelPageIndex],
+                        startRank = levelPageIndex * 5 + 1,
+                        onUserClick = onUserClick,
+                        modifier = pageModifier
+                    )
+                }
             }
 
-            if (pages.size > 1) {
+            if (totalPages > 1) {
                 Spacer(modifier = Modifier.height(10.dp))
                 PageIndicatorDots(
-                    pageCount = pages.size,
+                    pageCount = totalPages,
                     currentPage = pagerState.currentPage,
                     modifier = Modifier.align(Alignment.End)
                 )
@@ -936,6 +957,197 @@ private fun LeaderboardPodiumPage(
                 )
             } else {
                 Spacer(modifier = Modifier.width(58.dp))
+            }
+        }
+    }
+}
+
+// Data satu baris Top Supporter buat podium: nama, total donasi, dan avatar_url
+// kalau nama donaturnya matched sama akun terdaftar (userDirectory) — kalau ga match,
+// avatarUrl null dan fallback ke lingkaran inisial.
+private data class SupporterEntry(
+    val name: String,
+    val amount: Int,
+    val avatarUrl: String? = null
+)
+
+// Halaman podium khusus Top Supporter (donasi) — dipakai sebagai slide PERTAMA
+// di carousel TOP LEADERBOARD. Susunan sama kayak podium level: #4 #2 #1 #3 #5.
+// Avatar pakai foto asli kalau nama donatur match sama akun terdaftar, kalau ga
+// ketemu (donasi anonim/nama beda) fallback ke lingkaran inisial gold/silver/bronze.
+@Composable
+private fun SupporterPodiumPage(
+    supporters: List<SupporterEntry>,
+    modifier: Modifier = Modifier
+) {
+    val slotOffsets = listOf(3, 1, 0, 2, 4)
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(150.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        slotOffsets.forEachIndexed { i, offset ->
+            val supporter = supporters.getOrNull(offset)
+            if (supporter != null) {
+                val rank = offset + 1
+                SupporterPodiumAvatar(
+                    rank = rank,
+                    name = supporter.name,
+                    amount = supporter.amount,
+                    avatarUrl = supporter.avatarUrl,
+                    size = when (offset) {
+                        0 -> 60.dp
+                        1, 2 -> 50.dp
+                        else -> 42.dp
+                    },
+                    entranceDelayMs = when (offset) {
+                        0 -> 150
+                        1, 2 -> 80
+                        else -> 0
+                    },
+                    entranceKey = "supporter-$rank"
+                )
+            } else {
+                Spacer(modifier = Modifier.width(58.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupporterPodiumAvatar(
+    rank: Int,
+    name: String,
+    amount: Int,
+    avatarUrl: String?,
+    size: androidx.compose.ui.unit.Dp,
+    entranceDelayMs: Int = 0,
+    entranceKey: Any? = null
+) {
+    val ringBrush = when (rank) {
+        1 -> Brush.linearGradient(colors = listOf(Color(0xFFFFF3B0), Color(0xFFFFC107), Color(0xFFFFD54F)))
+        2 -> Brush.linearGradient(colors = listOf(Color(0xFFECEFF1), Color(0xFF90A4AE)))
+        3 -> Brush.linearGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
+        else -> Brush.linearGradient(colors = listOf(Color.White.copy(alpha = 0.3f), Color.White.copy(alpha = 0.12f)))
+    }
+    val avatarFill = when (rank) {
+        1 -> Brush.linearGradient(colors = listOf(Color(0xFFFFE082), Color(0xFFFFC107)))
+        2 -> Brush.linearGradient(colors = listOf(Color(0xFFECEFF1), Color(0xFFB0BEC5)))
+        3 -> Brush.linearGradient(colors = listOf(Color(0xFFE6B98A), Color(0xFFB07040)))
+        else -> Brush.linearGradient(colors = listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.06f)))
+    }
+    val chipColor = when (rank) {
+        1 -> Color(0xFFFFC107)
+        2 -> Color(0xFFCFD8DC)
+        3 -> Color(0xFFCE8B5B)
+        else -> Color.White.copy(alpha = 0.22f)
+    }
+    val chipTextColor = if (rank <= 3) Color(0xFF1B1330) else Color.White
+
+    var visible by remember(entranceKey) { mutableStateOf(false) }
+    LaunchedEffect(entranceKey) {
+        visible = false
+        delay(entranceDelayMs.toLong())
+        visible = true
+    }
+
+    val infinite = rememberInfiniteTransition(label = "supporterPodiumPulse")
+    val pulse by infinite.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "supporterPulseAlpha"
+    )
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(320)) + scaleIn(initialScale = 0.7f, animationSpec = tween(320))
+    ) {
+        Column(
+            modifier = Modifier.width(66.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (rank == 1) {
+                CrownIcon(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .graphicsLayer { alpha = pulse },
+                    tint = Color(0xFFFFD54F)
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+            } else {
+                Spacer(modifier = Modifier.height(21.dp))
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(size)
+                    .then(
+                        if (rank == 1) Modifier.graphicsLayer { alpha = 0.85f + (0.15f * pulse) }
+                        else Modifier
+                    )
+                    .clip(CircleShape)
+                    .background(if (avatarUrl.isNullOrBlank()) avatarFill else Brush.linearGradient(listOf(Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.06f))))
+                    .border(if (rank == 1) 3.dp else 2.dp, ringBrush, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (avatarUrl.isNullOrBlank()) {
+                    Text(
+                        text = name.trim().take(1).uppercase().ifBlank { "?" },
+                        color = Color(0xFF1B1330),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = (size.value * 0.4f).sp
+                    )
+                } else {
+                    AsyncImage(
+                        model = avatarUrl,
+                        contentDescription = name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = name.ifBlank { "Anonim" },
+                color = if (rank == 1) Color(0xFFFFD54F) else Color.White.copy(alpha = 0.85f),
+                fontSize = if (rank == 1) 11.sp else 10.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(64.dp)
+            )
+            Text(
+                text = formatRupiah(amount),
+                color = Color(0xFFFFD54F).copy(alpha = 0.85f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(chipColor)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "#$rank",
+                    color = chipTextColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -1882,13 +2094,35 @@ fun HomeScreen(
                     val topUsers = remember(userDirectory) {
                         userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
                     }
+                    val donationsForHome by viewModel.donations.collectAsState()
+                    val topSupporters = remember(donationsForHome, userDirectory) {
+                        donationsForHome
+                            .groupBy { it.supporter_name }
+                            .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
+                            .sortedByDescending { it.second }
+                            .take(5)
+                            .map { (name, amount) ->
+                                // Cocokin nama donatur ke akun terdaftar (kalau dia donasi
+                                // pakai username yang sama) buat ambil foto profil asli.
+                                val matchedUser = userDirectory.firstOrNull {
+                                    it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
+                                }
+                                SupporterEntry(
+                                    name = name,
+                                    amount = amount,
+                                    avatarUrl = matchedUser?.avatar_url
+                                )
+                            }
+                    }
 
                     if (topUsers.isNotEmpty()) {
                         TopLeaderboardCard(
                             topUsers = topUsers,
+                            topSupporters = topSupporters,
                             accentColor = accentColor,
                             onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
-                            onSeeAllClick = { navController.navigate("user_list") }
+                            onSeeAllClick = { navController.navigate("user_list") },
+                            onSeeAllSupportersClick = { navController.navigate("top_supporter") }
                         )
                     }
 
