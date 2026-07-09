@@ -239,7 +239,7 @@ object VideoExtractor {
                 // extractor lain yang emang gak match buat host ini.
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
                 host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
-                host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl)
+                host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl, referer)
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
@@ -476,27 +476,43 @@ object VideoExtractor {
     // resmi player-nya buat dapetin daftar kualitas (mp4 per-resolusi +
     // manifest HLS "auto"). Gak perlu HTML scraping, ini JSON API publik
     // yang emang dipanggil sama web player Dailymotion sendiri.
+    //
+    // PENTING: video Dailymotion sering dibatasi cuma bisa di-embed dari
+    // domain tertentu (whitelist yang di-set uploader-nya). Jadi header
+    // Referer/Origin buat MUTER stream-nya (bukan buat fetch metadata JSON)
+    // harus pakai domain halaman ASLI tempat embed ini nempel (`referer`
+    // yang dioper dari WebView/detail episode), bukan dailymotion.com —
+    // kalau di-hardcode ke dailymotion.com, CDN-nya bisa nolak request
+    // segment/manifest walau URL-nya sendiri valid (hasilnya: layar hitam,
+    // durasi 00:00, ExoPlayer gak crash tapi videonya gak pernah kemuat).
     // ---------------------------------------------------------------------
-    private fun extractDailymotion(embedUrl: String): ResolvedStream? {
+    private fun extractDailymotion(embedUrl: String, referer: String?): ResolvedStream? {
         val videoId = Regex("""video[/=]([a-zA-Z0-9]+)""").find(embedUrl)?.groupValues?.get(1)
             ?: Regex("""dai\.ly/([a-zA-Z0-9]+)""").find(embedUrl)?.groupValues?.get(1)
             ?: return null
 
         val metaUrl = "https://www.dailymotion.com/player/metadata/video/$videoId"
+        // Endpoint metadata JSON-nya sendiri API publik dailymotion.com, jadi aman
+        // tetap pakai referer dailymotion.com khusus buat request INI SAJA.
         val json = fetchHtml(metaUrl, "https://www.dailymotion.com/")
         val meta = org.json.JSONObject(json)
         val qualities = meta.optJSONObject("qualities") ?: return null
+
+        // Origin/Referer buat MUTER stream-nya (headers yang bakal dipasang ke
+        // ExoPlayer): pakai domain halaman asli kalau ada, fallback dailymotion.com.
+        val playbackReferer = referer?.takeIf { it.isNotBlank() } ?: "https://www.dailymotion.com/"
+        val playbackHeaders = mapOf(
+            "Referer" to playbackReferer,
+            "Origin" to originOf(playbackReferer),
+            "User-Agent" to DESKTOP_UA
+        )
 
         // Prioritas: "auto" (HLS adaptif) baru fallback ke mp4 kualitas tertinggi.
         val autoArr = qualities.optJSONArray("auto")
         if (autoArr != null && autoArr.length() > 0) {
             val hlsUrl = autoArr.getJSONObject(0).optString("url").takeIf { it.isNotBlank() }
             if (hlsUrl != null) {
-                return ResolvedStream(
-                    url = hlsUrl,
-                    isHls = true,
-                    headers = mapOf("Referer" to "https://www.dailymotion.com/", "User-Agent" to DESKTOP_UA)
-                )
+                return ResolvedStream(url = hlsUrl, isHls = true, headers = playbackHeaders)
             }
         }
 
@@ -506,11 +522,7 @@ object VideoExtractor {
             for (i in 0 until arr.length()) {
                 val url = arr.getJSONObject(i).optString("url").takeIf { it.isNotBlank() }
                 if (url != null) {
-                    return ResolvedStream(
-                        url = url,
-                        isHls = url.contains(".m3u8"),
-                        headers = mapOf("Referer" to "https://www.dailymotion.com/", "User-Agent" to DESKTOP_UA)
-                    )
+                    return ResolvedStream(url = url, isHls = url.contains(".m3u8"), headers = playbackHeaders)
                 }
             }
         }
