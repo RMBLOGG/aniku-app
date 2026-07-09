@@ -388,6 +388,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _resolvedHeaders = MutableStateFlow<Map<String, String>>(emptyMap())
     val resolvedHeaders: StateFlow<Map<String, String>> = _resolvedHeaders.asStateFlow()
 
+    // Debug info dari percobaan ekstraksi video terakhir yang GAGAL (jatuh ke WebView
+    // fallback) - isinya VideoExtractor.lastDebugSnippet. Tujuannya buat yang build via
+    // GitHub Actions/CI (gak ada akses Logcat/adb sama sekali) - tinggal buka dialog-nya
+    // di UI, copy teksnya atau screenshot, gak perlu colok laptop/adb logcat.
+    private val _extractDebugInfo = MutableStateFlow<String?>(null)
+    val extractDebugInfo: StateFlow<String?> = _extractDebugInfo.asStateFlow()
+
     // Auth flows
     private val _authLoading = MutableStateFlow(false)
     val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
@@ -1357,6 +1364,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _activeStreamUrl.value = extracted.url
                                         _resolvedHeaders.value = extracted.headers
                                         _isDirectStream.value = true
+                                        _extractDebugInfo.value = null
                                     } else {
                                         // Ekstraksi gagal — jangan pakai resolvedUrl mentah kalau itu
                                         // shortlink (short.ink/short.icu/dll) yang DNS-nya di-block ISP,
@@ -1366,6 +1374,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         )
                                         _resolvedHeaders.value = emptyMap()
                                         _isDirectStream.value = false
+                                        _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                                     }
                                 }
                             } catch (e: Exception) {
@@ -1404,10 +1413,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
+                            _extractDebugInfo.value = null
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1434,10 +1445,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
+                            _extractDebugInfo.value = null
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1457,10 +1470,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
+                            _extractDebugInfo.value = null
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1546,10 +1561,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _activeStreamUrl.value = resolved.url
                         _resolvedHeaders.value = resolved.headers
                         _isDirectStream.value = true
+                        _extractDebugInfo.value = null
                     } else {
                         _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
                         _resolvedHeaders.value = emptyMap()
                         _isDirectStream.value = isDirectUrl(rawUrl)
+                        _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                     }
                     _isStreamLoading.value = false
                 }

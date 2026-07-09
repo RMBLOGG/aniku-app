@@ -60,6 +60,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -4969,6 +4970,7 @@ fun WatchScreen(
     onLoginRequired: () -> Unit = {}
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
+    var showExtractDebugDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
     val session by viewModel.session.collectAsState()
@@ -4980,6 +4982,7 @@ fun WatchScreen(
     val selectedIndex by viewModel.selectedStreamIndex.collectAsState()
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
+    val extractDebugInfo by viewModel.extractDebugInfo.collectAsState()
     val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
     val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
     val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
@@ -6347,6 +6350,18 @@ fun WatchScreen(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Cuma nongol kalau ekstraksi ExoPlayer gagal & jatuh ke WebView fallback.
+                // Dibikin biar yang build lewat CI/GitHub Actions (gak ada akses Logcat/adb)
+                // tetep bisa lihat alasan gagalnya - tinggal tap, copy, kirim ke Claude.
+                if (extractDebugInfo != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "⚠ Gagal jadi player native — tap buat lihat kenapa (debug)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.clickable { showExtractDebugDialog = true }
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -6378,6 +6393,36 @@ fun WatchScreen(
                     }
                 }
             }
+        }
+
+        if (showExtractDebugDialog && extractDebugInfo != null) {
+            AlertDialog(
+                onDismissRequest = { showExtractDebugDialog = false },
+                title = { Text("Debug ekstraksi video") },
+                text = {
+                    // SelectionContainer biar teksnya bisa di-select manual/copy sebagian
+                    // kalau tombol "Copy Semua" di bawah kurang pas (mis. mau kirim potongan
+                    // tertentu doang).
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(
+                            text = extractDebugInfo ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .heightIn(max = 400.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(extractDebugInfo ?: ""))
+                    }) { Text("Copy Semua") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExtractDebugDialog = false }) { Text("Tutup") }
+                }
+            )
         }
 
         // Previous and Next Episode controls
