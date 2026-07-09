@@ -994,6 +994,333 @@ data class AnimekompiEpisodeResponse(
     val data: AnimekompiEpisodeData? = null
 )
 
+// ================================================================
+// DONGHUA MODELS (Anichin, scraper Sanka Vollerei)
+// Sumber: https://www.sankavollerei.web.id/anime/donghua/
+// ================================================================
+
+// --- Home (donghua/home/{page}) ---
+@JsonClass(generateAdapter = true)
+data class DonghuaHomeResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val latest_release: List<DonghuaReleaseItem>? = null,
+    val completed_donghua: List<DonghuaBasicItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaReleaseItem(
+    val title: String? = null,
+    val slug: String? = null, // ini slug EPISODE, bukan slug detail anime
+    val poster: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val current_episode: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    // Contoh: "perfect-world-episode-277-subtitle-indonesia/" -> "perfect-world"
+    private fun animeSlugFromEpisodeSlug(epSlug: String): String {
+        val cleaned = epSlug.trim().trimEnd('/')
+        val match = Regex("^(.+?)-episode-\\d").find(cleaned)
+        return match?.groupValues?.get(1) ?: cleaned.removeSuffix("-subtitle-indonesia")
+    }
+
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = animeSlugFromEpisodeSlug(slug ?: ""),
+        poster = poster ?: "",
+        episode = current_episode,
+        type = type,
+        status = status
+    )
+}
+
+// --- Item dasar dipakai di: home.completed_donghua, ongoing, completed ---
+@JsonClass(generateAdapter = true)
+data class DonghuaBasicItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = (slug ?: "").trimEnd('/'),
+        poster = poster ?: "",
+        type = type,
+        status = status
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class DonghuaOngoingResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val ongoing_donghua: List<DonghuaBasicItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaCompletedResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val completed_donghua: List<DonghuaBasicItem>? = null
+)
+
+// --- Item dipakai di: latest, az-list, search (ada field "sub") ---
+@JsonClass(generateAdapter = true)
+data class DonghuaListItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val sub: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = (slug ?: "").trimEnd('/'),
+        poster = poster ?: "",
+        type = type,
+        status = status
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class DonghuaLatestResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val latest_donghua: List<DonghuaListItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaAzListResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val donghua_list: List<DonghuaListItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaSearchResponse(
+    val creator: String? = null,
+    val data: List<DonghuaListItem>? = null
+)
+
+// --- Schedule ---
+@JsonClass(generateAdapter = true)
+data class DonghuaScheduleItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val release_time: String? = null,
+    val episode: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = (slug ?: "").trimEnd('/'),
+        poster = poster ?: "",
+        episode = episode,
+        estimation = release_time
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class DonghuaScheduleDay(
+    val day: String? = null,
+    val donghua_list: List<DonghuaScheduleItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaScheduleResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val schedule: List<DonghuaScheduleDay>? = null
+)
+
+// --- Genres (daftar tag polos: genre, tahun, studio semua dalam 1 list) ---
+@JsonClass(generateAdapter = true)
+data class DonghuaGenreTag(
+    val name: String? = null,
+    val slug: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toGenreRaw() = GenreRaw(name = name ?: "", slug = slug ?: "")
+}
+
+@JsonClass(generateAdapter = true)
+data class DonghuaGenresResponse(
+    val creator: String? = null,
+    val data: List<DonghuaGenreTag>? = null
+)
+
+// --- Item "kaya" dipakai di: genres/{slug}/{page} dan seasons/{year} ---
+@JsonClass(generateAdapter = true)
+data class DonghuaItemGenre(
+    val name: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaRichItem(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val episodes: String? = null,
+    val alternative: String? = null,
+    val rating: Double? = null,
+    val studio: String? = null,
+    val description: String? = null,
+    val genres: List<DonghuaItemGenre>? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title ?: "Unknown",
+        slug = (slug ?: "").trimEnd('/'),
+        poster = poster ?: "",
+        type = type,
+        status = status,
+        score = rating?.toString(),
+        episode_count = episodes,
+        genres = genres?.map { it.name ?: "" }
+    )
+}
+
+// Dipakai bareng untuk genres/{slug}/{page} dan seasons/{year} — struktur JSON-nya sama persis
+@JsonClass(generateAdapter = true)
+data class DonghuaGenreDetailResponse(
+    val creator: String? = null,
+    val data: List<DonghuaRichItem>? = null
+)
+
+// --- Detail (donghua/detail/{slug}) ---
+@JsonClass(generateAdapter = true)
+data class DonghuaDetailGenre(
+    val name: String? = null,
+    val slug: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaDetailEpisodeItem(
+    val episode: String? = null,
+    val slug: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+) {
+    fun toDetailEpisodeRaw() = DetailEpisodeRaw(
+        name = episode?.takeIf { it.isNotBlank() } ?: (slug ?: ""),
+        slug = slug ?: ""
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class DonghuaDetailResponse(
+    val status: String? = null, // ini status anime (Completed/Ongoing), bukan status request
+    val creator: String? = null,
+    val title: String? = null,
+    val alter_title: String? = null,
+    val poster: String? = null,
+    val rating: String? = null,
+    val studio: String? = null,
+    val network: String? = null,
+    val released: String? = null,
+    val duration: String? = null,
+    val type: String? = null,
+    val episodes_count: String? = null,
+    val season: String? = null,
+    val country: String? = null,
+    val released_on: String? = null,
+    val updated_on: String? = null,
+    val genres: List<DonghuaDetailGenre>? = null,
+    val synopsis: String? = null,
+    val episodes_list: List<DonghuaDetailEpisodeItem>? = null
+) {
+    fun toDetailData() = DetailData(
+        title = title?.takeIf { it.isNotBlank() } ?: alter_title ?: "Unknown",
+        synonym = alter_title,
+        poster = poster ?: "",
+        rating = rating?.takeIf { it.isNotBlank() } ?: "N/A",
+        synopsis = synopsis,
+        trailer = null,
+        genres = genres?.map { DetailGenreRaw(it.name ?: "", it.slug ?: "") },
+        status = status,
+        aired = released_on ?: released,
+        type = type,
+        duration = duration,
+        author = network,
+        studio = studio,
+        season = season,
+        episodes = episodes_list?.map { it.toDetailEpisodeRaw() },
+        characters = null
+    )
+}
+
+// --- Episode / watch page (donghua/episode/{slug}) ---
+@JsonClass(generateAdapter = true)
+data class DonghuaServerLink(
+    val name: String? = null,
+    val url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaStreaming(
+    val main_url: DonghuaServerLink? = null,
+    val servers: List<DonghuaServerLink>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaEpisodeDetailsRef(
+    val title: String? = null,
+    val slug: String? = null,
+    val poster: String? = null,
+    val type: String? = null,
+    val released: String? = null,
+    val uploader: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaNavRef(
+    val episode: String? = null,
+    val slug: String? = null,
+    val href: String? = null,
+    val anichinUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaEpisodeNavigation(
+    val all_episodes: DonghuaNavRef? = null,
+    val previous_episode: DonghuaNavRef? = null,
+    val next_episode: DonghuaNavRef? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class DonghuaEpisodeResponse(
+    val status: String? = null,
+    val creator: String? = null,
+    val episode: String? = null,
+    val streaming: DonghuaStreaming? = null,
+    // key dinamis: download_url_360p / _480p / _720p / _1080p -> {"Mirrored": url, "Terabox": url}
+    val download_url: Map<String, Map<String, String>>? = null,
+    val donghua_details: DonghuaEpisodeDetailsRef? = null,
+    val navigation: DonghuaEpisodeNavigation? = null,
+    val episodes_list: List<DonghuaDetailEpisodeItem>? = null
+)
+
 // Trakteer Donation
 @JsonClass(generateAdapter = true)
 data class Donation(

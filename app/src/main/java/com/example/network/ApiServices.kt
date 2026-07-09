@@ -178,6 +178,46 @@ interface AnimekompiApi {
     suspend fun getEpisode(@Path("slug") slug: String): AnimekompiEpisodeResponse
 }
 
+// Donghua (Anichin, scraper Sanka Vollerei) — sumber ke-4, base url beda lagi:
+// https://www.sankavollerei.web.id/anime/  (prefix "donghua/...")
+interface DonghuaApi {
+    @GET("donghua/home/{page}")
+    suspend fun getHome(@Path("page") page: Int = 1): DonghuaHomeResponse
+
+    @GET("donghua/ongoing/{page}")
+    suspend fun getOngoing(@Path("page") page: Int = 1): DonghuaOngoingResponse
+
+    @GET("donghua/completed/{page}")
+    suspend fun getCompleted(@Path("page") page: Int = 1): DonghuaCompletedResponse
+
+    @GET("donghua/latest/{page}")
+    suspend fun getLatest(@Path("page") page: Int = 1): DonghuaLatestResponse
+
+    @GET("donghua/schedule")
+    suspend fun getSchedule(): DonghuaScheduleResponse
+
+    @GET("donghua/az-list/{letter}/{page}")
+    suspend fun getAzList(@Path("letter") letter: String, @Path("page") page: Int = 1): DonghuaAzListResponse
+
+    @GET("donghua/search/{query}")
+    suspend fun search(@Path("query") query: String): DonghuaSearchResponse
+
+    @GET("donghua/detail/{slug}")
+    suspend fun getDetail(@Path("slug") slug: String): DonghuaDetailResponse
+
+    @GET("donghua/episode/{slug}")
+    suspend fun getEpisode(@Path("slug") slug: String): DonghuaEpisodeResponse
+
+    @GET("donghua/genres")
+    suspend fun getGenres(): DonghuaGenresResponse
+
+    @GET("donghua/genres/{slug}/{page}")
+    suspend fun getByGenre(@Path("slug") slug: String, @Path("page") page: Int = 1): DonghuaGenreDetailResponse
+
+    @GET("donghua/seasons/{year}")
+    suspend fun getBySeason(@Path("year") year: String): DonghuaGenreDetailResponse
+}
+
 interface SupabaseFunctionsApi {
     @POST("functions/v1/register-ip-guard")
     suspend fun checkIpGuard(
@@ -960,6 +1000,14 @@ object NetworkClient {
             .build()
             .create(AnimekompiApi::class.java)
 
+    fun donghuaApi(context: Context): DonghuaApi =
+        Retrofit.Builder()
+            .baseUrl("https://www.sankavollerei.web.id/anime/")
+            .client(animeOkHttpClient(context))
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(DonghuaApi::class.java)
+
     val supabaseAuthApi: SupabaseAuthApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
@@ -1013,10 +1061,12 @@ object NetworkClient {
 //   private val animeApi by lazy { NetworkClient.animeApi(appContext) }
 //   private val samehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
 //   private val animekompiApi by lazy { NetworkClient.animekompiApi(appContext) }
+//   private val donghuaApi by lazy { NetworkClient.donghuaApi(appContext) }
 //
 // Lalu ganti semua:
 //   NetworkClient.animeApi.xxx  →  animeApi.xxx
 //   NetworkClient.samehadakuApi.xxx  →  samehadakuApi.xxx
 //   NetworkClient.animekompiApi.xxx  →  animekompiApi.xxx
+//   NetworkClient.donghuaApi.xxx  →  donghuaApi.xxx
 //
 // NetworkClient.supabaseDbApi dan NetworkClient.supabaseAuthApi tidak perlu diubah.
