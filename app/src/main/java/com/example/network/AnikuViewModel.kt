@@ -395,6 +395,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _extractDebugInfo = MutableStateFlow<String?>(null)
     val extractDebugInfo: StateFlow<String?> = _extractDebugInfo.asStateFlow()
 
+    // Info URL hasil resolve TERAKHIR, diisi baik pas berhasil MAUPUN gagal.
+    // Beda sama _extractDebugInfo (yang cuma keisi pas gagal total/fallback
+    // WebView) - ini buat kasus resolve() "berhasil" (dapet URL, ExoPlayer native
+    // kepasang) tapi kontennya salah/placeholder (mis. "Waiting Encoding video"
+    // dari host, atau video hitam/0:00 karena URL-nya sebenarnya gak valid).
+    // Ditampilin lewat tombol info netral yang SELALU ada (beda sama warning
+    // merah yang cuma nongol pas fallback), biar bisa dicek URL persisnya tanpa
+    // Logcat/adb.
+    private val _lastResolvedUrlInfo = MutableStateFlow<String?>(null)
+    val lastResolvedUrlInfo: StateFlow<String?> = _lastResolvedUrlInfo.asStateFlow()
+
     // Auth flows
     private val _authLoading = MutableStateFlow(false)
     val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
@@ -1365,6 +1376,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _resolvedHeaders.value = extracted.headers
                                         _isDirectStream.value = true
                                         _extractDebugInfo.value = null
+                                        _lastResolvedUrlInfo.value = "embedUrl: $resolvedUrl\nresolvedUrl: ${extracted.url}\nisHls: ${extracted.isHls}\nheaders: ${extracted.headers}"
                                     } else {
                                         // Ekstraksi gagal — jangan pakai resolvedUrl mentah kalau itu
                                         // shortlink (short.ink/short.icu/dll) yang DNS-nya di-block ISP,
@@ -1375,6 +1387,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _resolvedHeaders.value = emptyMap()
                                         _isDirectStream.value = false
                                         _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                                        _lastResolvedUrlInfo.value = "embedUrl: $resolvedUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                                     }
                                 }
                             } catch (e: Exception) {
@@ -1414,11 +1427,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
                             _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1446,11 +1461,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
                             _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1471,11 +1488,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
                             _isDirectStream.value = isDirectUrl(firstUrl)
                             _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1562,11 +1581,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _resolvedHeaders.value = resolved.headers
                         _isDirectStream.value = true
                         _extractDebugInfo.value = null
+                        _lastResolvedUrlInfo.value = "embedUrl: $rawUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
                     } else {
                         _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
                         _resolvedHeaders.value = emptyMap()
                         _isDirectStream.value = isDirectUrl(rawUrl)
                         _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                        _lastResolvedUrlInfo.value = "embedUrl: $rawUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                     }
                     _isStreamLoading.value = false
                 }

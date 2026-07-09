@@ -4971,6 +4971,7 @@ fun WatchScreen(
 ) {
     var currentEpisodeSlug by remember { mutableStateOf(episodeSlug) }
     var showExtractDebugDialog by remember { mutableStateOf(false) }
+    var showStreamInfoDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
     val session by viewModel.session.collectAsState()
@@ -4983,6 +4984,7 @@ fun WatchScreen(
     val isStreamLoading by viewModel.isStreamLoading.collectAsState()
     val streamError by viewModel.streamError.collectAsState()
     val extractDebugInfo by viewModel.extractDebugInfo.collectAsState()
+    val lastResolvedUrlInfo by viewModel.lastResolvedUrlInfo.collectAsState()
     val episodeTitle by viewModel.streamEpisodeTitle.collectAsState()
     val detail by viewModel.animeDetail.collectAsState() // Hold backing episode listing
     val currentAnimeSlug by viewModel.currentAnimeSlug.collectAsState()
@@ -6362,6 +6364,22 @@ fun WatchScreen(
                         modifier = Modifier.clickable { showExtractDebugDialog = true }
                     )
                 }
+                // Beda sama warning merah di atas (yang cuma nongol pas TOTAL gagal /
+                // fallback WebView) - ini SELALU ada selama pernah ada percobaan resolve,
+                // walau "berhasil" (ExoPlayer native kepasang). Gunanya: kadang resolve()
+                // sukses dapet URL, tapi kontennya salah/placeholder (mis. video "Waiting
+                // Encoding" dari host, atau URL nyasar ke source yang salah/kosong bikin
+                // layar hitam 00:00) - dari sini bisa dicek URL persis yang lagi diputar
+                // tanpa perlu Logcat/adb.
+                if (lastResolvedUrlInfo != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "ℹ Info stream yang lagi diputar (tap)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable { showStreamInfoDialog = true }
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -6421,6 +6439,33 @@ fun WatchScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showExtractDebugDialog = false }) { Text("Tutup") }
+                }
+            )
+        }
+
+        if (showStreamInfoDialog && lastResolvedUrlInfo != null) {
+            AlertDialog(
+                onDismissRequest = { showStreamInfoDialog = false },
+                title = { Text("Info stream") },
+                text = {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(
+                            text = lastResolvedUrlInfo ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .verticalScroll(rememberScrollState())
+                                .heightIn(max = 400.dp)
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(lastResolvedUrlInfo ?: ""))
+                    }) { Text("Copy Semua") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showStreamInfoDialog = false }) { Text("Tutup") }
                 }
             )
         }
