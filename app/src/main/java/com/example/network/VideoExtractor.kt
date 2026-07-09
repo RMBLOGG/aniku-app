@@ -703,10 +703,7 @@ object VideoExtractor {
         var working = html
         var attempts = 0
         while (fileUrl == null && attempts < 3) {
-            val packedMatch = Regex(
-                """eval\(function\(p,a,c,k,e,[rd]\).*?\)\)""",
-                RegexOption.DOT_MATCHES_ALL
-            ).find(working) ?: break
+            val packedMatch = PACKED_EVAL_REGEX.find(working) ?: break
             val unpacked = unpackJs(packedMatch.value) ?: break
             fileUrl = extractSourceFile(unpacked)
             working = unpacked
@@ -728,10 +725,7 @@ object VideoExtractor {
                     var jsWorking = externalJs!!
                     var jsAttempts = 0
                     while (fileUrl == null && jsAttempts < 3) {
-                        val packedMatch = Regex(
-                            """eval\(function\(p,a,c,k,e,[rd]\).*?\)\)""",
-                            RegexOption.DOT_MATCHES_ALL
-                        ).find(jsWorking) ?: break
+                        val packedMatch = PACKED_EVAL_REGEX.find(jsWorking) ?: break
                         val unpacked = unpackJs(packedMatch.value) ?: break
                         fileUrl = extractSourceFile(unpacked)
                         jsWorking = unpacked
@@ -885,6 +879,50 @@ object VideoExtractor {
      * token alfanumerik, terus lookup ke dictionary — hasil akhirnya identik,
      * tapi jauh lebih cepat (dari ratusan pass jadi 1 pass).
      */
+    // Regex buat nangkep FULL isi `eval(function(p,a,c,k,e,d){...}(payload,radix,count,'dict'.split('|'),0,{}))`.
+    //
+    // PENTING kenapa gak boleh cuma `.*?\)\)` (non-greedy) doang: fungsi unpacker-nya
+    // SENDIRI (`e=function(c){return(c<a?'':e(parseInt(c/a)))+...`) udah punya `))`
+    // di tengah body-nya sendiri (dari `parseInt(c/a))`), jauh sebelum payload asli
+    // kelar. Non-greedy match bakal berhenti DI SITU (ketemu di anichin.stream:
+    // hasilnya cuma ke-capture 71 karakter doang dari ~1743 karakter yang harusnya),
+    // jadi `unpackJs()` selalu dikasih string setengah jadi -> selalu gagal parse
+    // -> extractor ini selalu jatuh ke WebView fallback padahal sebenarnya JS-nya
+    // decode-able. Fix: paksa match harus lewatin `.split('|')` dulu baru boleh
+    // berhenti di `))` — itu satu-satunya `))` yang valid jadi penutup IIFE.
+    private val PACKED_EVAL_REGEX = Regex(
+        """eval\(function\(p,a,c,k,e,[rd]\).*?\.split\('\|'\).*?\)\)""",
+        RegexOption.DOT_MATCHES_ALL
+    )
+
+    /**
+     * Replikasi persis fungsi encode `e(c)` bawaan packer (BUKAN base konversi
+     * standar!). Dipakai buat bangun dictionary token->keyword di unpackJs().
+     *
+     * Kenapa gak bisa pakai `Integer.toString(c, radix)` bawaan Kotlin/Java:
+     * radix di packed script BISA lebih dari 36 (mis. anichin.stream pakai a=62,
+     * dictionary isinya 117 kata) - tapi `Integer.toString()` di JVM cuma
+     * support radix 2-36 dan bakal LEMPAR IllegalArgumentException kalau dikasih
+     * radix di atas itu (ke-catch diam-diam di try/catch luar -> extraction
+     * selalu gagal). Packer aslinya nge-handle ini dengan encoding custom:
+     * digit 0-35 pakai karakter biasa (0-9,a-z, sama kayak toString(36)), tapi
+     * digit 36 ke atas (buat radix > 36) pakai `String.fromCharCode(digit+29)`
+     * yang hasilnya karakter 'A'-'Z' (36+29=65='A', 61+29=90='Z'). Ini fungsi
+     * Kotlin-nya, sama persis logikanya cuma bentuk iteratif (bukan rekursif).
+     */
+    private fun packerEncodeToken(value: Int, radix: Int): String {
+        fun digitChar(d: Int): Char =
+            if (d > 35) (d + 29).toChar() else if (d < 10) ('0' + d) else ('a' + (d - 10))
+        if (value == 0) return digitChar(0).toString()
+        var n = value
+        val digits = ArrayDeque<Char>()
+        while (n > 0) {
+            digits.addFirst(digitChar(n % radix))
+            n /= radix
+        }
+        return digits.joinToString("")
+    }
+
     private fun unpackJs(packed: String): String? {
         val match = Regex(
             """\}\('(.*)',\s*(\d+),\s*(\d+),\s*'(.*?)'\.split\('\|'\)""",
@@ -896,11 +934,15 @@ object VideoExtractor {
         val count = match.groupValues[3].toIntOrNull() ?: return null
         val keywords = match.groupValues[4].split("|")
 
-        // token base-radix (mis. "a3", "12") -> keyword aslinya, sekali bikin aja
+        // token base-radix (mis. "a3", "12", atau "A3" kalau radix>36) -> keyword
+        // aslinya, sekali bikin aja. Pakai packerEncodeToken (bukan
+        // Integer.toString) supaya benar juga untuk radix>36 (mis. anichin.stream
+        // yang pakai a=62 - Integer.toString cuma sanggup radix 2-36 dan bakal
+        // throw IllegalArgumentException kalau dipaksa radix 62).
         val dict = HashMap<String, String>(count * 2)
         for (c in 0 until count) {
             if (c < keywords.size && keywords[c].isNotEmpty()) {
-                dict[Integer.toString(c, radix)] = keywords[c]
+                dict[packerEncodeToken(c, radix)] = keywords[c]
             }
         }
 
