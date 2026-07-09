@@ -10751,28 +10751,29 @@ private fun PodiumPlaque(
         label = "glowAlpha"
     )
 
-    ElevatedCard(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isGold) 8.dp else 2.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.045f), Color.White.copy(alpha = 0.015f))
-                    )
-                )
-                .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
-                .padding(
-                    top = if (isGold) 18.dp else 14.dp,
-                    bottom = if (isGold) 16.dp else 12.dp,
-                    start = 6.dp,
-                    end = 6.dp
+    Column(
+        modifier = modifier
+            .shadow(
+                elevation = if (isGold) 10.dp else 3.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = if (isGold) gold.copy(alpha = 0.5f) else Color.Black,
+                spotColor = if (isGold) gold.copy(alpha = 0.5f) else Color.Black
+            )
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.045f), Color.White.copy(alpha = 0.015f))
                 ),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+                shape = RoundedCornerShape(18.dp)
+            )
+            .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
+            .padding(
+                top = if (isGold) 18.dp else 14.dp,
+                bottom = if (isGold) 16.dp else 12.dp,
+                start = 6.dp,
+                end = 6.dp
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
             Box(
                 modifier = Modifier
                     .size(rankSize)
@@ -10831,6 +10832,5 @@ private fun PodiumPlaque(
                 color = amountColor,
                 delayMillis = countDelay
             )
-        }
     }
 }
