@@ -5611,17 +5611,57 @@ fun WatchScreen(
                                                 ),
                                                 modifier = Modifier.height(28.dp)
                                             )
-                                            // PiP button
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Next episode button — cuma nongol kalau ada episode
+                                                // berikutnya, biar user gak perlu keluar fullscreen dulu
+                                                // buat lanjut nonton episode selanjutnya.
+                                                val epsForNav = detail?.episodes
+                                                val navIndex = epsForNav?.indexOfFirst { it.slug == currentEpisodeSlug } ?: -1
+                                                val nextEp = if (navIndex > 0) epsForNav?.getOrNull(navIndex - 1) else null
+                                                if (nextEp != null) {
+                                                    FilledIconButton(
+                                                        onClick = { currentEpisodeSlug = nextEp.slug },
+                                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                                            containerColor = Color.Black.copy(alpha = 0.4f),
+                                                            contentColor = Color.White
+                                                        ),
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.SkipNext, contentDescription = "Episode selanjutnya", modifier = Modifier.size(18.dp))
+                                                    }
+                                                }
+                                                // Fullscreen toggle — biar bisa masuk/keluar layar penuh
+                                                // langsung dari overlay player, gak perlu scroll ke tombol
+                                                // "Layar Penuh" yang ke-hidden pas lagi fullscreen.
                                                 FilledIconButton(
-                                                    onClick = { enterPiP() },
+                                                    onClick = { isFullscreen = !isFullscreen },
                                                     colors = IconButtonDefaults.filledIconButtonColors(
                                                         containerColor = Color.Black.copy(alpha = 0.4f),
                                                         contentColor = Color.White
                                                     ),
                                                     modifier = Modifier.size(34.dp)
                                                 ) {
-                                                    Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", modifier = Modifier.size(16.dp))
+                                                    Icon(
+                                                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                                        contentDescription = if (isFullscreen) "Keluar layar penuh" else "Layar penuh",
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                                // PiP button
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                    FilledIconButton(
+                                                        onClick = { enterPiP() },
+                                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                                            containerColor = Color.Black.copy(alpha = 0.4f),
+                                                            contentColor = Color.White
+                                                        ),
+                                                        modifier = Modifier.size(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", modifier = Modifier.size(16.dp))
+                                                    }
                                                 }
                                             }
                                         }
