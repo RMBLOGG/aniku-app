@@ -5039,9 +5039,11 @@ fun WatchScreen(
     // interval. Ini disengaja — bukan "makin lama nonton makin banyak XP", tapi "coba
     // kirim ulang tiap interval sampai berhasil ke-catat", biar lebih tahan terhadap
     // gagal-kirim sesaat (network blip dsb) dibanding cuma 1x nembak di 1 momen doang.
+    val xpIntervalSeconds = 3 * 60 // checkpoint tiap 3 menit aktif nonton
+    val xpMaxAttempts = 4 // berhenti nyoba setelah ±12 menit (cukup buat hampir semua durasi episode)
+    var xpTicksSent by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
+    var activeSeconds by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
     run {
-        var xpTicksSent by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
-        var activeSeconds by remember(currentEpisodeSlug) { mutableIntStateOf(0) }
         val watchLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         var isScreenActive by remember { mutableStateOf(true) }
         DisposableEffect(watchLifecycleOwner) {
@@ -5064,13 +5066,11 @@ fun WatchScreen(
         // LANGSUNG tiap tick di dalam loop (semua state Compose, selalu kebaca versi terbaru),
         // bukan di-capture sekali di luar sebagai val.
         LaunchedEffect(currentEpisodeSlug) {
-            val intervalSeconds = 3 * 60 // checkpoint tiap 3 menit aktif nonton
-            val maxAttempts = 4 // berhenti nyoba setelah ±12 menit (cukup buat hampir semua durasi episode)
-            while (xpTicksSent < maxAttempts) {
+            while (xpTicksSent < xpMaxAttempts) {
                 kotlinx.coroutines.delay(1_000)
                 val playbackHasStarted = !activeStreamUrl.isNullOrEmpty() && (isDirectStream || userStartedPlayback)
                 if (isScreenActive && playbackHasStarted) activeSeconds++
-                if (activeSeconds >= intervalSeconds * (xpTicksSent + 1)) {
+                if (activeSeconds >= xpIntervalSeconds * (xpTicksSent + 1)) {
                     xpTicksSent++
                     viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
                 }
@@ -5598,19 +5598,51 @@ fun WatchScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             // Quality chip
-                                            AssistChip(
-                                                onClick = {},
-                                                label = { Text("720p", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
-                                                colors = AssistChipDefaults.assistChipColors(
-                                                    containerColor = Color.Black.copy(alpha = 0.4f),
-                                                    labelColor = Color.White.copy(alpha = 0.9f)
-                                                ),
-                                                border = AssistChipDefaults.assistChipBorder(
-                                                    enabled = true,
-                                                    borderColor = Color.White.copy(alpha = 0.15f)
-                                                ),
-                                                modifier = Modifier.height(28.dp)
-                                            )
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                AssistChip(
+                                                    onClick = {},
+                                                    label = { Text("720p", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                                                    colors = AssistChipDefaults.assistChipColors(
+                                                        containerColor = Color.Black.copy(alpha = 0.4f),
+                                                        labelColor = Color.White.copy(alpha = 0.9f)
+                                                    ),
+                                                    border = AssistChipDefaults.assistChipBorder(
+                                                        enabled = true,
+                                                        borderColor = Color.White.copy(alpha = 0.15f)
+                                                    ),
+                                                    modifier = Modifier.height(28.dp)
+                                                )
+                                                // Badge XP checkpoint — cuma nongol selama masih ada
+                                                // kesempatan checkpoint tersisa (xpTicksSent < xpMaxAttempts),
+                                                // biar user tau nonton dia beneran "kehitung" bukan cuma nebak.
+                                                if (xpTicksSent < xpMaxAttempts) {
+                                                    val secondsToNextTick = (xpIntervalSeconds * (xpTicksSent + 1) - activeSeconds).coerceAtLeast(0)
+                                                    val mm = secondsToNextTick / 60
+                                                    val ss = secondsToNextTick % 60
+                                                    AssistChip(
+                                                        onClick = {},
+                                                        label = {
+                                                            Text(
+                                                                "⚡ $xpTicksSent/$xpMaxAttempts · ${mm}:${ss.toString().padStart(2, '0')}",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.SemiBold
+                                                            )
+                                                        },
+                                                        colors = AssistChipDefaults.assistChipColors(
+                                                            containerColor = Color.Black.copy(alpha = 0.4f),
+                                                            labelColor = Color.White.copy(alpha = 0.9f)
+                                                        ),
+                                                        border = AssistChipDefaults.assistChipBorder(
+                                                            enabled = true,
+                                                            borderColor = Color.White.copy(alpha = 0.15f)
+                                                        ),
+                                                        modifier = Modifier.height(28.dp)
+                                                    )
+                                                }
+                                            }
                                             Row(
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                 verticalAlignment = Alignment.CenterVertically
@@ -6385,6 +6417,48 @@ fun WatchScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { seriesProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(50)),
+                    color = accentColor,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // XP checkpoint episode ini — beda dari "Progres Menonton" di atas (yang
+                // basisnya posisi episode dalam series). Ini basisnya lama nonton AKTIF di
+                // episode yang lagi dibuka sekarang (lihat catatan run{} XP di atas).
+                val xpCycleProgress = if (xpTicksSent >= xpMaxAttempts) 1f else {
+                    ((activeSeconds - xpIntervalSeconds * xpTicksSent).toFloat() / xpIntervalSeconds).coerceIn(0f, 1f)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚡", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "XP CHECKPOINT EPISODE INI",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        if (xpTicksSent >= xpMaxAttempts) "Selesai" else "$xpTicksSent/$xpMaxAttempts",
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { xpCycleProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
