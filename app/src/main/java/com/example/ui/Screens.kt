@@ -5072,7 +5072,7 @@ fun WatchScreen(
                 if (isScreenActive && playbackHasStarted) activeSeconds++
                 if (activeSeconds >= xpIntervalSeconds * (xpTicksSent + 1)) {
                     xpTicksSent++
-                    viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug)
+                    viewModel.reportWatchEvent(currentAnimeSlug, currentEpisodeSlug, checkpointNumber = xpTicksSent)
                 }
             }
         }

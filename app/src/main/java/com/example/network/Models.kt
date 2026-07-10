@@ -427,6 +427,16 @@ data class WatchEventRequest(
     val episode_slug: String
 )
 
+// Request buat RPC log_watch_checkpoint - versi baru yang ngasih XP per-checkpoint
+// (beda dari WatchEventRequest/log_watch_event lama yang cuma sekali per episode).
+@JsonClass(generateAdapter = true)
+data class WatchCheckpointRequest(
+    val user_id: String,
+    val anime_slug: String?,
+    val episode_slug: String,
+    val checkpoint_number: Int
+)
+
 @JsonClass(generateAdapter = true)
 data class ChatMessageRequest(
     val user_id: String,

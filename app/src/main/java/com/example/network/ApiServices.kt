@@ -611,6 +611,18 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
+    // Versi baru — 1 checkpoint = 1 baris XP sendiri (tabel & RPC terpisah dari watch_events/
+    // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
+    // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
+    // (bukan cuma "retry sampai berhasil 1x" kayak mekanisme lama).
+    @POST("rest/v1/rpc/log_watch_checkpoint")
+    suspend fun insertWatchCheckpoint(
+        @Body data: WatchCheckpointRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): retrofit2.Response<Unit>
+
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
