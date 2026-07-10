@@ -203,9 +203,93 @@ object VideoExtractor {
             Log.d("VideoExtractor", "Cache hit: $embedUrl")
             return it
         }
-        val result = resolveUncached(embedUrl, referer, context)
-        if (result != null) cachePut(key, result)
+        var result = resolveUncached(embedUrl, referer, context)
+        // Beberapa server (kejadian nyata: anichin.stream) ngasih HLS MASTER
+        // playlist yang keputus di tengah - baris terakhir #EXT-X-STREAM-INF
+        // gak punya baris URL sesudahnya (mis. varian 1080p ke-cut, padahal
+        // 360p/480p/720p di atasnya lengkap). Browser/hls.js cuek aja soal ini,
+        // tapi ExoPlayer strict dan gagal total parsing SELURUH manifest gara-gara
+        // 1 baris rusak di ujung. Di-patch di sini: bersihin baris yang orphan,
+        // simpen ke file lokal, baru itu yang dikasih ke ExoPlayer - biar 3 varian
+        // yang valid tetap bisa diputar walau 1 varian di ujungnya cacat.
+        if (result != null && result.isHls && context != null) {
+            val sanitizedUri = withContext(Dispatchers.IO) {
+                sanitizeHlsMasterPlaylist(context, result!!.url, result!!.headers)
+            }
+            if (sanitizedUri != null) {
+                Log.d("VideoExtractor", "HLS master playlist di-sanitize, disimpen lokal: $sanitizedUri")
+                result = result!!.copy(url = sanitizedUri)
+            }
+        }
+        if (result != null) cachePut(key, result!!)
         return result
+    }
+
+    /**
+     * Fetch manifest master HLS, buang baris #EXT-X-STREAM-INF yang gak punya
+     * baris URL sesudahnya (orphan/keputus), simpen hasil bersihnya ke file lokal
+     * di cache dir. Return null kalau: gagal fetch, atau manifest-nya udah bener
+     * (gak ada yang perlu dibersihin) - jadi caller tau harus tetap pakai URL
+     * remote asli, gak usah ganti ke file lokal kalau gak perlu.
+     */
+    private fun sanitizeHlsMasterPlaylist(context: Context, url: String, headers: Map<String, String>): String? {
+        val body = try {
+            val builder = Request.Builder().url(url)
+            headers.forEach { (k, v) -> builder.header(k, v) }
+            client.newCall(builder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                resp.body?.string() ?: return null
+            }
+        } catch (e: Exception) {
+            Log.w("VideoExtractor", "sanitizeHlsMasterPlaylist: gagal fetch manifest - ${e.message}")
+            return null
+        }
+
+        // Bukan master playlist (tidak ada tag ini) - gak relevan buat di-sanitize.
+        if (!body.contains("#EXT-X-STREAM-INF")) return null
+
+        val lines = body.lines()
+        val cleaned = mutableListOf<String>()
+        var droppedAny = false
+        var i = 0
+        while (i < lines.size) {
+            val line = lines[i]
+            if (line.startsWith("#EXT-X-STREAM-INF")) {
+                // Cari baris URI berikutnya yang bukan blank/comment.
+                var j = i + 1
+                while (j < lines.size && lines[j].isBlank()) j++
+                val hasUri = j < lines.size && !lines[j].startsWith("#")
+                if (hasUri) {
+                    cleaned.add(line)
+                } else {
+                    // Orphan - baris STREAM-INF ini gak punya URL, buang.
+                    droppedAny = true
+                }
+                i++
+            } else {
+                cleaned.add(line)
+                i++
+            }
+        }
+
+        if (!droppedAny) return null // manifest udah OK apa adanya, gak usah ganti apa-apa
+
+        val resolvedLines = cleaned.map { l ->
+            if (l.isNotBlank() && !l.startsWith("#")) {
+                runCatching { URI(url).resolve(normalizeUrl(l.trim())).toString() }.getOrDefault(l)
+            } else l
+        }
+
+        return try {
+            val cacheDir = java.io.File(context.cacheDir, "hls_sanitized").apply { mkdirs() }
+            val fileName = "manifest_${url.hashCode()}.m3u8"
+            val outFile = java.io.File(cacheDir, fileName)
+            outFile.writeText(resolvedLines.joinToString("\n"))
+            "file://${outFile.absolutePath}"
+        } catch (e: Exception) {
+            Log.w("VideoExtractor", "sanitizeHlsMasterPlaylist: gagal simpen file lokal - ${e.message}")
+            null
+        }
     }
 
     private suspend fun resolveUncached(embedUrl: String, referer: String? = null, context: Context? = null): ResolvedStream? {
