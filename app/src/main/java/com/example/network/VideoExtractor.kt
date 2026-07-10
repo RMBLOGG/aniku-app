@@ -357,6 +357,7 @@ object VideoExtractor {
                 // host packed-JS di atas, termasuk anichin.stream, jadi salah rute
                 // dan gak pernah lewat extractPackedJwPlayer sama sekali).
                 host.contains("gdriveplayer") -> extractGdrivePlayer(embedUrl, referer)
+                host.contains("rumble") -> extractRumble(embedUrl, referer)
                 host.contains("ok.ru") -> extractOkRu(embedUrl, referer)
                 host.contains("dailymotion") || host.contains("dai.ly") -> extractDailymotion(embedUrl, referer)
                 // Abyssplayer nyimpen source video dalam bentuk terenkripsi (didekripsi
@@ -572,6 +573,44 @@ object VideoExtractor {
             url = url,
             isHls = url.contains(".m3u8"),
             headers = mapOf("User-Agent" to DESKTOP_UA)
+        )
+    }
+
+    // ---------------------------------------------------------------------
+    // Rumble — video ID sama persis dengan kode di path embed URL
+    // (rumble.com/embed/{videoId}/...). Endpoint embedJS/u3/ balikin JSON
+    // resmi yang dipanggil player Rumble sendiri; kita ambil ua.hls.auto.url
+    // (master playlist HLS standar). Field lain di response (`tar`,
+    // `timeline`) itu skema byte-range custom Rumble (video di-pack jadi
+    // 1 file .tar terus di-"potong" lewat query param r_file/r_range) -
+    // gak perlu disentuh sama sekali karena hls.auto sudah nyediain
+    // manifest m3u8 biasa yang CDN-nya translate otomatis di server-side
+    // (dikonfirmasi manual: curl ke variant .tar?r_file=chunklist.m3u8...
+    // balikin teks m3u8 valid, bukan file tar mentah/binary).
+    //
+    // CATATAN JARINGAN: Rumble dikonfirmasi diblokir sebagian ISP Indonesia
+    // (minimal Telkomsel) di level SNI/TLS interception (server ngasih
+    // sertifikat "internetbaik.telkomsel.com", bukan sertifikat Rumble asli).
+    // FallbackDns (DoH) di client OkHttp TIDAK menolong kasus ini - itu cuma
+    // efektif buat block di level DNS. User dengan jaringan yang diblokir
+    // begini bakal tetap gagal resolve; caller otomatis fallback ke WebView
+    // seperti host lain yang gagal resolve.
+    // ---------------------------------------------------------------------
+    private fun extractRumble(embedUrl: String, referer: String?): ResolvedStream? {
+        val videoId = Regex("""rumble\.com/embed/([a-zA-Z0-9]+)""")
+            .find(embedUrl)?.groupValues?.get(1) ?: return null
+
+        val apiUrl = "https://rumble.com/embedJS/u3/?request=video&ver=2&v=$videoId"
+        val json = fetchHtml(apiUrl, embedUrl)
+        val ua = org.json.JSONObject(json).optJSONObject("ua") ?: return null
+
+        val hlsUrl = ua.optJSONObject("hls")?.optJSONObject("auto")?.optString("url")
+            ?.takeIf { it.isNotBlank() } ?: return null
+
+        return ResolvedStream(
+            url = hlsUrl,
+            isHls = true,
+            headers = mapOf("Referer" to "https://rumble.com/", "User-Agent" to DESKTOP_UA)
         )
     }
 
