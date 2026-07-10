@@ -3821,10 +3821,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 withValidToken { token ->
                     val response = NetworkClient.supabaseDbApi.insertWatchCheckpoint(
                         data = WatchCheckpointRequest(
-                            user_id = uid,
-                            anime_slug = animeSlug,
-                            episode_slug = episodeSlug,
-                            checkpoint_number = checkpointNumber
+                            p_user_id = uid,
+                            p_anime_slug = animeSlug,
+                            p_episode_slug = episodeSlug,
+                            p_checkpoint_number = checkpointNumber
                         ),
                         authHeader = "Bearer $token",
                         apiKey = SUPABASE_ANON_KEY

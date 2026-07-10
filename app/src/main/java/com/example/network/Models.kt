@@ -429,12 +429,16 @@ data class WatchEventRequest(
 
 // Request buat RPC log_watch_checkpoint - versi baru yang ngasih XP per-checkpoint
 // (beda dari WatchEventRequest/log_watch_event lama yang cuma sekali per episode).
+// PENTING: nama field di sini HARUS persis sama kayak nama parameter function SQL-nya
+// (p_user_id, p_anime_slug, dst) - PostgREST matching JSON body ke parameter RPC
+// berdasarkan NAMA, bukan urutan. Parameter di-prefix "p_" biar gak ambigu sama nama
+// kolom tabel watch_xp_checkpoints (lihat catatan error 42702/42P10 di riwayat SQL).
 @JsonClass(generateAdapter = true)
 data class WatchCheckpointRequest(
-    val user_id: String,
-    val anime_slug: String?,
-    val episode_slug: String,
-    val checkpoint_number: Int
+    val p_user_id: String,
+    val p_anime_slug: String?,
+    val p_episode_slug: String,
+    val p_checkpoint_number: Int
 )
 
 @JsonClass(generateAdapter = true)
