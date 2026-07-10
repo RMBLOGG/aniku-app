@@ -3819,7 +3819,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 withValidToken { token ->
-                    NetworkClient.supabaseDbApi.insertWatchCheckpoint(
+                    val response = NetworkClient.supabaseDbApi.insertWatchCheckpoint(
                         data = WatchCheckpointRequest(
                             user_id = uid,
                             anime_slug = animeSlug,
@@ -3829,9 +3829,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         authHeader = "Bearer $token",
                         apiKey = SUPABASE_ANON_KEY
                     )
+                    // PENTING: Response<Unit> dari Retrofit TIDAK nge-throw exception buat
+                    // HTTP error (400/404/dst) - dia cuma balikin isSuccessful=false. Tanpa
+                    // pengecekan ini, RPC yang gagal bakal ketelen diem-diem tanpa jejak sama
+                    // sekali (gak masuk catch, gak ke-log). Toast ini SEMENTARA buat debugging
+                    // tanpa perlu adb/logcat - bisa dihapus/diganti Log.e biasa setelah dipastikan
+                    // beres.
+                    if (!response.isSuccessful) {
+                        val errorBody = response.errorBody()?.string()
+                        Log.e("AnikuVM", "reportWatchEvent gagal: HTTP ${response.code()} - $errorBody")
+                        android.widget.Toast.makeText(
+                            appContext,
+                            "XP checkpoint gagal: ${response.code()} - ${errorBody?.take(150)}",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "reportWatchEvent error: ${e.message}")
+                android.widget.Toast.makeText(
+                    appContext,
+                    "XP checkpoint error: ${e.message}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
