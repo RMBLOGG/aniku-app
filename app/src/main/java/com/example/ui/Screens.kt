@@ -5417,6 +5417,22 @@ fun WatchScreen(
                             override fun onPlaybackStateChanged(state: Int) {
                                 isBuffering = state == Player.STATE_BUFFERING
                             }
+                            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                                // Sebelumnya error ExoPlayer (403 diblok, token/link expired,
+                                // manifest gagal di-parse, timeout, dsb) ketelen diam-diam -
+                                // layar cuma stuck hitam 00:00/00:00 tanpa info apa-apa.
+                                // Sekarang error asli (termasuk HTTP status code kalau ada,
+                                // via error.cause) dimunculin ke streamError biar keliatan
+                                // penyebab pastinya, bukan nebak-nebak.
+                                val cause = error.cause
+                                val detail = when (cause) {
+                                    is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException ->
+                                        "HTTP ${cause.responseCode} dari server (${cause.dataSpec.uri})"
+                                    else -> cause?.message ?: error.message
+                                }
+                                android.util.Log.e("ExoPlayerError", "Gagal play: ${error.errorCodeName} - $detail", error)
+                                viewModel.setStreamError("Gagal memutar video: ${error.errorCodeName}\n$detail")
+                            }
                         }
                         exoPlayer.addListener(listener)
                         onDispose { exoPlayer.removeListener(listener) }

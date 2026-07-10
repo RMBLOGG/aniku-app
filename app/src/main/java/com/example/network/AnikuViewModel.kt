@@ -382,6 +382,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _streamError = MutableStateFlow<String?>(null)
     val streamError: StateFlow<String?> = _streamError.asStateFlow()
 
+    // Dipanggil dari listener ExoPlayer (Screens.kt) waktu playback gagal
+    // (403/timeout/manifest invalid/dll) - sebelumnya error ini gak pernah
+    // sampai ke sini sama sekali, jadi UI cuma stuck hitam tanpa pesan.
+    fun setStreamError(message: String) {
+        _streamError.value = message
+    }
+
     private val _isDirectStream = MutableStateFlow(false)
     val isDirectStream: StateFlow<Boolean> = _isDirectStream.asStateFlow()
 
