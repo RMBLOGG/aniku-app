@@ -379,27 +379,6 @@ object VideoExtractor {
                         null
                     }
                 }
-                // rubyvidhub.com / streamruby.net — JWPlayer packed-JS statis
-                // BISA di-parse (sources/file ketemu via extractPackedJwPlayer),
-                // tapi CDN-nya (streamruby.net) nolak (403) request tanpa cookie
-                // sesi asli - dikonfirmasi manual: Referer+UA yang cocok pun tetap
-                // 403 kalau di-fetch lewat OkHttp polos tanpa cookie jar. Makanya
-                // wajib lewat WebView beneran biar cookie sesi ke-set natural.
-                host.contains("rubyvidhub") || host.contains("streamruby") -> {
-                    if (context != null) {
-                        val stream = StreamRubyWebViewExtractor.resolve(context, embedUrl, referer)
-                        if (stream != null) {
-                            Log.d("VideoExtractor", "StreamRuby resolved via WebView: ${stream.url.take(80)}")
-                            stream
-                        } else {
-                            Log.w("VideoExtractor", "StreamRubyWebViewExtractor gagal, fallback WebView biasa")
-                            null
-                        }
-                    } else {
-                        Log.d("VideoExtractor", "StreamRuby butuh context (WebView) - belum ada, fallback WebView biasa")
-                        null
-                    }
-                }
                 else -> {
                     // Host belum dikenal — kemungkinan besar shortlink (short.ink, dll)
                     // yang ngebungkus URL server video asli. Ikutin redirect-nya sendiri
