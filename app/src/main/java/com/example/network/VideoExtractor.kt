@@ -344,6 +344,11 @@ object VideoExtractor {
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") ||
+                // rubyvidhub.com / streamruby.com — sama-sama JWPlayer packed-JS
+                // standar (eval(function(p,a,c,k,e,d){...}), confirmed dari HTML
+                // embed asli via curl manual), cuma beda brand mirror doang.
+                host.contains("rubyvidhub") ||
+                host.contains("streamruby") ||
                 // anichin.stream — domain embed "Premium" milik Anichin sendiri (dipakai
                 // Donghua/Dayynime-v4). Konfigurasi JWPlayer-nya packed-JS standar
                 // (eval(function(p,a,c,k,e,d){...})), sama kayak Filemoon/Vidhide dkk
