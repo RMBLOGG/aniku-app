@@ -167,6 +167,8 @@ internal fun GlossyGradientText(
 // Set warna gradient khusus per role, dipakai bareng GlossyGradientText
 internal val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), Color(0xFFFF8E53))
 internal val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
+// Beta - badge kosmetik doang, gak ada hak akses moderasi apapun di chat
+internal val betaGradientColors = listOf(Color(0xFF22D3EE), Color(0xFF3B82F6))
 internal val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
 internal val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
 internal val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
@@ -798,6 +800,7 @@ private fun ChatBubble(
     val nameColor = when {
         message.role == "admin" || message.is_admin == true -> Color(0xFFFF6B6B)
         message.role == "moderator" -> Color(0xFFB388FF)
+        message.role == "beta" -> Color(0xFF22D3EE)
         else -> MaterialTheme.colorScheme.onSurface
     }
     val nameGradient = when {
@@ -805,6 +808,8 @@ private fun ChatBubble(
             Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
         message.role == "moderator" ->
             Brush.linearGradient(listOf(Color(0xFFB388FF), Color(0xFF7C4DFF)))
+        message.role == "beta" ->
+            Brush.linearGradient(betaGradientColors)
         else -> null
     }
 
@@ -888,6 +893,7 @@ private fun ChatBubble(
                     colors = when {
                         message.role == "admin" || message.is_admin == true -> adminGradientColors
                         message.role == "moderator" -> moderatorGradientColors
+                        message.role == "beta" -> betaGradientColors
                         else -> defaultNameGradientColors
                     },
                     fontSize = 13.sp
@@ -920,6 +926,13 @@ private fun ChatBubble(
                     GlossyGradientText(
                         text = "MODERATOR",
                         colors = moderatorGradientColors,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.4.sp
+                    )
+                } else if (message.role == "beta") {
+                    GlossyGradientText(
+                        text = "BETA",
+                        colors = betaGradientColors,
                         fontSize = 10.sp,
                         letterSpacing = 0.4.sp
                     )
@@ -1132,6 +1145,13 @@ private fun OwnChatBubble(
                         fontSize = 10.sp,
                         letterSpacing = 0.4.sp
                     )
+                } else if (message.role == "beta") {
+                    GlossyGradientText(
+                        text = "BETA",
+                        colors = betaGradientColors,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.4.sp
+                    )
                 }
                 message.season_level?.let { lvl ->
                     GlossyGradientText(
@@ -1155,6 +1175,7 @@ private fun OwnChatBubble(
                     colors = when {
                         message.role == "admin" || message.is_admin == true -> adminGradientColors
                         message.role == "moderator" -> moderatorGradientColors
+                        message.role == "beta" -> betaGradientColors
                         else -> defaultNameGradientColors
                     },
                     fontSize = 13.sp

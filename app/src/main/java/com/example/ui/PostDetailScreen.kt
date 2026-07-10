@@ -428,6 +428,9 @@ private fun PostHeader(
                     } else if (post.role == "moderator") {
                         Spacer(modifier = Modifier.width(5.dp))
                         ModeratorBadge()
+                    } else if (post.role == "beta") {
+                        Spacer(modifier = Modifier.width(5.dp))
+                        BetaBadge()
                     }
                 }
                 Text(

@@ -215,9 +215,14 @@ data class ProfileDto(
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"
+    // Beta - murni badge kosmetik (mis. buat penghargaan donatur), TIDAK dapet hak
+    // akses admin/moderator apapun. Semua pengecekan permission tetap cuma cek isAdmin()/
+    // isModerator(), role "beta" gak pernah dicek di jalur permission manapun.
+    fun isBeta() = role == "beta"
     fun roleLabel() = when (role) {
         "admin" -> "Admin"
         "moderator" -> "Moderator"
+        "beta" -> "Beta"
         else -> "Pengguna"
     }
 }

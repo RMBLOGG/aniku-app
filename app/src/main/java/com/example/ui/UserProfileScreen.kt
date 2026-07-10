@@ -154,6 +154,7 @@ fun UserProfileScreen(
         val roleBadge = when {
             p.isAdmin() -> RoleBadgeStyle("ADMINISTRATOR", goldAccent, premium = true)
             p.role == "moderator" -> RoleBadgeStyle("MODERATOR", Color(0xFFB388FF), premium = true)
+            p.role == "beta" -> RoleBadgeStyle("BETA", Color(0xFF22D3EE), premium = true)
             else -> RoleBadgeStyle("USER", MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), premium = false)
         }
 

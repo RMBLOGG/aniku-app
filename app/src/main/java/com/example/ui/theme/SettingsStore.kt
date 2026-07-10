@@ -211,6 +211,9 @@ data class UserSession(
     val avatarUrl: String?,
     val isAdmin: Boolean,
     val isModerator: Boolean = false,
+    // Beta - badge kosmetik doang, sengaja TIDAK dipakai di canModerate() atau
+    // pengecekan permission manapun.
+    val isBeta: Boolean = false,
     val isBanned: Boolean,
     val userNumber: Int? = null
 ) {

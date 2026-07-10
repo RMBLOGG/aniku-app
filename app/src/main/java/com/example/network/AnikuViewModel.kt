@@ -1708,6 +1708,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
+                    isBeta = profile?.isBeta() ?: false,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1849,6 +1850,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         ?: res.user?.user_metadata?.get("avatar_url")?.toString(),
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
+                    isBeta = profile?.isBeta() ?: false,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1928,6 +1930,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
+                    isBeta = profile?.isBeta() ?: false,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1982,6 +1985,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     avatarUrl = profile?.avatar_url,
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
+                    isBeta = profile?.isBeta() ?: false,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )

@@ -8428,6 +8428,9 @@ fun AdminPanelScreen(
                                                 } else if (usr.isModerator()) {
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     ModeratorBadge()
+                                                } else if (usr.isBeta()) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    BetaBadge()
                                                 }
                                             }
                                             Spacer(modifier = Modifier.height(4.dp))
@@ -8644,7 +8647,7 @@ fun AdminPanelScreen(
                                                 title = { Text("Set Role: ${usr.username}") },
                                                 text = {
                                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                        listOf("user", "moderator", "admin").forEach { roleOption ->
+                                                        listOf("user", "moderator", "admin", "beta").forEach { roleOption ->
                                                             val isSelected = usr.role == roleOption
                                                             Button(
                                                                 onClick = {
@@ -9302,6 +9305,7 @@ fun SettingsScreen(
                                             when {
                                                 sess.isAdmin -> AdminBadge()
                                                 sess.isModerator -> ModeratorBadge()
+                                                sess.isBeta -> BetaBadge()
                                                 else -> Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(4.dp))

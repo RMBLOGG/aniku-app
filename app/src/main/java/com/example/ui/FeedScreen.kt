@@ -235,6 +235,9 @@ private fun TweetCard(
                 } else if (post.role == "moderator") {
                     Spacer(modifier = Modifier.width(4.dp))
                     ModeratorBadge()
+                } else if (post.role == "beta") {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    BetaBadge()
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
@@ -460,6 +463,22 @@ fun ModeratorBadge() {
             colors = listOf(Color(0xFF4C1D95), Color(0xFF831843))
         ),
         textColor = Color(0xFFD8B4FE)
+    )
+}
+
+// Badge kosmetik doang - biasanya buat penghargaan donatur/tester. TIDAK ngasih hak
+// akses admin/moderator apapun, murni tampilan "Beta" di sebelah nama.
+@Composable
+fun BetaBadge() {
+    ChipBadge(
+        label = "Beta",
+        dotBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF06B6D4), Color(0xFF3B82F6))
+        ),
+        borderBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF155E75), Color(0xFF1E3A8A))
+        ),
+        textColor = Color(0xFFA5F3FC)
     )
 }
 

@@ -160,6 +160,7 @@ private fun UserDirectoryRow(
     val (roleColor, roleLabel) = when {
         user.isAdmin() -> Color(0xFFFFD200) to "ADMIN"
         user.isModerator() -> Color(0xFFB388FF) to "MODERATOR"
+        user.isBeta() -> Color(0xFF22D3EE) to "BETA"
         else -> null to null
     }
     val ringColor = roleColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
