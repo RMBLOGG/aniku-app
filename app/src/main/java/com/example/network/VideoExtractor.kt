@@ -350,6 +350,37 @@ object VideoExtractor {
         }
     }
 
+    /**
+     * Ambil isi teks mentah manifest (.m3u8) atau response lain buat keperluan
+     * DEBUG doang - dipanggil dari AnikuViewModel abis resolve() sukses & isHls
+     * true, biar isinya bisa ditampilin di dialog "Info stream" tanpa user
+     * harus buka browser terpisah & paste URL manual.
+     *
+     * Pakai header yang SAMA PERSIS kayak yang bakal dipakai ExoPlayer (Referer/
+     * Origin/User-Agent dari ResolvedStream.headers), supaya kalau ada
+     * perbedaan hasil antara "app fetch" vs "ExoPlayer fetch" bisa ketauan
+     * juga (mis. dua-duanya sama-sama dapet manifest rusak -> confirmed
+     * server-side, bukan bug spesifik ExoPlayer/OkHttpDataSource).
+     *
+     * Dibatasin ke ~4000 karakter pertama - manifest HLS biasanya kecil (list
+     * teks), jadi ini harusnya udah cukup buat lihat struktur lengkapnya tanpa
+     * bikin dialog debug kebanjiran teks kalau ternyata malah dapet HTML gede.
+     */
+    fun peekManifestText(url: String, headers: Map<String, String>, maxChars: Int = 4000): String? {
+        return try {
+            val builder = Request.Builder().url(url)
+            headers.forEach { (k, v) -> builder.header(k, v) }
+            client.newCall(builder.build()).execute().use { resp ->
+                val body = resp.body?.string() ?: return "(HTTP ${resp.code}, body kosong)"
+                val status = "HTTP ${resp.code}, content-type: ${resp.header("content-type") ?: "?"}, panjang: ${body.length} char"
+                val preview = if (body.length > maxChars) body.take(maxChars) + "\n... (dipotong, total ${body.length} char)" else body
+                "$status\n\n$preview"
+            }
+        } catch (e: Exception) {
+            "(Gagal ambil manifest: ${e.message})"
+        }
+    }
+
     private fun originOf(url: String): String =
         runCatching { URI(url).let { "${it.scheme}://${it.host}" } }.getOrDefault(url)
 

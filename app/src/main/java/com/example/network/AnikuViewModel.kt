@@ -1383,7 +1383,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                         _resolvedHeaders.value = extracted.headers
                                         _isDirectStream.value = true
                                         _extractDebugInfo.value = null
-                                        _lastResolvedUrlInfo.value = "embedUrl: $resolvedUrl\nresolvedUrl: ${extracted.url}\nisHls: ${extracted.isHls}\nheaders: ${extracted.headers}"
+                                        _lastResolvedUrlInfo.value = buildResolvedInfoText(resolvedUrl, extracted)
                                     } else {
                                         // Ekstraksi gagal — jangan pakai resolvedUrl mentah kalau itu
                                         // shortlink (short.ink/short.icu/dll) yang DNS-nya di-block ISP,
@@ -1434,7 +1434,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
@@ -1468,7 +1468,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
@@ -1495,7 +1495,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
                             _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
                             _resolvedHeaders.value = emptyMap()
@@ -1588,7 +1588,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _resolvedHeaders.value = resolved.headers
                         _isDirectStream.value = true
                         _extractDebugInfo.value = null
-                        _lastResolvedUrlInfo.value = "embedUrl: $rawUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
+                        _lastResolvedUrlInfo.value = buildResolvedInfoText(rawUrl, resolved)
                     } else {
                         _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
                         _resolvedHeaders.value = emptyMap()
@@ -1611,6 +1611,20 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun isDirectUrl(url: String): Boolean {
         val lower = url.lowercase()
         return lower.contains(".mp4") || lower.contains(".m3u8") || lower.contains(".mkv")
+    }
+
+    // Bangun teks buat dialog "Info stream". Kalau hasilnya HLS (isHls=true),
+    // ikutan ambil isi mentah manifest-nya (pakai header yang sama kayak yang
+    // dipakai ExoPlayer) - supaya kalau manifest-nya rusak/malformed di sisi
+    // server, keliatan langsung dari sini tanpa user harus buka browser lain
+    // & paste URL manual.
+    private suspend fun buildResolvedInfoText(embedUrl: String, resolved: ResolvedStream): String {
+        val base = "embedUrl: $embedUrl\nresolvedUrl: ${resolved.url}\nisHls: ${resolved.isHls}\nheaders: ${resolved.headers}"
+        if (!resolved.isHls) return base
+        val manifestPreview = withContext(Dispatchers.IO) {
+            VideoExtractor.peekManifestText(resolved.url, resolved.headers)
+        }
+        return "$base\n\n--- Isi manifest (debug) ---\n$manifestPreview"
     }
 
     // Toggle Bookmarks locally
