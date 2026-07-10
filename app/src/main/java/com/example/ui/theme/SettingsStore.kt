@@ -30,6 +30,7 @@ class SettingsStore(private val context: Context) {
         val IS_ADMIN = booleanPreferencesKey("is_admin")
         val USER_NUMBER = intPreferencesKey("user_number")
         val IS_MODERATOR = booleanPreferencesKey("is_moderator")
+        val IS_BETA = booleanPreferencesKey("is_beta")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
         val CHAT_NOTIF_ENABLED = booleanPreferencesKey("chat_notif_enabled")
@@ -81,6 +82,7 @@ class SettingsStore(private val context: Context) {
             avatarUrl = preferences[AVATAR_URL],
             isAdmin = preferences[IS_ADMIN] ?: false,
             isModerator = preferences[IS_MODERATOR] ?: false,
+            isBeta = preferences[IS_BETA] ?: false,
             isBanned = preferences[IS_BANNED] ?: false,
             userNumber = preferences[USER_NUMBER]
         )
@@ -144,6 +146,7 @@ class SettingsStore(private val context: Context) {
             preferences[AVATAR_URL] = session.avatarUrl ?: ""
             preferences[IS_ADMIN] = session.isAdmin
             preferences[IS_MODERATOR] = session.isModerator
+            preferences[IS_BETA] = session.isBeta
             preferences[IS_BANNED] = session.isBanned
             session.userNumber?.let { preferences[USER_NUMBER] = it }
         }
@@ -159,6 +162,7 @@ class SettingsStore(private val context: Context) {
             preferences.remove(AVATAR_URL)
             preferences.remove(IS_ADMIN)
             preferences.remove(IS_MODERATOR)
+            preferences.remove(IS_BETA)
             preferences.remove(IS_BANNED)
             preferences.remove(USER_NUMBER)
         }
