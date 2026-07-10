@@ -8660,7 +8660,7 @@ fun AdminPanelScreen(
                                                                 modifier = Modifier.fillMaxWidth()
                                                             ) {
                                                                 Text(
-                                                                    text = when(roleOption) { "admin" -> "Admin"; "moderator" -> "Moderator"; else -> "Pengguna" },
+                                                                    text = when(roleOption) { "admin" -> "Admin"; "moderator" -> "Moderator"; "beta" -> "Beta"; else -> "Pengguna" },
                                                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                                                                 )
                                                             }
