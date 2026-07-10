@@ -344,11 +344,6 @@ object VideoExtractor {
                 host.contains("moviesm4u") ||
                 host.contains("ztreamhub") ||
                 host.contains("guccihide") ||
-                // rubyvidhub.com / streamruby.com — sama-sama JWPlayer packed-JS
-                // standar (eval(function(p,a,c,k,e,d){...}), confirmed dari HTML
-                // embed asli via curl manual), cuma beda brand mirror doang.
-                host.contains("rubyvidhub") ||
-                host.contains("streamruby") ||
                 // anichin.stream — domain embed "Premium" milik Anichin sendiri (dipakai
                 // Donghua/Dayynime-v4). Konfigurasi JWPlayer-nya packed-JS standar
                 // (eval(function(p,a,c,k,e,d){...})), sama kayak Filemoon/Vidhide dkk
@@ -381,6 +376,27 @@ object VideoExtractor {
                         }
                     } else {
                         Log.d("VideoExtractor", "Abyss butuh context (WebView) - belum ada, fallback WebView biasa")
+                        null
+                    }
+                }
+                // rubyvidhub.com / streamruby.net — JWPlayer packed-JS statis
+                // BISA di-parse (sources/file ketemu via extractPackedJwPlayer),
+                // tapi CDN-nya (streamruby.net) nolak (403) request tanpa cookie
+                // sesi asli - dikonfirmasi manual: Referer+UA yang cocok pun tetap
+                // 403 kalau di-fetch lewat OkHttp polos tanpa cookie jar. Makanya
+                // wajib lewat WebView beneran biar cookie sesi ke-set natural.
+                host.contains("rubyvidhub") || host.contains("streamruby") -> {
+                    if (context != null) {
+                        val stream = StreamRubyWebViewExtractor.resolve(context, embedUrl, referer)
+                        if (stream != null) {
+                            Log.d("VideoExtractor", "StreamRuby resolved via WebView: ${stream.url.take(80)}")
+                            stream
+                        } else {
+                            Log.w("VideoExtractor", "StreamRubyWebViewExtractor gagal, fallback WebView biasa")
+                            null
+                        }
+                    } else {
+                        Log.d("VideoExtractor", "StreamRuby butuh context (WebView) - belum ada, fallback WebView biasa")
                         null
                     }
                 }
