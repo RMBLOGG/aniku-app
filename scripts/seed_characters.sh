@@ -11,6 +11,8 @@ JIKAN_BASE="https://api.jikan.moe/v4"
 DELAY=2   # detik antar request, jaga2 di bawah limit 60 req/menit Jikan
 UA="Mozilla/5.0 (compatible; AnikuSeedBot/1.0; +https://github.com/RMBLOGG/aniku-app)"
 
+# jikan_get URL -> stdout body kalau sukses, retry sampai 4x kalau kena 429/5xx/gagal koneksi.
+# Nge-print alasan gagal ke stderr biar keliatan di log Actions.
 jikan_get() {
   local url="$1"
   local attempt=1
@@ -36,6 +38,7 @@ jikan_get() {
       continue
     fi
 
+    # Error selain rate-limit/server (misal 403 diblokir, 404, dll) - gak ada gunanya retry
     return 1
   done
   return 1
@@ -74,6 +77,7 @@ for page in $(seq 1 "$PAGES"); do
     fi
     sleep "$DELAY"
 
+    # Hitung rarity dari kombinasi ranking anime + role karakter (Main/Supporting)
     payload=$(echo "$chars_resp" | jq --argjson rank "$rank_counter" --argjson anime_id "$anime_id" --arg anime_title "$anime_title" '
       [.data[]? | select(.character.mal_id != null) | {
         mal_id: .character.mal_id,
@@ -103,6 +107,9 @@ for page in $(seq 1 "$PAGES"); do
       continue
     fi
 
+    # Tulis payload ke file dulu (bukan lewat argumen langsung) - anime dengan
+    # cast super banyak (One Piece, Naruto, dll) bikin payload-nya kelewat batas
+    # panjang argumen command-line kalau dikirim lewat -d langsung.
     printf '%s' "$payload" > /tmp/upsert_payload.json
 
     http_code=$(curl -s -o /tmp/supabase_resp.json -w "%{http_code}" \

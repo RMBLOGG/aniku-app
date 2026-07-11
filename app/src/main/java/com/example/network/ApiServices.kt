@@ -658,6 +658,30 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
+    // Gacha karakter - potong DM, roll rarity, pilih karakter random, simpen ke
+    // koleksi user. SEMUA logic (termasuk cek saldo cukup) jalan di server lewat
+    // function gacha_roll (SECURITY DEFINER), jadi gak bisa dicurangin dari client.
+    // "return=representation" wajib di sini karena gacha_roll itu function yang
+    // ngembaliin jsonb (bukan void kayak give_diamond), beda dari RPC lain di atas.
+    @POST("rest/v1/rpc/gacha_roll")
+    suspend fun rollGacha(
+        @Body body: GachaRollRequest = GachaRollRequest(),
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): GachaRollResult
+
+    // Koleksi karakter user sendiri - RLS di tabel user_characters udah mastiin
+    // cuma baris milik user yang login yang keliatan (auth.uid() = user_id),
+    // jadi gak perlu filter user_id manual di sini.
+    @GET("rest/v1/user_characters")
+    suspend fun getUserCharacters(
+        @Query("select") select: String = "count,obtained_at,last_obtained_at,characters(mal_id,name,image_url,anime_title,rarity)",
+        @Query("order") order: String = "last_obtained_at.desc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<UserCharacterEntry>
+
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(

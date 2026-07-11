@@ -458,6 +458,49 @@ data class WatchCheckpointRequest(
     val p_checkpoint_number: Int
 )
 
+// Request buat RPC gacha_roll - nama field HARUS "p_cost" persis kayak parameter
+// function SQL-nya (public.gacha_roll(p_cost integer default 50)).
+@JsonClass(generateAdapter = true)
+data class GachaRollRequest(
+    val p_cost: Int = 50
+)
+
+// Hasil roll gacha - field-field ini persis sama kayak jsonb_build_object yang
+// dikembalikan function gacha_roll di database (lihat supabase/gacha_system.sql).
+@JsonClass(generateAdapter = true)
+data class GachaRollResult(
+    val mal_id: Int,
+    val name: String,
+    val image_url: String?,
+    val anime_title: String?,
+    val rarity: String,
+    val is_new: Boolean,
+    val total_owned: Int,
+    val remaining_balance: Int
+)
+
+// Dipake buat nampilin 1 karakter (tanpa info kepemilikan) di dalam koleksi -
+// field-nya sengaja cuma subset dari tabel characters yang perlu ditampilin di UI.
+@JsonClass(generateAdapter = true)
+data class CharacterInfoDto(
+    val mal_id: Int,
+    val name: String,
+    val image_url: String?,
+    val anime_title: String?,
+    val rarity: String
+)
+
+// 1 baris koleksi user - hasil embed join user_characters + characters lewat
+// PostgREST (?select=...,characters(...)). Nama field "characters" HARUS persis
+// sama kayak nama tabel yang di-embed, itu aturan PostgREST buat nested object.
+@JsonClass(generateAdapter = true)
+data class UserCharacterEntry(
+    val count: Int,
+    val obtained_at: String?,
+    val last_obtained_at: String?,
+    val characters: CharacterInfoDto?
+)
+
 @JsonClass(generateAdapter = true)
 data class ChatMessageRequest(
     val user_id: String,

@@ -1032,6 +1032,13 @@ class MainActivity : FragmentActivity() {
                                 onTopUpClick = { navController.navigate("diamond_topup") }
                             )
                         }
+                        composable("gacha") {
+                            GachaScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onTopUpClick = { navController.navigate("diamond_topup") }
+                            )
+                        }
                         composable("diamond_topup") {
                             DiamondTopUpScreen(
                                 viewModel = viewModel,

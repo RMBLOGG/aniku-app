@@ -2090,6 +2090,19 @@ fun HomeScreen(
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // ── Gacha Karakter row ──
+                    HomeQuickActionCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = "Gacha Karakter",
+                        subtitle = "Tukar DM buat dapetin karakter anime favoritmu",
+                        icon = Icons.Default.Diamond,
+                        accent = Color(0xFFFFC93C),
+                        gradientColors = listOf(Color(0xFF2A1B4D), Color(0xFF1B2E4D)),
+                        onClick = { navController.navigate("gacha") }
+                    )
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // ── Top Leaderboard Card ──

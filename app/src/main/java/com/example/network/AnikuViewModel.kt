@@ -3016,6 +3016,93 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
+    // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
+    // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.
+    fun rollGacha(cost: Int = 50, onResult: (GachaRollResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.rollGacha(
+                    body = GachaRollRequest(p_cost = cost),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal gacha (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "rollGacha error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Roll gacha berkali-kali sekaligus (mis. paket "x6"). Manggil RPC gacha_roll
+    // yang sama beberapa kali berturut-turut (BUKAN function SQL baru) - masing-masing
+    // panggilan tetap 1 transaksi atom sendiri di server, jadi tetap aman dari race
+    // condition. Kalau di tengah jalan saldo abis, berhenti & kasih hasil yang udah
+    // didapet sejauh itu (partial), bukan gagal total.
+    fun rollGachaMulti(times: Int = 6, cost: Int = 50, onResult: (List<GachaRollResult>, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            val results = mutableListOf<GachaRollResult>()
+            var errorMsg: String? = null
+            for (i in 1..times) {
+                try {
+                    val result = NetworkClient.supabaseDbApi.rollGacha(
+                        body = GachaRollRequest(p_cost = cost),
+                        authHeader = authHeader,
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                    results.add(result)
+                } catch (e: retrofit2.HttpException) {
+                    errorMsg = try {
+                        val errorBody = e.response()?.errorBody()?.string()
+                        val json = errorBody?.let { org.json.JSONObject(it) }
+                        json?.optString("message")?.takeIf { it.isNotBlank() }
+                    } catch (parseErr: Exception) { null }
+                    errorMsg = errorMsg ?: "Gagal gacha di tarikan ke-$i (HTTP ${e.code()})"
+                    break
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "rollGachaMulti error di tarikan ke-$i", e)
+                    errorMsg = e.message ?: "Terjadi kesalahan di tarikan ke-$i"
+                    break
+                }
+            }
+            onResult(results, errorMsg)
+        }
+    }
+
+    private val _gachaCollection = MutableStateFlow<List<UserCharacterEntry>>(emptyList())
+    val gachaCollection: StateFlow<List<UserCharacterEntry>> = _gachaCollection.asStateFlow()
+
+    // Ambil koleksi karakter user sendiri, di-join langsung sama tabel characters
+    // (nama, gambar, rarity, anime asal) lewat fitur embed PostgREST - 1 request
+    // doang, gak perlu loop manual gabungin data di client.
+    fun loadGachaCollection() {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getUserCharacters(
+                    select = "count,obtained_at,last_obtained_at,characters(mal_id,name,image_url,anime_title,rarity)",
+                    order = "last_obtained_at.desc",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _gachaCollection.value = result
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadGachaCollection error", e)
+            }
+        }
+    }
+
+
     fun updateUserRole(profile: ProfileDto, newRole: String) {
         if (!session.value.isAdmin) return
         val authHeader = getAuthHeader()
