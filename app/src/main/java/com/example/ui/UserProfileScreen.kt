@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -650,14 +651,22 @@ fun UserProfileScreen(
                     var giveInProgress by remember { mutableStateOf(false) }
 
                     Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = { showGiveDialog = true },
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Beri Diamond", fontWeight = FontWeight.Bold)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                        OutlinedButton(
+                            onClick = { showGiveDialog = true },
+                            shape = RoundedCornerShape(50),
+                            border = BorderStroke(1.dp, Color(0xFF4FD8E8).copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color(0xFF4FD8E8).copy(alpha = 0.08f),
+                                contentColor = Color(0xFF4FD8E8)
+                            ),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                            modifier = Modifier.height(42.dp)
+                        ) {
+                            Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Beri Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+                        }
                     }
 
                     if (showGiveDialog) {
