@@ -859,34 +859,42 @@ private fun ChatBubble(
         horizontalArrangement = Arrangement.Start
     ) {
         // Avatar selalu di kiri (flat layout, gaya AniKme)
-        if (!message.avatar_url.isNullOrEmpty()) {
-            AsyncImage(
-                model = message.avatar_url,
-                contentDescription = message.username,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .clickable { navController.navigate("user_profile/${message.user_id}") },
-                contentScale = ContentScale.Crop,
-                error = null,
-                fallback = null,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                    .clickable { navController.navigate("user_profile/${message.user_id}") },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = message.username.take(1).uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary
+        // Avatar user Beta dibungkus cincin gradient muter - efek eksklusif kosmetik.
+        val avatarContent: @Composable () -> Unit = {
+            if (!message.avatar_url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = message.avatar_url,
+                    contentDescription = message.username,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .clickable { navController.navigate("user_profile/${message.user_id}") },
+                    contentScale = ContentScale.Crop,
+                    error = null,
+                    fallback = null,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .clickable { navController.navigate("user_profile/${message.user_id}") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message.username.take(1).uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
+        }
+        if (message.role == "beta") {
+            BetaAvatarRing(size = 30.dp) { avatarContent() }
+        } else {
+            Box(modifier = Modifier.size(30.dp)) { avatarContent() }
         }
         Spacer(modifier = Modifier.width(8.dp))
 
@@ -1108,6 +1116,19 @@ private fun OwnChatBubble(
         }
     }
 
+    // Efek partikel cuma muncul kalau pesan ini baru banget dikirim (<5 detik lalu) - biar
+    // gak nge-replay animasi tiap kali chat di-scroll/reload buat pesan-pesan lama.
+    val isRecentMessage = remember(message.created_at) {
+        try {
+            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val sentAt = parser.parse(message.created_at.take(19))?.time ?: 0L
+            (System.currentTimeMillis() - sentAt) < 5000L
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     // Shape khas futuristik: sudut tajam di tiga sisi, satu sudut "ekor" kecil
     val bubbleShape = RoundedCornerShape(
         topStart = 18.dp,
@@ -1299,34 +1320,46 @@ private fun OwnChatBubble(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        if (!message.avatar_url.isNullOrEmpty()) {
-            AsyncImage(
-                model = message.avatar_url,
-                contentDescription = message.username,
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .clickable { navController.navigate("user_profile/${message.user_id}") },
-                contentScale = ContentScale.Crop,
-                error = null,
-                fallback = null,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                    .clickable { navController.navigate("user_profile/${message.user_id}") },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = message.username.take(1).uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary
+        val ownAvatarContent: @Composable () -> Unit = {
+            if (!message.avatar_url.isNullOrEmpty()) {
+                AsyncImage(
+                    model = message.avatar_url,
+                    contentDescription = message.username,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .clickable { navController.navigate("user_profile/${message.user_id}") },
+                    contentScale = ContentScale.Crop,
+                    error = null,
+                    fallback = null,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                        .clickable { navController.navigate("user_profile/${message.user_id}") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = message.username.take(1).uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
+        }
+        if (message.role == "beta") {
+            Box {
+                BetaAvatarRing(size = 30.dp) { ownAvatarContent() }
+                if (isRecentMessage) {
+                    MessageSendBurst(key = message.id, modifier = Modifier.matchParentSize())
+                }
+            }
+        } else {
+            Box(modifier = Modifier.size(30.dp)) { ownAvatarContent() }
         }
     }
 

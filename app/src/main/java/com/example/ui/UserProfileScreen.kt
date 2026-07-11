@@ -205,12 +205,19 @@ fun UserProfileScreen(
                         .size(108.dp)
                         .offset(y = (-58).dp)
                 ) {
+                    // Ring avatar user Beta pakai warna cyan/biru khusus (beda dari
+                    // accent/gold user biasa) - identitas visual eksklusif kosmetik.
+                    val ringColors = if (p.isBeta()) {
+                        listOf(Color(0xFF22D3EE), Color(0xFF3B82F6), Color(0xFF22D3EE))
+                    } else {
+                        listOf(accentColor, goldAccent, accentColor)
+                    }
                     if (!p.avatar_url.isNullOrBlank()) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Brush.sweepGradient(listOf(accentColor, goldAccent, accentColor)))
+                                .background(Brush.sweepGradient(ringColors))
                                 .padding(2.5.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.background)
@@ -232,7 +239,7 @@ fun UserProfileScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(CircleShape)
-                                .background(Brush.sweepGradient(listOf(accentColor, goldAccent, accentColor)))
+                                .background(Brush.sweepGradient(ringColors))
                                 .padding(2.5.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.background)
