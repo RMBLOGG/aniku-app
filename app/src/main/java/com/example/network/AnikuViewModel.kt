@@ -204,7 +204,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val session = settingsStore.sessionFlow.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        UserSession(null, null, null, null, null, null, false, false, false, false)
+        UserSession(null, null, null, null, null, null, false, false, false, null, false)
     )
 
     // Update check state
@@ -1709,6 +1709,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
                     isBeta = profile?.isBeta() ?: false,
+                    customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1851,6 +1852,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
                     isBeta = profile?.isBeta() ?: false,
+                    customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1931,6 +1933,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
                     isBeta = profile?.isBeta() ?: false,
+                    customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -1986,6 +1989,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isAdmin = profile?.isAdmin() ?: false,
                     isModerator = profile?.isModerator() ?: false,
                     isBeta = profile?.isBeta() ?: false,
+                    customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
                     userNumber = profile?.user_number
                 )
@@ -2858,6 +2862,40 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Ganti warna nama sendiri di chat - cuma efektif kalau role beta/moderator/admin
+    // (dipaksa ulang di server lewat trigger enforce_custom_name_color, jadi walau
+    // dipanggil user biasa lewat cara lain, server bakal nge-null-in lagi otomatis).
+    fun updateMyNameColor(hexColor: String?, onComplete: (Boolean) -> Unit = {}) {
+        val sess = session.value
+        if (!sess.isBeta && !sess.isModerator && !sess.isAdmin) {
+            onComplete(false)
+            return
+        }
+        val token = sess.token ?: return
+        val uId = sess.userId ?: return
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.updateProfile(
+                    idQuery = "eq.$uId",
+                    profile = mapOf("custom_name_color" to hexColor),
+                    authHeader = "Bearer $token",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 204) {
+                    val updatedSession = sess.copy(customNameColor = hexColor)
+                    settingsStore.saveSession(updatedSession)
+                    onComplete(true)
+                } else {
+                    Log.e("AnikuVM", "Failed updateMyNameColor: HTTP ${response.code()}")
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed to update name color", e)
+                onComplete(false)
+            }
+        }
+    }
+
     fun updateUserRole(profile: ProfileDto, newRole: String) {
         if (!session.value.isAdmin) return
         val authHeader = getAuthHeader()
@@ -3643,6 +3681,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             avatar_url = currentSession.avatarUrl,
                             role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; currentSession.isBeta -> "beta"; else -> "user" },
                             is_admin = currentSession.isAdmin,
+                            custom_name_color = currentSession.customNameColor,
                             user_number = currentSession.userNumber,
                             message = trimmed,
                             reply_to_id = replyToId,

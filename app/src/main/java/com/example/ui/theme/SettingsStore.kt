@@ -31,6 +31,7 @@ class SettingsStore(private val context: Context) {
         val USER_NUMBER = intPreferencesKey("user_number")
         val IS_MODERATOR = booleanPreferencesKey("is_moderator")
         val IS_BETA = booleanPreferencesKey("is_beta")
+        val CUSTOM_NAME_COLOR = stringPreferencesKey("custom_name_color")
         val IS_BANNED = booleanPreferencesKey("is_banned")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
         val CHAT_NOTIF_ENABLED = booleanPreferencesKey("chat_notif_enabled")
@@ -83,6 +84,7 @@ class SettingsStore(private val context: Context) {
             isAdmin = preferences[IS_ADMIN] ?: false,
             isModerator = preferences[IS_MODERATOR] ?: false,
             isBeta = preferences[IS_BETA] ?: false,
+            customNameColor = preferences[CUSTOM_NAME_COLOR],
             isBanned = preferences[IS_BANNED] ?: false,
             userNumber = preferences[USER_NUMBER]
         )
@@ -147,6 +149,11 @@ class SettingsStore(private val context: Context) {
             preferences[IS_ADMIN] = session.isAdmin
             preferences[IS_MODERATOR] = session.isModerator
             preferences[IS_BETA] = session.isBeta
+            if (session.customNameColor != null) {
+                preferences[CUSTOM_NAME_COLOR] = session.customNameColor
+            } else {
+                preferences.remove(CUSTOM_NAME_COLOR)
+            }
             preferences[IS_BANNED] = session.isBanned
             session.userNumber?.let { preferences[USER_NUMBER] = it }
         }
@@ -163,6 +170,7 @@ class SettingsStore(private val context: Context) {
             preferences.remove(IS_ADMIN)
             preferences.remove(IS_MODERATOR)
             preferences.remove(IS_BETA)
+            preferences.remove(CUSTOM_NAME_COLOR)
             preferences.remove(IS_BANNED)
             preferences.remove(USER_NUMBER)
         }
@@ -218,6 +226,8 @@ data class UserSession(
     // Beta - badge kosmetik doang, sengaja TIDAK dipakai di canModerate() atau
     // pengecekan permission manapun.
     val isBeta: Boolean = false,
+    // Warna nama chat custom (hex "#RRGGBB") - null berarti pakai warna default sesuai role
+    val customNameColor: String? = null,
     val isBanned: Boolean,
     val userNumber: Int? = null
 ) {

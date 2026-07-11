@@ -797,13 +797,20 @@ private fun ChatBubble(
     val swipeThreshold = 80f
 
     // Warna nama berdasarkan role: admin = merah, moderator = ungu, lainnya = putih/abu
+    val customColorParsed = remember(message.custom_name_color) {
+        message.custom_name_color?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { null }
+        }
+    }
     val nameColor = when {
+        customColorParsed != null -> customColorParsed
         message.role == "admin" || message.is_admin == true -> Color(0xFFFF6B6B)
         message.role == "moderator" -> Color(0xFFB388FF)
         message.role == "beta" -> Color(0xFF22D3EE)
         else -> MaterialTheme.colorScheme.onSurface
     }
     val nameGradient = when {
+        customColorParsed != null -> null
         message.role == "admin" || message.is_admin == true ->
             Brush.linearGradient(listOf(Color(0xFFFF6B6B), Color(0xFFFF8E53)))
         message.role == "moderator" ->
@@ -891,6 +898,7 @@ private fun ChatBubble(
                 GlossyGradientText(
                     text = message.username,
                     colors = when {
+                        customColorParsed != null -> listOf(customColorParsed, customColorParsed)
                         message.role == "admin" || message.is_admin == true -> adminGradientColors
                         message.role == "moderator" -> moderatorGradientColors
                         message.role == "beta" -> betaGradientColors
@@ -1094,6 +1102,12 @@ private fun OwnChatBubble(
 ) {
     var showFullImage by remember { mutableStateOf(false) }
 
+    val customColorParsed = remember(message.custom_name_color) {
+        message.custom_name_color?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { null }
+        }
+    }
+
     // Shape khas futuristik: sudut tajam di tiga sisi, satu sudut "ekor" kecil
     val bubbleShape = RoundedCornerShape(
         topStart = 18.dp,
@@ -1173,6 +1187,7 @@ private fun OwnChatBubble(
                 GlossyGradientText(
                     text = message.username,
                     colors = when {
+                        customColorParsed != null -> listOf(customColorParsed, customColorParsed)
                         message.role == "admin" || message.is_admin == true -> adminGradientColors
                         message.role == "moderator" -> moderatorGradientColors
                         message.role == "beta" -> betaGradientColors

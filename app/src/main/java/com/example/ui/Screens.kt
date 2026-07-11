@@ -9355,6 +9355,49 @@ fun SettingsScreen(
                                         Text("Keluar", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
+
+                                // Picker warna nama chat - cuma nongol buat role beta/moderator/
+                                // admin (sesuai yang diizinin trigger enforce_custom_name_color
+                                // di server). Klik warna yang sama lagi buat reset ke default.
+                                if (sess.isBeta || sess.canModerate()) {
+                                    Spacer(modifier = Modifier.height(14.dp))
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        "Warna Nama Chat",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val presetColors = listOf(
+                                        "#22D3EE", "#F472B6", "#A78BFA", "#FACC15",
+                                        "#4ADE80", "#FB923C", "#F87171", "#60A5FA"
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        presetColors.forEach { hex ->
+                                            val parsed = Color(android.graphics.Color.parseColor(hex))
+                                            val isSelected = sess.customNameColor.equals(hex, ignoreCase = true)
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(30.dp)
+                                                    .clip(CircleShape)
+                                                    .background(parsed)
+                                                    .border(
+                                                        width = if (isSelected) 2.dp else 0.dp,
+                                                        color = Color.White,
+                                                        shape = CircleShape
+                                                    )
+                                                    .clickable {
+                                                        val newValue = if (isSelected) null else hex
+                                                        viewModel.updateMyNameColor(newValue)
+                                                    }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -211,7 +211,10 @@ data class ProfileDto(
     val created_at: String? = null,
     val season_xp: Int? = 0,
     val season_level: Int? = 1,
-    val diamond_balance: Int? = 0
+    val diamond_balance: Int? = 0,
+    // Warna nama custom - cuma efektif kalau role beta/moderator/admin (dipaksa server-side
+    // lewat trigger enforce_custom_name_color). Format hex "#RRGGBB".
+    val custom_name_color: String? = null
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"
@@ -372,6 +375,7 @@ data class ChatMessage(
     val avatar_url: String? = null,
     val role: String? = "user",
     val is_admin: Boolean? = false,
+    val custom_name_color: String? = null,
     val user_number: Int? = null,
     val season_level: Int? = null,
     val message: String,
@@ -453,6 +457,7 @@ data class ChatMessageRequest(
     val avatar_url: String? = null,
     val role: String? = "user",
     val is_admin: Boolean? = false,
+    val custom_name_color: String? = null,
     val user_number: Int? = null,
     val message: String,
     val reply_to_id: String? = null,
