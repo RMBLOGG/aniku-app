@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.MilitaryTech
@@ -690,9 +691,10 @@ fun UserProfileScreen(
                                     enabled = !giveInProgress && giveAmountText.toIntOrNull()?.let { it > 0 } == true,
                                     onClick = {
                                         val amount = giveAmountText.toIntOrNull() ?: return@TextButton
+                                        val targetUsername = p.username ?: return@TextButton
                                         giveInProgress = true
                                         giveResultMsg = null
-                                        viewModel.giveDiamond(p.username, amount) { success, error ->
+                                        viewModel.giveDiamond(targetUsername, amount) { success, error ->
                                             giveInProgress = false
                                             if (success) {
                                                 showGiveDialog = false
