@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate as rotateScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -104,35 +103,48 @@ private const val GACHA_COST_SINGLE = 50
 private const val GACHA_COST_MULTI = 300 // x6, sedikit lebih murah per-tarikan dibanding satuan
 private const val GACHA_MULTI_COUNT = 6
 
-// ── Modifier custom: border gradient yang berputar pelan, dipakai di kartu rarity tinggi ──
-private fun Modifier.rotatingGradientBorder(
+// ── Border "glossy": outline gradient diam + kilau kaca yang meluncur pelan di sepanjang sisinya ──
+// (pengganti border yang muter 360° — sekarang cuma kilaunya aja yang jalan, bentuknya tetap diam)
+@Composable
+private fun rememberGlossyShine(durationMillis: Int = 2600): Float {
+    val infinite = rememberInfiniteTransition(label = "glossyShine")
+    val shine by infinite.animateFloat(
+        initialValue = -0.35f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(tween(durationMillis, easing = LinearEasing), RepeatMode.Restart),
+        label = "shine"
+    )
+    return shine
+}
+
+private fun Modifier.glossyBorder(
     colors: List<Color>,
-    angle: Float,
+    shine: Float,
     cornerRadius: Dp,
-    strokeWidth: Dp = 2.5.dp
+    strokeWidth: Dp = 1.6.dp
 ): Modifier = this.drawWithContent {
     drawContent()
     val stroke = strokeWidth.toPx()
     val corner = cornerRadius.toPx()
-    rotateScope(angle) {
-        drawRoundRect(
-            brush = Brush.sweepGradient(colors),
-            style = Stroke(width = stroke),
-            cornerRadius = CornerRadius(corner, corner)
-        )
-    }
-}
-
-@Composable
-private fun rememberRotatingAngle(durationMillis: Int = 3200): Float {
-    val infinite = rememberInfiniteTransition(label = "borderRotate")
-    val angle by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(durationMillis, easing = LinearEasing)),
-        label = "angle"
+    // outline gradient dasar - warna rarity, diagonal, diam (nggak muter)
+    drawRoundRect(
+        brush = Brush.linearGradient(colors = colors, start = Offset(0f, 0f), end = Offset(size.width, size.height)),
+        style = Stroke(width = stroke),
+        cornerRadius = CornerRadius(corner, corner)
     )
-    return angle
+    // lapisan kilau putih yang meluncur pelan di atas outline, kesan kaca/glossy mengkilap
+    val diag = size.width + size.height
+    val bandWidth = diag * 0.32f
+    val x = shine * diag
+    drawRoundRect(
+        brush = Brush.linearGradient(
+            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.85f), Color.Transparent),
+            start = Offset(x - bandWidth, 0f),
+            end = Offset(x, size.height)
+        ),
+        style = Stroke(width = stroke),
+        cornerRadius = CornerRadius(corner, corner)
+    )
 }
 
 // ── Overlay holografik yang menyapu dari kiri ke kanan terus-menerus, buat kesan kartu "berkilau" ──
@@ -360,7 +372,7 @@ fun GachaScreen(
 // ============================================================================
 @Composable
 private fun NeonBalanceCard(diamondBalance: Int, onTopUp: () -> Unit) {
-    val angle = rememberRotatingAngle(5000)
+    val shine = rememberGlossyShine(3200)
     val infinite = rememberInfiniteTransition(label = "diamondTilt")
     val diamondTilt by infinite.animateFloat(
         initialValue = -8f,
@@ -375,9 +387,9 @@ private fun NeonBalanceCard(diamondBalance: Int, onTopUp: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Brush.linearGradient(listOf(Neon.Glass, Color.White.copy(alpha = 0.03f))))
-            .rotatingGradientBorder(
-                colors = listOf(Neon.Cyan.copy(alpha = 0.5f), Neon.Purple.copy(alpha = 0.5f), Neon.Magenta.copy(alpha = 0.5f), Neon.Cyan.copy(alpha = 0.5f)),
-                angle = angle,
+            .glossyBorder(
+                colors = listOf(Neon.Cyan.copy(alpha = 0.6f), Neon.Purple.copy(alpha = 0.6f), Neon.Magenta.copy(alpha = 0.6f)),
+                shine = shine,
                 cornerRadius = 16.dp,
                 strokeWidth = 1.2.dp
             )
@@ -567,7 +579,7 @@ private fun NeonPrimaryButton(label: String, isLoading: Boolean, enabled: Boolea
 
 @Composable
 private fun NeonOutlineButton(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val angle = rememberRotatingAngle(3400)
+    val shine = rememberGlossyShine(2600)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "press2")
@@ -579,9 +591,9 @@ private fun NeonOutlineButton(label: String, enabled: Boolean, onClick: () -> Un
             .scale(pressScale)
             .clip(RoundedCornerShape(16.dp))
             .background(Neon.Gold.copy(alpha = 0.08f))
-            .rotatingGradientBorder(
-                colors = listOf(Neon.Gold, Color(0xFFFFF3B0), Color(0xFFFF8A00), Neon.Gold),
-                angle = angle,
+            .glossyBorder(
+                colors = listOf(Neon.Gold, Color(0xFFFFF3B0), Color(0xFFFF8A00)),
+                shine = shine,
                 cornerRadius = 16.dp,
                 strokeWidth = 1.6.dp
             )
@@ -688,7 +700,7 @@ private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: 
             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
         )
     ) {
-        val angle = if (premium) rememberRotatingAngle(3000) else 0f
+        val shine = if (premium) rememberGlossyShine(2800) else 0f
 
         Column(
             modifier = Modifier
@@ -699,9 +711,9 @@ private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: 
                 .background(Brush.linearGradient(listOf(Neon.CardBase, Color(0xFF0E0E17))))
                 .then(
                     if (premium) {
-                        Modifier.rotatingGradientBorder(
+                        Modifier.glossyBorder(
                             colors = rarityShimmerColors(rarity),
-                            angle = angle,
+                            shine = shine,
                             cornerRadius = 16.dp,
                             strokeWidth = 2.dp
                         )
@@ -908,7 +920,7 @@ private fun GachaResultCard(result: GachaRollResult, big: Boolean) {
     val rarity = result.rarity
     val color = rarityColor(rarity)
     val premium = isPremiumRarity(rarity)
-    val angle = if (premium) rememberRotatingAngle(2400) else 0f
+    val shine = if (premium) rememberGlossyShine(2200) else 0f
 
     val infinite = rememberInfiniteTransition(label = "cardPulse")
     val pulseScale by infinite.animateFloat(
@@ -926,9 +938,9 @@ private fun GachaResultCard(result: GachaRollResult, big: Boolean) {
             .background(rarityGradient(rarity))
             .then(
                 if (premium) {
-                    Modifier.rotatingGradientBorder(
+                    Modifier.glossyBorder(
                         colors = rarityShimmerColors(rarity),
-                        angle = angle,
+                        shine = shine,
                         cornerRadius = 18.dp,
                         strokeWidth = 2.6.dp
                     )
