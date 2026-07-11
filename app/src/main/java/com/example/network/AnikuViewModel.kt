@@ -2976,6 +2976,46 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Kasih Diamond ke user lain (username tujuan) - fitur eksklusif role beta/moderator/
+    // admin. Validasi asli (role, saldo, limit harian 200 DM) ada di server (function
+    // give_diamond), jadi walau pengecekan client-side ini di-bypass, server tetap nolak.
+    fun giveDiamond(receiverUsername: String, amount: Int, onResult: (Boolean, String?) -> Unit) {
+        val sess = session.value
+        if (!sess.isBeta && !sess.isModerator && !sess.isAdmin) {
+            onResult(false, "Fitur ini cuma buat role Beta/Moderator/Admin")
+            return
+        }
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.giveDiamond(
+                    body = mapOf(
+                        "p_receiver_username" to receiverUsername,
+                        "p_amount" to amount
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 204) {
+                    onResult(true, null)
+                } else {
+                    // Postgres RAISE EXCEPTION dari function nyampe ke sini lewat error body
+                    // JSON (field "message") - ini yang dipakai buat kasih tau alasan gagal
+                    // yang jelas ke user (mis. "melebihi batas harian...", bukan cuma "HTTP 400").
+                    val errorMsg = try {
+                        val errorBody = response.errorBody()?.string()
+                        val json = errorBody?.let { org.json.JSONObject(it) }
+                        json?.optString("message")?.takeIf { it.isNotBlank() }
+                    } catch (e: Exception) { null }
+                    onResult(false, errorMsg ?: "Gagal memberi Diamond (HTTP ${response.code()})")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "giveDiamond error", e)
+                onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     fun updateUserRole(profile: ProfileDto, newRole: String) {
         if (!session.value.isAdmin) return
         val authHeader = getAuthHeader()

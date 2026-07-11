@@ -638,6 +638,81 @@ fun UserProfileScreen(
                         }
                     }
                 }
+
+                // Tombol "Beri Diamond" - eksklusif buat role beta/moderator/admin,
+                // cuma nongol pas liat profil ORANG LAIN (bukan profil sendiri).
+                // Validasi asli (limit harian, saldo) tetap dicek ulang di server.
+                if (!isOwnProfile && (session.isBeta || session.isModerator || session.isAdmin)) {
+                    var showGiveDialog by remember { mutableStateOf(false) }
+                    var giveAmountText by remember { mutableStateOf("") }
+                    var giveResultMsg by remember { mutableStateOf<String?>(null) }
+                    var giveInProgress by remember { mutableStateOf(false) }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showGiveDialog = true },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Beri Diamond", fontWeight = FontWeight.Bold)
+                    }
+
+                    if (showGiveDialog) {
+                        AlertDialog(
+                            onDismissRequest = { if (!giveInProgress) showGiveDialog = false },
+                            title = { Text("Beri Diamond ke ${p.username}") },
+                            text = {
+                                Column {
+                                    Text(
+                                        "Maksimal 200 DM per hari (gabungan semua penerima).",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = giveAmountText,
+                                        onValueChange = { giveAmountText = it.filter { c -> c.isDigit() } },
+                                        label = { Text("Jumlah DM") },
+                                        singleLine = true,
+                                        enabled = !giveInProgress,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (giveResultMsg != null) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(giveResultMsg ?: "", color = Color(0xFFE57373), fontSize = 12.sp)
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = !giveInProgress && giveAmountText.toIntOrNull()?.let { it > 0 } == true,
+                                    onClick = {
+                                        val amount = giveAmountText.toIntOrNull() ?: return@TextButton
+                                        giveInProgress = true
+                                        giveResultMsg = null
+                                        viewModel.giveDiamond(p.username, amount) { success, error ->
+                                            giveInProgress = false
+                                            if (success) {
+                                                showGiveDialog = false
+                                                giveAmountText = ""
+                                            } else {
+                                                giveResultMsg = error
+                                            }
+                                        }
+                                    }
+                                ) { Text(if (giveInProgress) "Mengirim..." else "Kirim") }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    enabled = !giveInProgress,
+                                    onClick = { showGiveDialog = false }
+                                ) { Text("Batal") }
+                            }
+                        )
+                    }
+                }
             }
         }
     }

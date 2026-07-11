@@ -635,6 +635,17 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
+    // Kasih Diamond ke user lain - cuma role beta/moderator/admin (divalidasi ulang
+    // server-side di dalam function give_diamond, gak bisa dibypass), dengan limit
+    // harian 200 DM yang juga dicek di server.
+    @POST("rest/v1/rpc/give_diamond")
+    suspend fun giveDiamond(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): retrofit2.Response<Unit>
+
     // Versi baru — 1 checkpoint = 1 baris XP sendiri (tabel & RPC terpisah dari watch_events/
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
