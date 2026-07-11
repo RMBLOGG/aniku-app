@@ -289,6 +289,14 @@ data class FeaturedAnimeDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class FeatureFlagDto(
+    val feature_key: String,
+    val enabled_for_beta: Boolean = true,
+    val enabled_for_all: Boolean = false,
+    val description: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class BlacklistedAnimeDto(
     val id: String,
     val anime_slug: String,

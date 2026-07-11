@@ -905,3 +905,136 @@ fun AdminRequestAnimeSection(viewModel: AnikuViewModel) {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// 5. FEATURE FLAGS ADMIN SECTION — toggle rollout bertahap ("Beta akses
+//    duluan") tanpa perlu update APK. Cuma admin yang bisa akses tab ini
+//    sama sekali (di-gate dari AdminPanelScreen di Screens.kt lewat
+//    sess.canModerate() buat masuk panel-nya, tapi toggle-nya sendiri
+//    di-gate lagi di ViewModel.toggleFeatureFlag/createFeatureFlag yang
+//    cuma jalan kalau session.isAdmin - moderator TIDAK bisa ubah flag
+//    walau entah gimana caranya bisa liat tab ini).
+// ─────────────────────────────────────────────────────────────────────────
+@Composable
+fun FeatureFlagsAdminSection(viewModel: AnikuViewModel) {
+    val flags by viewModel.featureFlags.collectAsState()
+    var newKey by remember { mutableStateOf("") }
+    var newDesc by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) { viewModel.loadFeatureFlags() }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Feature Flags",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            "Kontrol rollout fitur baru - Beta dapet akses duluan, widen ke semua tanpa perlu update APK.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Form tambah flag baru ──
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("Daftarin Fitur Baru", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = newKey,
+                    onValueChange = { newKey = it },
+                    label = { Text("feature_key (mis: nobar_v2)", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = newDesc,
+                    onValueChange = { newDesc = it },
+                    label = { Text("Deskripsi singkat (opsional)", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = {
+                        viewModel.createFeatureFlag(newKey, newDesc)
+                        newKey = ""
+                        newDesc = ""
+                    },
+                    enabled = newKey.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Tambah Flag")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (flags.isEmpty()) {
+            Text(
+                "Belum ada feature flag terdaftar.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp
+            )
+        }
+
+        flags.values.sortedBy { it.feature_key }.forEach { flag ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(flag.feature_key, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    if (!flag.description.isNullOrBlank()) {
+                        Text(
+                            flag.description,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Akses buat Beta", fontSize = 13.sp)
+                        Switch(
+                            checked = flag.enabled_for_beta,
+                            onCheckedChange = {
+                                viewModel.toggleFeatureFlag(flag.feature_key, "enabled_for_beta", it)
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Rilis ke Semua Orang", fontSize = 13.sp)
+                        Switch(
+                            checked = flag.enabled_for_all,
+                            onCheckedChange = {
+                                viewModel.toggleFeatureFlag(flag.feature_key, "enabled_for_all", it)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

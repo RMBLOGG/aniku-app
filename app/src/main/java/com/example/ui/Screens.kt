@@ -8263,7 +8263,8 @@ fun AdminPanelScreen(
                 "Hero Slider" to Icons.Default.ViewCarousel,
                 "Blacklist Anime" to Icons.Default.Block,
                 "Blacklist Genre" to Icons.Default.FilterAltOff,
-                "Anime Request" to Icons.Default.VideoLibrary
+                "Anime Request" to Icons.Default.VideoLibrary,
+                "Feature Flags" to Icons.Default.Science
             )
             sections.forEachIndexed { index, (label, icon) ->
                 val isSelected = selectedTab == index
@@ -9037,6 +9038,9 @@ fun AdminPanelScreen(
                     }
                     5 -> {
                         AdminRequestAnimeSection(viewModel = viewModel)
+                    }
+                    6 -> {
+                        FeatureFlagsAdminSection(viewModel = viewModel)
                     }
                 }
             }

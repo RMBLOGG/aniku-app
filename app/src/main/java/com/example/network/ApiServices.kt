@@ -295,6 +295,30 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<BlacklistedAnimeDto>
 
+    // Feature flags - buat rollout bertahap "Beta akses duluan" tanpa perlu update APK.
+    // Dibaca sekali pas app dibuka, di-cache di ViewModel.
+    @GET("rest/v1/feature_flags")
+    suspend fun getFeatureFlags(
+        @Header("apikey") apiKey: String
+    ): List<FeatureFlagDto>
+
+    @PATCH("rest/v1/feature_flags")
+    suspend fun updateFeatureFlag(
+        @Query("feature_key") keyQuery: String,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): retrofit2.Response<Unit>
+
+    @POST("rest/v1/feature_flags")
+    suspend fun insertFeatureFlag(
+        @Body body: FeatureFlagDto,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): retrofit2.Response<Unit>
+
     // Blacklist genre — genre yang disembunyikan dari daftar pilihan genre di Eksplor
     @GET("rest/v1/blacklisted_genres")
     suspend fun getBlacklistedGenres(

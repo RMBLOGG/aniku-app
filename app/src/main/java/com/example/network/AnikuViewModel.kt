@@ -455,6 +455,85 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _adminBlacklist = MutableStateFlow<List<BlacklistedAnimeDto>>(emptyList())
     val adminBlacklist: StateFlow<List<BlacklistedAnimeDto>> = _adminBlacklist.asStateFlow()
 
+    // Feature flags - rollout bertahap "Beta akses duluan". Di-fetch sekali pas app
+    // dibuka (lihat init{}), di-cache di memori selama sesi app berjalan.
+    private val _featureFlags = MutableStateFlow<Map<String, FeatureFlagDto>>(emptyMap())
+    val featureFlags: StateFlow<Map<String, FeatureFlagDto>> = _featureFlags.asStateFlow()
+
+    fun loadFeatureFlags() {
+        viewModelScope.launch {
+            try {
+                val flags = NetworkClient.supabaseDbApi.getFeatureFlags(SUPABASE_ANON_KEY)
+                _featureFlags.value = flags.associateBy { it.feature_key }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed loading feature flags", e)
+            }
+        }
+    }
+
+    // Helper utama buat dipanggil dari UI: `if (viewModel.canAccessFeature("fitur_x")) { ... }`
+    // Kalau flag-nya belum ada di database sama sekali, default-nya TERTUTUP buat semua
+    // (fail-closed) - biar aman, gak keburu kebuka ke semua orang gara-gara lupa insert baris.
+    fun canAccessFeature(key: String): Boolean {
+        val flag = _featureFlags.value[key] ?: return false
+        if (flag.enabled_for_all) return true
+        return flag.enabled_for_beta && session.value.isBeta
+    }
+
+    // Toggle satu kolom boolean di feature_flags - cuma admin (moderator TIDAK bisa,
+    // sama pola-nya kayak updateUserRole). field cuma boleh "enabled_for_beta" atau
+    // "enabled_for_all", divalidasi biar gak bisa dipakai buat nulis kolom sembarangan.
+    fun toggleFeatureFlag(key: String, field: String, value: Boolean) {
+        if (!session.value.isAdmin) return
+        if (field != "enabled_for_beta" && field != "enabled_for_all") return
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.updateFeatureFlag(
+                    keyQuery = "eq.$key",
+                    body = mapOf(field to value),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 204) {
+                    loadFeatureFlags()
+                } else {
+                    Log.e("AnikuVM", "toggleFeatureFlag gagal: HTTP ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed toggling feature flag $key", e)
+            }
+        }
+    }
+
+    // Bikin flag baru - cuma admin. Default: kebuka buat Beta doang, tertutup buat semua.
+    fun createFeatureFlag(key: String, description: String?) {
+        if (!session.value.isAdmin) return
+        if (key.isBlank()) return
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.insertFeatureFlag(
+                    body = FeatureFlagDto(
+                        feature_key = key.trim(),
+                        enabled_for_beta = true,
+                        enabled_for_all = false,
+                        description = description?.trim()?.takeIf { it.isNotBlank() }
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful || response.code() == 201 || response.code() == 204) {
+                    loadFeatureFlags()
+                } else {
+                    Log.e("AnikuVM", "createFeatureFlag gagal: HTTP ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Failed creating feature flag $key", e)
+            }
+        }
+    }
+
     private val _adminBlacklistGenres = MutableStateFlow<List<BlacklistedGenreDto>>(emptyList())
     val adminBlacklistGenres: StateFlow<List<BlacklistedGenreDto>> = _adminBlacklistGenres.asStateFlow()
 
@@ -523,6 +602,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadSearchPopular()
         checkForUpdate()
         loadDonations()
+        loadFeatureFlags()
         // Presence: heartbeat + polling total online seluruh aplikasi
         startAppPresenceHeartbeat()
         startOnlineCountPolling()
