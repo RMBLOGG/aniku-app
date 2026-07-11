@@ -11,8 +11,6 @@ JIKAN_BASE="https://api.jikan.moe/v4"
 DELAY=2   # detik antar request, jaga2 di bawah limit 60 req/menit Jikan
 UA="Mozilla/5.0 (compatible; AnikuSeedBot/1.0; +https://github.com/RMBLOGG/aniku-app)"
 
-# jikan_get URL -> stdout body kalau sukses, retry sampai 4x kalau kena 429/5xx/gagal koneksi.
-# Nge-print alasan gagal ke stderr biar keliatan di log Actions.
 jikan_get() {
   local url="$1"
   local attempt=1
@@ -105,13 +103,15 @@ for page in $(seq 1 "$PAGES"); do
       continue
     fi
 
+    printf '%s' "$payload" > /tmp/upsert_payload.json
+
     http_code=$(curl -s -o /tmp/supabase_resp.json -w "%{http_code}" \
       -X POST "$SUPABASE_URL/rest/v1/characters?on_conflict=mal_id" \
       -H "apikey: $SUPABASE_KEY" \
       -H "Authorization: Bearer $SUPABASE_KEY" \
       -H "Content-Type: application/json" \
       -H "Prefer: resolution=merge-duplicates" \
-      -d "$payload")
+      --data-binary @/tmp/upsert_payload.json)
 
     if [ "$http_code" -ge 300 ]; then
       echo "  WARNING upsert gagal (HTTP $http_code): $(cat /tmp/supabase_resp.json)"
