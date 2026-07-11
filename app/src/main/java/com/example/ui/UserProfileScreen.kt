@@ -602,73 +602,90 @@ fun UserProfileScreen(
                     ) {
                         Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
                     }
-                } else if (canModerate) {
-                    val isBanned = p.is_banned == true
-                    Button(
-                        onClick = { viewModel.toggleUserBanStatus(p) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                        contentPadding = PaddingValues(),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.linearGradient(
-                                        if (isBanned) listOf(Color(0xFF1B7A3D), Color(0xFF145C2D))
-                                        else listOf(Color(0xFFB71C1C), Color(0xFF7F1414))
-                                    ),
-                                    RoundedCornerShape(14.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    if (isBanned) "Aktifkan Kembali User" else "Banned User",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
+                } else {
+                    // Tombol "Banned User" (canModerate) dan "Beri Diamond" (beta/mod/admin)
+                    // digabung jadi satu row/grid biar rapih, ga ada satu tombol nyempil sendiri
+                    // dengan jarak gede di bawah. Masing-masing tetap independen kondisinya.
+                    val showBanButton = canModerate
+                    val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin
 
-                // Tombol "Beri Diamond" - eksklusif buat role beta/moderator/admin,
-                // cuma nongol pas liat profil ORANG LAIN (bukan profil sendiri).
-                // Validasi asli (limit harian, saldo) tetap dicek ulang di server.
-                if (!isOwnProfile && (session.isBeta || session.isModerator || session.isAdmin)) {
                     var showGiveDialog by remember { mutableStateOf(false) }
                     var giveAmountText by remember { mutableStateOf("") }
                     var giveResultMsg by remember { mutableStateOf<String?>(null) }
                     var giveInProgress by remember { mutableStateOf(false) }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        OutlinedButton(
-                            onClick = { showGiveDialog = true },
-                            shape = RoundedCornerShape(50),
-                            border = BorderStroke(1.dp, Color(0xFF4FD8E8).copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color(0xFF4FD8E8).copy(alpha = 0.08f),
-                                contentColor = Color(0xFF4FD8E8)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                            modifier = Modifier.height(42.dp)
+                    if (showBanButton || showDiamondButton) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Beri Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp)
+                            if (showBanButton) {
+                                val isBanned = p.is_banned == true
+                                Button(
+                                    onClick = { viewModel.toggleUserBanStatus(p) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                    contentPadding = PaddingValues(),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .weight(if (showDiamondButton) 1.4f else 1f)
+                                        .height(52.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.linearGradient(
+                                                    if (isBanned) listOf(Color(0xFF1B7A3D), Color(0xFF145C2D))
+                                                    else listOf(Color(0xFFB71C1C), Color(0xFF7F1414))
+                                                ),
+                                                RoundedCornerShape(14.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                if (isBanned) "Aktifkan Kembali" else "Banned User",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.5.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Tombol "Beri Diamond" - eksklusif buat role beta/moderator/admin,
+                            // cuma nongol pas liat profil ORANG LAIN (bukan profil sendiri).
+                            // Validasi asli (limit harian, saldo) tetap dicek ulang di server.
+                            if (showDiamondButton) {
+                                OutlinedButton(
+                                    onClick = { showGiveDialog = true },
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF4FD8E8).copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color(0xFF4FD8E8).copy(alpha = 0.08f),
+                                        contentColor = Color(0xFF4FD8E8)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp),
+                                    modifier = Modifier
+                                        .weight(if (showBanButton) 1f else 1f)
+                                        .height(52.dp)
+                                ) {
+                                    Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
+                                }
+                            }
                         }
                     }
-
                     if (showGiveDialog) {
                         AlertDialog(
                             onDismissRequest = { if (!giveInProgress) showGiveDialog = false },
