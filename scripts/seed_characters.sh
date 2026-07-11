@@ -8,7 +8,40 @@ SUPABASE_URL="${SUPABASE_URL:?Missing SUPABASE_URL}"
 SUPABASE_KEY="${SUPABASE_SERVICE_KEY:?Missing SUPABASE_SERVICE_KEY}"
 TOP_ANIME_COUNT="${TOP_ANIME_COUNT:-300}"
 JIKAN_BASE="https://api.jikan.moe/v4"
-DELAY=1.3   # detik, jaga2 di bawah limit 60 req/menit Jikan
+DELAY=2   # detik antar request, jaga2 di bawah limit 60 req/menit Jikan
+UA="Mozilla/5.0 (compatible; AnikuSeedBot/1.0; +https://github.com/RMBLOGG/aniku-app)"
+
+# jikan_get URL -> stdout body kalau sukses, retry sampai 4x kalau kena 429/5xx/gagal koneksi.
+# Nge-print alasan gagal ke stderr biar keliatan di log Actions.
+jikan_get() {
+  local url="$1"
+  local attempt=1
+  local max_attempts=4
+  local wait=3
+  while [ "$attempt" -le "$max_attempts" ]; do
+    local http_code body
+    body=$(curl -s -A "$UA" -w $'\n%{http_code}' "$url")
+    http_code=$(echo "$body" | tail -n1)
+    body=$(echo "$body" | sed '$d')
+
+    if [ "$http_code" = "200" ]; then
+      echo "$body"
+      return 0
+    fi
+
+    echo "  [percobaan $attempt/$max_attempts] $url -> HTTP $http_code : $(echo "$body" | head -c 200)" >&2
+
+    if [ "$http_code" = "429" ] || [ "$http_code" -ge 500 ] 2>/dev/null; then
+      sleep "$wait"
+      wait=$((wait * 2))
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    return 1
+  done
+  return 1
+}
 
 PAGES=$(( (TOP_ANIME_COUNT + 24) / 25 ))
 echo "Target: $TOP_ANIME_COUNT anime teratas (~$PAGES halaman /top/anime)"
@@ -16,7 +49,11 @@ echo "Target: $TOP_ANIME_COUNT anime teratas (~$PAGES halaman /top/anime)"
 rank_counter=0
 
 for page in $(seq 1 "$PAGES"); do
-  resp=$(curl -sf "$JIKAN_BASE/top/anime?page=${page}&limit=25") || { echo "Gagal fetch top/anime hal $page, skip"; sleep "$DELAY"; continue; }
+  if ! resp=$(jikan_get "$JIKAN_BASE/top/anime?page=${page}&limit=25"); then
+    echo "Gagal fetch top/anime hal $page setelah beberapa percobaan, skip halaman ini"
+    sleep "$DELAY"
+    continue
+  fi
   sleep "$DELAY"
 
   count=$(echo "$resp" | jq '.data | length')
@@ -32,10 +69,13 @@ for page in $(seq 1 "$PAGES"); do
     anime_title=$(echo "$resp" | jq -r ".data[$i].title")
     echo "[$rank_counter/$TOP_ANIME_COUNT] $anime_title (mal_id=$anime_id)"
 
-    chars_resp=$(curl -sf "$JIKAN_BASE/anime/$anime_id/characters") || { echo "  gagal fetch characters, skip"; sleep "$DELAY"; continue; }
+    if ! chars_resp=$(jikan_get "$JIKAN_BASE/anime/$anime_id/characters"); then
+      echo "  gagal fetch characters setelah beberapa percobaan, skip"
+      sleep "$DELAY"
+      continue
+    fi
     sleep "$DELAY"
 
-    # Hitung rarity dari kombinasi ranking anime + role karakter (Main/Supporting)
     payload=$(echo "$chars_resp" | jq --argjson rank "$rank_counter" --argjson anime_id "$anime_id" --arg anime_title "$anime_title" '
       [.data[]? | select(.character.mal_id != null) | {
         mal_id: .character.mal_id,
