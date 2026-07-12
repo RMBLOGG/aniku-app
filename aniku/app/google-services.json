@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1050856790349",
+    "firebase_url": "https://aniku-b677f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "aniku-b677f",
+    "storage_bucket": "aniku-b677f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1050856790349:android:83838dd22fec1ea5d93f04",
+        "android_client_info": {
+          "package_name": "com.aistudio.aniku.plxwzq"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBK9kGAVfzxSchW6NI9J-qE4IvNAyjsXOo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,25 @@
+name: Seed Anime Characters
+
+on:
+  workflow_dispatch:
+    inputs:
+      top_anime_count:
+        description: 'Jumlah anime teratas yang mau di-seed karakternya'
+        required: false
+        default: '300'
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run seeding script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TOP_ANIME_COUNT: ${{ github.event.inputs.top_anime_count }}
+        run: |
+          chmod +x scripts/seed_characters.sh
+          ./scripts/seed_characters.sh

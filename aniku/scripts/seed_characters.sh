@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Seeding karakter anime dari Jikan API ke tabel `characters` di Supabase.
+# Cuma nulis ke tabel referensi `characters` — gak nyentuh tabel user/donasi/clan.
+# Pake upsert (on_conflict=mal_id), jadi aman dijalankan berkali-kali tanpa data dobel.
+set -euo pipefail
+
+SUPABASE_URL="${SUPABASE_URL:?Missing SUPABASE_URL}"
+SUPABASE_KEY="${SUPABASE_SERVICE_KEY:?Missing SUPABASE_SERVICE_KEY}"
+TOP_ANIME_COUNT="${TOP_ANIME_COUNT:-300}"
+JIKAN_BASE="https://api.jikan.moe/v4"
+DELAY=2   # detik antar request, jaga2 di bawah limit 60 req/menit Jikan
+UA="Mozilla/5.0 (compatible; AnikuSeedBot/1.0; +https://github.com/RMBLOGG/aniku-app)"
+
+# jikan_get URL -> stdout body kalau sukses, retry sampai 4x kalau kena 429/5xx/gagal koneksi.
+# Nge-print alasan gagal ke stderr biar keliatan di log Actions.
+jikan_get() {
+  local url="$1"
+  local attempt=1
+  local max_attempts=4
+  local wait=3
+  while [ "$attempt" -le "$max_attempts" ]; do
+    local http_code body
+    body=$(curl -s -A "$UA" -w $'\n%{http_code}' "$url")
+    http_code=$(echo "$body" | tail -n1)
+    body=$(echo "$body" | sed '$d')
+
+    if [ "$http_code" = "200" ]; then
+      echo "$body"
+      return 0
+    fi
+
+    echo "  [percobaan $attempt/$max_attempts] $url -> HTTP $http_code : $(echo "$body" | head -c 200)" >&2
+
+    if [ "$http_code" = "429" ] || [ "$http_code" -ge 500 ] 2>/dev/null; then
+      sleep "$wait"
+      wait=$((wait * 2))
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    # Error selain rate-limit/server (misal 403 diblokir, 404, dll) - gak ada gunanya retry
+    return 1
+  done
+  return 1
+}
+
+PAGES=$(( (TOP_ANIME_COUNT + 24) / 25 ))
+echo "Target: $TOP_ANIME_COUNT anime teratas (~$PAGES halaman /top/anime)"
+
+rank_counter=0
+
+for page in $(seq 1 "$PAGES"); do
+  if ! resp=$(jikan_get "$JIKAN_BASE/top/anime?page=${page}&limit=25"); then
+    echo "Gagal fetch top/anime hal $page setelah beberapa percobaan, skip halaman ini"
+    sleep "$DELAY"
+    continue
+  fi
+  sleep "$DELAY"
+
+  count=$(echo "$resp" | jq '.data | length')
+  [ "$count" -eq 0 ] && break
+
+  for i in $(seq 0 $((count - 1))); do
+    rank_counter=$((rank_counter + 1))
+    if [ "$rank_counter" -gt "$TOP_ANIME_COUNT" ]; then
+      break 2
+    fi
+
+    anime_id=$(echo "$resp" | jq -r ".data[$i].mal_id")
+    anime_title=$(echo "$resp" | jq -r ".data[$i].title")
+    echo "[$rank_counter/$TOP_ANIME_COUNT] $anime_title (mal_id=$anime_id)"
+
+    if ! chars_resp=$(jikan_get "$JIKAN_BASE/anime/$anime_id/characters"); then
+      echo "  gagal fetch characters setelah beberapa percobaan, skip"
+      sleep "$DELAY"
+      continue
+    fi
+    sleep "$DELAY"
+
+    # Hitung rarity dari kombinasi ranking anime + role karakter (Main/Supporting)
+    payload=$(echo "$chars_resp" | jq --argjson rank "$rank_counter" --argjson anime_id "$anime_id" --arg anime_title "$anime_title" '
+      [.data[]? | select(.character.mal_id != null) | {
+        mal_id: .character.mal_id,
+        name: .character.name,
+        image_url: (.character.images.jpg.image_url // null),
+        anime_mal_id: $anime_id,
+        anime_title: $anime_title,
+        role: .role,
+        rarity: (
+          if .role == "Main" then
+            (if $rank <= 10 then "Mythic"
+             elif $rank <= 30 then "Legendary"
+             elif $rank <= 80 then "Epic"
+             else "Rare" end)
+          else
+            (if $rank <= 30 then "Epic"
+             elif $rank <= 100 then "Rare"
+             else "Common" end)
+          end
+        )
+      }]
+    ')
+
+    charcount=$(echo "$payload" | jq 'length')
+    if [ "$charcount" -eq 0 ]; then
+      echo "  (gak ada karakter, skip)"
+      continue
+    fi
+
+    # Tulis payload ke file dulu (bukan lewat argumen langsung) - anime dengan
+    # cast super banyak (One Piece, Naruto, dll) bikin payload-nya kelewat batas
+    # panjang argumen command-line kalau dikirim lewat -d langsung.
+    printf '%s' "$payload" > /tmp/upsert_payload.json
+
+    http_code=$(curl -s -o /tmp/supabase_resp.json -w "%{http_code}" \
+      -X POST "$SUPABASE_URL/rest/v1/characters?on_conflict=mal_id" \
+      -H "apikey: $SUPABASE_KEY" \
+      -H "Authorization: Bearer $SUPABASE_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Prefer: resolution=merge-duplicates" \
+      --data-binary @/tmp/upsert_payload.json)
+
+    if [ "$http_code" -ge 300 ]; then
+      echo "  WARNING upsert gagal (HTTP $http_code): $(cat /tmp/supabase_resp.json)"
+    else
+      echo "  -> $charcount karakter di-upsert"
+    fi
+  done
+done
+
+echo "Selesai. Total anime diproses: $rank_counter"
