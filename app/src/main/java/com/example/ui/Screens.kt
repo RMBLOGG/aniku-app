@@ -1433,9 +1433,13 @@ fun HomeScreen(
         if (isLoggedIn) viewModel.loadMyClanMembership()
     }
 
-    LaunchedEffect(ongoingList, recentList, popularList) {
-        val slugs = (ongoingList + recentList + popularList).map { it.slug }
-        if (slugs.isNotEmpty()) viewModel.startViewerCountPolling(slugs)
+    LaunchedEffect(ongoingList, recentList, popularList, slidesList) {
+        val slugs = (ongoingList + recentList + popularList).map { it.slug } + slidesList.map { it.anime_slug }
+        if (slugs.isNotEmpty()) viewModel.startViewerCountPolling(slugs.distinct())
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.loadChatMessages()
     }
 
     if (showLoginDialog) {
@@ -1741,407 +1745,541 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // ── Header ──────────────────────────────────────────────
+            // ── Hero: Profile card + EXP + Premium + Carousel + Search + Global Chat ──
             item {
                 val seasonLevel by viewModel.seasonLevel.collectAsState()
+                val seasonXp by viewModel.seasonXp.collectAsState()
+                val diamondBalance by viewModel.diamondBalance.collectAsState()
+                val userDirectory by viewModel.userDirectory.collectAsState()
+                val chatMessages by viewModel.chatMessages.collectAsState()
+
                 LaunchedEffect(isLoggedIn) {
-                    if (isLoggedIn) viewModel.loadSeasonProgress()
+                    if (isLoggedIn) {
+                        viewModel.loadSeasonProgress()
+                        viewModel.refreshProfile()
+                    }
+                    viewModel.loadUserDirectory()
                 }
 
-                Row(
+                val currentLevelBaseXp = 20 * (seasonLevel - 1) * (seasonLevel - 1)
+                val nextLevelXp = 20 * seasonLevel * seasonLevel
+                val xpIntoLevel = (seasonXp - currentLevelBaseXp).coerceAtLeast(0)
+                val xpNeededForLevel = (nextLevelXp - currentLevelBaseXp).coerceAtLeast(1)
+                val xpProgress = (xpIntoLevel.toFloat() / xpNeededForLevel.toFloat()).coerceIn(0f, 1f)
+
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (isLoggedIn) {
-                        // Avatar
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(accentColor.copy(alpha = 0.25f))
-                                .clickable { navController.navigate("profile") },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (!session.avatarUrl.isNullOrEmpty()) {
-                                AsyncImage(
-                                    model = session.avatarUrl,
-                                    contentDescription = "Avatar",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF4A0E10),
+                                    Color(0xFF2A0808),
+                                    MaterialTheme.colorScheme.background
                                 )
-                            } else {
-                                Text(
-                                    text = session.username?.take(1)?.uppercase() ?: "?",
-                                    color = accentColor,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 18.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        // Username + level pill + ID pill
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = session.username.orDefault("Otaku"),
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(modifier = Modifier.height(5.dp))
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        )
+                ) {
+                    Column {
+                        // ── Profile row ──
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding()
+                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(accentColor.copy(alpha = 0.25f))
+                                    .clickable { if (isLoggedIn) navController.navigate("profile") else onShowLoginDialog() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(Color.White.copy(alpha = 0.08f))
-                                        .padding(horizontal = 9.dp, vertical = 4.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(accentColor)
+                                if (isLoggedIn && !session.avatarUrl.isNullOrEmpty()) {
+                                    AsyncImage(
+                                        model = session.avatarUrl,
+                                        contentDescription = "Avatar",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
                                     )
+                                } else {
                                     Text(
-                                        text = "Lvl. $seasonLevel",
-                                        color = Color.White.copy(alpha = 0.75f),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
+                                        text = (session.username?.take(1)?.uppercase()) ?: "?",
+                                        color = accentColor,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 18.sp
                                     )
                                 }
-                                session.userNumber?.let { num ->
-                                    Box(
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isLoggedIn) session.username.orDefault("Otaku") else "Halo, Otaku!",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(20.dp))
                                             .background(Color.White.copy(alpha = 0.08f))
                                             .padding(horizontal = 9.dp, vertical = 4.dp)
                                     ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(accentColor)
+                                        )
                                         Text(
-                                            text = "#$num",
-                                            color = Color.White.copy(alpha = 0.5f),
+                                            text = "Lvl. $seasonLevel",
+                                            color = Color.White.copy(alpha = 0.75f),
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     }
-                                }
-                                myClanDetail?.let { clan ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(20.dp))
-                                            .background(
-                                                Brush.linearGradient(
-                                                    listOf(Color(0xFF7B2FBF).copy(alpha = 0.3f), Color(0xFF2FA8BF).copy(alpha = 0.3f))
+                                    if (isLoggedIn) {
+                                        session.userNumber?.let { num ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(20.dp))
+                                                    .background(Color.White.copy(alpha = 0.08f))
+                                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "#$num",
+                                                    color = Color.White.copy(alpha = 0.5f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold
                                                 )
-                                            )
-                                            .padding(horizontal = 9.dp, vertical = 4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Shield,
-                                            contentDescription = "Clan",
-                                            tint = Color(0xFF5FC9DE),
-                                            modifier = Modifier.size(10.dp)
-                                        )
-                                        Text(
-                                            text = "[${clan.tag}]",
-                                            color = Color.White.copy(alpha = 0.85f),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                            }
+                                        }
+                                        myClanDetail?.let { clan ->
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(20.dp))
+                                                    .background(
+                                                        Brush.linearGradient(
+                                                            listOf(Color(0xFF7B2FBF).copy(alpha = 0.3f), Color(0xFF2FA8BF).copy(alpha = 0.3f))
+                                                        )
+                                                    )
+                                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Shield,
+                                                    contentDescription = "Clan",
+                                                    tint = Color(0xFF5FC9DE),
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                                Text(
+                                                    text = "[${clan.tag}]",
+                                                    color = Color.White.copy(alpha = 0.85f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    } else {
-                        // Belum login: tetep greeting + logo lama
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(accentColor)
-                                )
-                                Text(
-                                    text = "Halo, Otaku!",
-                                    color = Color.White.copy(alpha = 0.55f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    letterSpacing = 0.3.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "ANIK",
-                                    color = Color.White,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 3.sp,
-                                    style = LocalTextStyle.current.copy(
-                                        shadow = androidx.compose.ui.graphics.Shadow(
-                                            color = Color.Black.copy(alpha = 0.4f),
-                                            blurRadius = 4f
-                                        )
-                                    )
-                                )
-                                Text(
-                                    text = "U",
-                                    color = accentColor,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 3.sp,
-                                    style = LocalTextStyle.current.copy(
-                                        shadow = androidx.compose.ui.graphics.Shadow(
-                                            color = accentColor.copy(alpha = 0.6f),
-                                            blurRadius = 8f
-                                        )
-                                    )
-                                )
-                            }
-                        }
-                    }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
 
-                    // Settings — tetep ada, ukuran disesuaikan biar pas sejajar avatar
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.10f),
-                                        Color.White.copy(alpha = 0.05f)
-                                    )
-                                )
-                            )
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.2f),
-                                        Color.White.copy(alpha = 0.05f)
-                                    )
-                                ),
-                                shape = RoundedCornerShape(14.dp)
-                            )
-                            .clickable { navController.navigate("settings") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            // ── Top-Up Diamond, Clan/Room Chat, Top Users ─────────────
-            item {
-                val userDirectory by viewModel.userDirectory.collectAsState()
-                val diamondBalance by viewModel.diamondBalance.collectAsState()
-
-                LaunchedEffect(Unit) {
-                    viewModel.loadUserDirectory()
-                    if (isLoggedIn) viewModel.refreshProfile()
-                }
-
-                val diamondPulse = rememberInfiniteTransition(label = "diamondPulse")
-                val diamondGlow by diamondPulse.animateFloat(
-                    initialValue = 0.30f,
-                    targetValue = 0.70f,
-                    animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                    label = "diamondGlow"
-                )
-                val diamondFloat by diamondPulse.animateFloat(
-                    initialValue = -4f,
-                    targetValue = 4f,
-                    animationSpec = infiniteRepeatable(tween(1600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                    label = "diamondFloat"
-                )
-
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-
-                    // ── Top-Up Diamond banner ──
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFF3A0E4F), Color(0xFF6A1FA0), Color(0xFF9B3FD1))
-                                )
-                            )
-                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp))
-                            .clickable { navController.navigate("diamond_topup") }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .drawBehind {
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(Color.White.copy(alpha = diamondGlow * 0.30f), Color.Transparent)
-                                        ),
-                                        radius = size.minDimension * 0.85f,
-                                        center = androidx.compose.ui.geometry.Offset(size.width * 0.88f, size.height * 0.15f)
-                                    )
-                                }
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                            // Notifikasi
                             Box(
                                 modifier = Modifier
-                                    .size(52.dp)
-                                    .offset(y = diamondFloat.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color.White.copy(alpha = 0.16f)),
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable { navController.navigate("settings") },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.Diamond,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
+                                    Icons.Default.NotificationsNone,
+                                    contentDescription = "Notifikasi",
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Top-Up Diamond",
-                                    color = Color.White,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Room Chat
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable { if (isLoggedIn) navController.navigate("chat") else onShowLoginDialog() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.ChatBubbleOutline,
+                                    contentDescription = "Room Chat",
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(19.dp)
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
+                            }
+                        }
+
+                        // ── EXP bar + Diamond + Clan pill ──
+                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            if (isLoggedIn) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Exp", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("$xpIntoLevel/$xpNeededForLevel", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color.White.copy(alpha = 0.12f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(xpProgress)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Brush.horizontalGradient(listOf(accentColor.copy(alpha = 0.7f), accentColor)))
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clickable { navController.navigate("diamond_topup") }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(15.dp))
+                                    Text("$diamondBalance", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                    Text("Diamond", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
+                                }
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Brush.horizontalGradient(listOf(Color(0xFF641015), Color(0xFF8C1A20))))
+                                        .clickable { if (isLoggedIn) navController.navigate("clans") else onShowLoginDialog() }
+                                        .padding(vertical = 9.dp)
+                                ) {
+                                    Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Clan", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // ── Premium / Top-Up banner ──
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                                .clickable { navController.navigate("diamond_topup") }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Brush.horizontalGradient(listOf(Color(0xFFFFB800), Color(0xFFFF7A00))))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                Text("Premium", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Top-Up Diamond", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 Text(
                                     text = if (isLoggedIn) "Saldo kamu: $diamondBalance Diamond" else "Isi Diamond, dukung Aniku & naik level",
-                                    color = Color.White.copy(alpha = 0.85f),
-                                    fontSize = 11.5.sp,
+                                    color = Color.White.copy(alpha = 0.55f),
+                                    fontSize = 11.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Box(
+                            Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // ── Gacha Karakter quick card ──
+                        Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            HomeQuickActionCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                title = "Gacha Karakter",
+                                subtitle = "Tukar Diamond buat dapetin karakter anime favoritmu",
+                                icon = Icons.Default.Diamond,
+                                accent = Color(0xFFFFC93C),
+                                gradientColors = listOf(Color(0xFF2A1B4D), Color(0xFF1B2E4D)),
+                                onClick = { if (isLoggedIn) navController.navigate("gacha") else onShowLoginDialog() }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // ── Hero carousel: featured anime ──
+                        if (slidesList.isNotEmpty()) {
+                            val pagerState = rememberPagerState(pageCount = { slidesList.size })
+                            HorizontalPager(
+                                state = pagerState,
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Color.White)
-                                    .padding(horizontal = 16.dp, vertical = 9.dp)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp)
+                            ) { page ->
+                                val slide = slidesList[page]
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(16f / 10f)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .clickable { onNavigateToDetail(slide.anime_slug) }
+                                ) {
+                                    AsyncImage(
+                                        model = slide.anime_poster,
+                                        contentDescription = slide.anime_title,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f)),
+                                                    startY = 120f
+                                                )
+                                            )
+                                    )
+                                    // Rank badge
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .padding(12.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.Black.copy(alpha = 0.55f))
+                                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("#${page + 1}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                                    }
+                                    // Viewer count chip
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(12.dp)
+                                            .clip(RoundedCornerShape(50))
+                                            .background(Color.Black.copy(alpha = 0.55f))
+                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    ) {
+                                        Icon(Icons.Default.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                        Text(
+                                            text = "%,d".format(viewerCounts[slide.anime_slug] ?: 0).replace(",", "."),
+                                            color = Color.White,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Text(
+                                        text = slide.anime_title.orDefault(""),
+                                        color = Color.White,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
                             ) {
+                                repeat(slidesList.size) { idx ->
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 3.dp)
+                                            .size(if (pagerState.currentPage == idx) 18.dp else 6.dp, 6.dp)
+                                            .clip(RoundedCornerShape(50))
+                                            .background(
+                                                if (pagerState.currentPage == idx) accentColor
+                                                else Color.White.copy(alpha = 0.25f)
+                                            )
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(18.dp))
+                        }
+
+                        // ── Search bar (decorative, buka halaman pencarian) ──
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = 0.07f))
+                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                                .clickable { navController.navigate("search") }
+                                .padding(horizontal = 16.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Cari Anime Di Sini", color = Color.White.copy(alpha = 0.4f), fontSize = 13.5.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // ── Global chat preview ──
+                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            Text(
+                                text = "GLOBAL CHAT",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val latestMsg = chatMessages.lastOrNull()
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { if (isLoggedIn) navController.navigate("chat") else onShowLoginDialog() },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(accentColor.copy(alpha = 0.25f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (!latestMsg?.avatar_url.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = latestMsg?.avatar_url,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = latestMsg?.username?.take(1)?.uppercase() ?: "?",
+                                            color = accentColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "TOP UP",
-                                    color = Color(0xFF6A1FA0),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
+                                    text = buildAnnotatedString {
+                                        withStyle(androidx.compose.ui.text.SpanStyle(color = accentColor, fontWeight = FontWeight.SemiBold)) {
+                                            append(latestMsg?.username ?: "Belum ada obrolan")
+                                        }
+                                        if (latestMsg != null) {
+                                            append(": ")
+                                            withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White.copy(alpha = 0.65f))) {
+                                                append(latestMsg.message)
+                                            }
+                                        }
+                                    },
+                                    fontSize = 12.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    Icons.Default.ArrowForward,
+                                    contentDescription = "Buka Room Chat",
+                                    tint = Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                    // ── Clan & Room Chat row ──
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        HomeQuickActionCard(
-                            modifier = Modifier.weight(1f),
-                            title = "Clan",
-                            subtitle = "Buat / gabung clan",
-                            icon = Icons.Default.Groups,
-                            accent = accentColor,
-                            gradientColors = listOf(Color(0xFF3A0B0F), Color(0xFF641015)),
-                            onClick = { navController.navigate("clans") }
-                        )
-                        HomeQuickActionCard(
-                            modifier = Modifier.weight(1f),
-                            title = "Room Chat",
-                            subtitle = "Ngobrol bareng komunitas",
-                            icon = Icons.Default.Chat,
-                            accent = Color(0xFF4FC3F7),
-                            gradientColors = listOf(Color(0xFF0B2A3A), Color(0xFF104663)),
-                            onClick = { navController.navigate("chat") }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // ── Gacha Karakter row ──
-                    HomeQuickActionCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        title = "Gacha Karakter",
-                        subtitle = "Tukar DM buat dapetin karakter anime favoritmu",
-                        icon = Icons.Default.Diamond,
-                        accent = Color(0xFFFFC93C),
-                        gradientColors = listOf(Color(0xFF2A1B4D), Color(0xFF1B2E4D)),
-                        onClick = { navController.navigate("gacha") }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // ── Top Leaderboard Card ──
-                    val topUsers = remember(userDirectory) {
-                        userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
-                    }
-                    val donationsForHome by viewModel.donations.collectAsState()
-                    val topSupporters = remember(donationsForHome, userDirectory) {
-                        donationsForHome
-                            .groupBy { it.supporter_name }
-                            .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
-                            .sortedByDescending { it.second }
-                            .take(5)
-                            .map { (name, amount) ->
-                                // Cocokin nama donatur ke akun terdaftar (kalau dia donasi
-                                // pakai username yang sama) buat ambil foto profil asli.
-                                val matchedUser = userDirectory.firstOrNull {
-                                    it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
+                        // ── Top Leaderboard / Top Supporter ──
+                        val topUsers = remember(userDirectory) {
+                            userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
+                        }
+                        val donationsForHome by viewModel.donations.collectAsState()
+                        val topSupporters = remember(donationsForHome, userDirectory) {
+                            donationsForHome
+                                .groupBy { it.supporter_name }
+                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
+                                .sortedByDescending { it.second }
+                                .take(5)
+                                .map { (name, amount) ->
+                                    val matchedUser = userDirectory.firstOrNull {
+                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
+                                    }
+                                    SupporterEntry(
+                                        name = name,
+                                        amount = amount,
+                                        avatarUrl = matchedUser?.avatar_url
+                                    )
                                 }
-                                SupporterEntry(
-                                    name = name,
-                                    amount = amount,
-                                    avatarUrl = matchedUser?.avatar_url
-                                )
-                            }
-                    }
+                        }
 
-                    if (topUsers.isNotEmpty()) {
-                        TopLeaderboardCard(
-                            topUsers = topUsers,
-                            topSupporters = topSupporters,
-                            accentColor = accentColor,
-                            onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
-                            onSeeAllClick = { navController.navigate("user_list") },
-                            onSeeAllSupportersClick = { navController.navigate("top_supporter") }
-                        )
-                    }
+                        if (topUsers.isNotEmpty()) {
+                            TopLeaderboardCard(
+                                topUsers = topUsers,
+                                topSupporters = topSupporters,
+                                accentColor = accentColor,
+                                onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
+                                onSeeAllClick = { navController.navigate("user_list") },
+                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
 
