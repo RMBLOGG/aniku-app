@@ -998,6 +998,38 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
+
+    // ─── Pertemanan (Add Teman) ───
+    @GET("rest/v1/friendships")
+    suspend fun getFriendships(
+        @Query("or") orQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<FriendshipDto>
+
+    @POST("rest/v1/friendships")
+    suspend fun sendFriendRequest(
+        @Body data: FriendshipRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<FriendshipDto>
+
+    @PATCH("rest/v1/friendships")
+    suspend fun updateFriendshipStatus(
+        @Query("id") idQuery: String,
+        @Body data: FriendshipStatusUpdate,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<FriendshipDto>
+
+    @DELETE("rest/v1/friendships")
+    suspend fun deleteFriendship(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
 }
 
 interface CloudinaryApi {

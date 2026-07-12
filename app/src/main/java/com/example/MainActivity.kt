@@ -513,6 +513,7 @@ class MainActivity : FragmentActivity() {
                 )
                 val sheetNavItems = listOf(
                     Triple("chat", "Chat", Icons.Default.Chat),
+                    Triple("friends", "Teman", Icons.Default.People),
                     Triple("feed", "Feed", Icons.Default.GridView),
                     Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
@@ -589,6 +590,7 @@ class MainActivity : FragmentActivity() {
                         )
                         val sheetDescriptions = mapOf(
                             "chat" to "Ngobrol bareng komunitas",
+                            "friends" to "Daftar teman & permintaan pertemanan",
                             "feed" to "Postingan dari pengguna",
                             "nobar_list" to "Nonton bareng, real-time",
                             "schedule" to "Jadwal tayang anime",
@@ -1018,7 +1020,8 @@ class MainActivity : FragmentActivity() {
                                 onEditOwnProfile = {
                                     navController.navigate("profile")
                                 },
-                                onNavigateToAnime = { slug -> navController.navigate("detail/$slug") }
+                                onNavigateToAnime = { slug -> navController.navigate("detail/$slug") },
+                                onOpenPrivateChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") }
                             )
                         }
                         composable("user_list") {
@@ -1026,6 +1029,26 @@ class MainActivity : FragmentActivity() {
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
                                 onUserClick = { userId -> navController.navigate("user_profile/$userId") }
+                            )
+                        }
+                        composable("friends") {
+                            FriendsScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onOpenChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") }
+                            )
+                        }
+                        composable(
+                            route = "private_chat/{userId}",
+                            arguments = listOf(
+                                navArgument("userId") { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val otherUserId = backStackEntry.arguments?.getString("userId") ?: ""
+                            PrivateChatScreen(
+                                viewModel = viewModel,
+                                otherUserId = otherUserId,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("clans") {

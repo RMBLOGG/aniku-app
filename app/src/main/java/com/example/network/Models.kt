@@ -1518,3 +1518,24 @@ data class UserWatchHistoryRequest(
     val episode_title: String? = null,
     val watched_at: String? = null
 )
+
+// ─── Pertemanan (Add Teman) ───
+data class FriendshipDto(
+    val id: String? = null,
+    val requester_id: String,
+    val addressee_id: String,
+    val status: String,
+    val created_at: String? = null,
+    val responded_at: String? = null
+)
+
+data class FriendshipRequest(
+    val requester_id: String,
+    val addressee_id: String,
+    val status: String = "pending"
+)
+
+data class FriendshipStatusUpdate(
+    val status: String,
+    val responded_at: String? = null
+)

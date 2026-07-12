@@ -4693,4 +4693,187 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _nobarError.value = null
     }
 
+    // ═══════════════════════════════════════════════════════
+    // ── PERTEMANAN (Add Teman) ──
+    // ═══════════════════════════════════════════════════════
+    private val _friendships = MutableStateFlow<List<FriendshipDto>>(emptyList())
+    val friendships: StateFlow<List<FriendshipDto>> = _friendships.asStateFlow()
+
+    private val _isFriendshipsLoading = MutableStateFlow(false)
+    val isFriendshipsLoading: StateFlow<Boolean> = _isFriendshipsLoading.asStateFlow()
+
+    /** Daftar teman yang udah accepted. */
+    val friendsList: StateFlow<List<FriendshipDto>> = friendships
+        .map { list -> list.filter { it.status == "accepted" } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Permintaan masuk (orang lain ngirim ke aku, belum aku respon). */
+    val incomingFriendRequests: StateFlow<List<FriendshipDto>> = friendships
+        .map { list ->
+            val myId = session.value.userId
+            list.filter { it.status == "pending" && it.addressee_id == myId }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun loadFriendships() {
+        val myId = session.value.userId ?: return
+        viewModelScope.launch {
+            _isFriendshipsLoading.value = true
+            try {
+                _friendships.value = NetworkClient.supabaseDbApi.getFriendships(
+                    orQuery = "(requester_id.eq.$myId,addressee_id.eq.$myId)",
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadFriendships error: ${e.message}")
+            } finally {
+                _isFriendshipsLoading.value = false
+            }
+        }
+    }
+
+    /** Status pertemanan aku dengan userId tertentu: null / "pending_sent" / "pending_received" / "accepted". */
+    fun friendshipStatusWith(userId: String): String? {
+        val myId = session.value.userId ?: return null
+        val match = friendships.value.firstOrNull {
+            (it.requester_id == myId && it.addressee_id == userId) ||
+                (it.requester_id == userId && it.addressee_id == myId)
+        } ?: return null
+        return when {
+            match.status == "accepted" -> "accepted"
+            match.status == "pending" && match.requester_id == myId -> "pending_sent"
+            match.status == "pending" && match.addressee_id == myId -> "pending_received"
+            else -> null
+        }
+    }
+
+    fun friendshipWith(userId: String): FriendshipDto? {
+        val myId = session.value.userId ?: return null
+        return friendships.value.firstOrNull {
+            (it.requester_id == myId && it.addressee_id == userId) ||
+                (it.requester_id == userId && it.addressee_id == myId)
+        }
+    }
+
+    fun sendFriendRequest(targetUserId: String) {
+        val myId = session.value.userId ?: return
+        if (myId == targetUserId) return
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.sendFriendRequest(
+                    data = FriendshipRequest(requester_id = myId, addressee_id = targetUserId),
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _friendships.value = _friendships.value + result
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "sendFriendRequest error: ${e.message}")
+            }
+        }
+    }
+
+    fun respondToFriendRequest(friendshipId: String, accept: Boolean) {
+        viewModelScope.launch {
+            try {
+                val newStatus = if (accept) "accepted" else "rejected"
+                NetworkClient.supabaseDbApi.updateFriendshipStatus(
+                    idQuery = "eq.$friendshipId",
+                    data = FriendshipStatusUpdate(status = newStatus, responded_at = java.time.Instant.now().toString()),
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadFriendships()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "respondToFriendRequest error: ${e.message}")
+            }
+        }
+    }
+
+    fun removeFriendOrCancelRequest(friendshipId: String) {
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteFriendship(
+                    idQuery = "eq.$friendshipId",
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _friendships.value = _friendships.value.filterNot { it.id == friendshipId }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "removeFriendOrCancelRequest error: ${e.message}")
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ── PRIVATE CHAT (realtime, Firebase RTDB) ──
+    // ═══════════════════════════════════════════════════════
+    private val _privateChatMessages = MutableStateFlow<List<PrivateMessage>>(emptyList())
+    val privateChatMessages: StateFlow<List<PrivateMessage>> = _privateChatMessages.asStateFlow()
+
+    private val _activePrivateChatId = MutableStateFlow<String?>(null)
+    val activePrivateChatId: StateFlow<String?> = _activePrivateChatId.asStateFlow()
+
+    private val _activePrivateChatOtherUserId = MutableStateFlow<String?>(null)
+    val activePrivateChatOtherUserId: StateFlow<String?> = _activePrivateChatOtherUserId.asStateFlow()
+
+    private var privateChatListenJob: kotlinx.coroutines.Job? = null
+
+    private val _userChats = MutableStateFlow<List<ChatPreview>>(emptyList())
+    val userChats: StateFlow<List<ChatPreview>> = _userChats.asStateFlow()
+    private var userChatsListenJob: kotlinx.coroutines.Job? = null
+
+    /** Mulai dengerin daftar chat (dipanggil sekali pas FriendsScreen/ChatList dibuka). */
+    fun startListeningUserChats() {
+        val myId = session.value.userId ?: return
+        userChatsListenJob?.cancel()
+        userChatsListenJob = viewModelScope.launch {
+            PrivateChatManager.listenUserChats(myId).collect { chats ->
+                _userChats.value = chats
+            }
+        }
+    }
+
+    fun stopListeningUserChats() {
+        userChatsListenJob?.cancel()
+        userChatsListenJob = null
+    }
+
+    /** Buka chat 1-on-1 dengan otherUserId, mulai dengerin pesan realtime. */
+    fun openPrivateChat(otherUserId: String) {
+        val myId = session.value.userId ?: return
+        val chatId = PrivateChatManager.chatIdFor(myId, otherUserId)
+        _activePrivateChatId.value = chatId
+        _activePrivateChatOtherUserId.value = otherUserId
+        _privateChatMessages.value = emptyList()
+
+        privateChatListenJob?.cancel()
+        privateChatListenJob = viewModelScope.launch {
+            PrivateChatManager.listenMessages(chatId).collect { messages ->
+                _privateChatMessages.value = messages
+            }
+        }
+    }
+
+    fun closePrivateChat() {
+        privateChatListenJob?.cancel()
+        privateChatListenJob = null
+        _activePrivateChatId.value = null
+        _activePrivateChatOtherUserId.value = null
+        _privateChatMessages.value = emptyList()
+    }
+
+    fun sendPrivateMessage(text: String) {
+        val myId = session.value.userId ?: return
+        val chatId = _activePrivateChatId.value ?: return
+        val otherUserId = _activePrivateChatOtherUserId.value ?: return
+        viewModelScope.launch {
+            try {
+                PrivateChatManager.sendMessage(chatId, myId, otherUserId, text)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "sendPrivateMessage error: ${e.message}")
+            }
+        }
+    }
+
 }
