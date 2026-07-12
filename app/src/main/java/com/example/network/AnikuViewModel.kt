@@ -181,11 +181,45 @@ class AnikuViewModel(context: Context) : ViewModel() {
         )
         watchHistoryManager.addHistory(item)
         refreshWatchHistory()
+
+        // Sinkron ke Supabase juga (fire-and-forget) biar keliatan di tab Histori profil publik.
+        val userId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.upsertUserWatchHistory(
+                    data = UserWatchHistoryRequest(
+                        user_id = userId,
+                        anime_slug = animeSlug,
+                        anime_title = animeTitle,
+                        anime_poster = animePoster,
+                        episode_slug = episodeSlug,
+                        episode_title = episodeTitle
+                    ),
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal sinkron riwayat tontonan ke Supabase: ${e.message}")
+            }
+        }
     }
 
     fun clearWatchHistory() {
         watchHistoryManager.clearHistory()
         refreshWatchHistory()
+
+        val userId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteAllUserWatchHistory(
+                    userIdQuery = "eq.$userId",
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal hapus riwayat tontonan di Supabase: ${e.message}")
+            }
+        }
     }
 
     private val SUPABASE_ANON_KEY = com.example.network.SUPABASE_ANON_KEY
@@ -1707,7 +1741,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
         return "$base\n\n--- Isi manifest (debug) ---\n$manifestPreview"
     }
 
-    // Toggle Bookmarks locally
+    // Toggle Bookmarks - local cache tetap dipertahankan biar UI instan, tapi sekarang juga
+    // disinkron ke Supabase (fire-and-forget) biar keliatan di tab Favorit profil publik.
     fun toggleBookmark(slug: String, title: String, poster: String, type: String? = null, ep: String? = null) {
         val currentlyBookmarked = bookmarkManager.isBookmarked(slug)
         if (currentlyBookmarked) {
@@ -1716,6 +1751,35 @@ class AnikuViewModel(context: Context) : ViewModel() {
             bookmarkManager.addBookmark(BookmarkedAnime(slug, title, poster, type, ep))
         }
         refreshBookmarks()
+
+        val userId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                if (currentlyBookmarked) {
+                    NetworkClient.supabaseDbApi.deleteUserBookmark(
+                        userIdQuery = "eq.$userId",
+                        animeSlugQuery = "eq.$slug",
+                        authHeader = getAuthHeader(),
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                } else {
+                    NetworkClient.supabaseDbApi.upsertUserBookmark(
+                        data = UserBookmarkRequest(
+                            user_id = userId,
+                            anime_slug = slug,
+                            title = title,
+                            poster = poster,
+                            type = type,
+                            episode = ep
+                        ),
+                        authHeader = getAuthHeader(),
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal sinkron bookmark ke Supabase: ${e.message}")
+            }
+        }
     }
 
     // Auth Actions: Login / Register / Get Profile
@@ -4184,6 +4248,61 @@ class AnikuViewModel(context: Context) : ViewModel() {
             } finally {
                 _isViewedProfileLoading.value = false
             }
+        }
+    }
+
+    // ── Konten tab profil publik: Komentar / Favorit / Histori ──
+    private val _viewedProfileComments = MutableStateFlow<List<EpisodeComment>>(emptyList())
+    val viewedProfileComments: StateFlow<List<EpisodeComment>> = _viewedProfileComments.asStateFlow()
+
+    private val _viewedProfileBookmarks = MutableStateFlow<List<UserBookmarkDto>>(emptyList())
+    val viewedProfileBookmarks: StateFlow<List<UserBookmarkDto>> = _viewedProfileBookmarks.asStateFlow()
+
+    private val _viewedProfileWatchHistory = MutableStateFlow<List<UserWatchHistoryDto>>(emptyList())
+    val viewedProfileWatchHistory: StateFlow<List<UserWatchHistoryDto>> = _viewedProfileWatchHistory.asStateFlow()
+
+    private val _isViewedProfileActivityLoading = MutableStateFlow(false)
+    val isViewedProfileActivityLoading: StateFlow<Boolean> = _isViewedProfileActivityLoading.asStateFlow()
+
+    fun loadPublicUserActivity(userId: String) {
+        viewModelScope.launch {
+            _isViewedProfileActivityLoading.value = true
+            _viewedProfileComments.value = emptyList()
+            _viewedProfileBookmarks.value = emptyList()
+            _viewedProfileWatchHistory.value = emptyList()
+            val authHeader = getAuthHeader()
+
+            try {
+                _viewedProfileComments.value = NetworkClient.supabaseDbApi.getUserComments(
+                    userIdQuery = "eq.$userId",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadPublicUserActivity comments error: ${e.message}")
+            }
+
+            try {
+                _viewedProfileBookmarks.value = NetworkClient.supabaseDbApi.getUserBookmarks(
+                    userIdQuery = "eq.$userId",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadPublicUserActivity bookmarks error: ${e.message}")
+            }
+
+            try {
+                _viewedProfileWatchHistory.value = NetworkClient.supabaseDbApi.getUserWatchHistory(
+                    userIdQuery = "eq.$userId",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadPublicUserActivity history error: ${e.message}")
+            }
+
+            _isViewedProfileActivityLoading.value = false
         }
     }
 

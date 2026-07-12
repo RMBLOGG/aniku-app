@@ -5,11 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
@@ -18,12 +23,16 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,7 +42,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -48,7 +59,11 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.R
 import com.example.network.AnikuViewModel
+import com.example.network.EpisodeComment
+import com.example.network.UserBookmarkDto
+import com.example.network.UserWatchHistoryDto
 import com.example.util.orDefault
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -64,13 +79,18 @@ fun UserProfileScreen(
     viewModel: AnikuViewModel,
     userId: String,
     onBack: () -> Unit,
-    onEditOwnProfile: () -> Unit
+    onEditOwnProfile: () -> Unit,
+    onNavigateToAnime: (String) -> Unit = {}
 ) {
     val session by viewModel.session.collectAsState()
     val profile by viewModel.viewedProfile.collectAsState()
     val donationTotal by viewModel.viewedProfileDonationTotal.collectAsState()
     val chatCount by viewModel.viewedProfileChatCount.collectAsState()
     val isLoading by viewModel.isViewedProfileLoading.collectAsState()
+    val comments by viewModel.viewedProfileComments.collectAsState()
+    val bookmarks by viewModel.viewedProfileBookmarks.collectAsState()
+    val watchHistory by viewModel.viewedProfileWatchHistory.collectAsState()
+    val isActivityLoading by viewModel.isViewedProfileActivityLoading.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val goldAccent = Color(0xFFFFC24B)
     val context = LocalContext.current
@@ -86,6 +106,7 @@ fun UserProfileScreen(
 
     LaunchedEffect(userId) {
         viewModel.loadPublicUserProfile(userId)
+        viewModel.loadPublicUserActivity(userId)
         hasMounted = true
     }
 
@@ -152,13 +173,22 @@ fun UserProfileScreen(
             "-"
         }
 
-        // Warna & gaya badge role — tiap role beda warna, admin/moderator dapet gaya "premium" (gradient + border)
+        // Berapa bulan sejak gabung - dipakai di stat row ala referensi ("bulan bergabung")
+        val monthsJoined = try {
+            val parsed = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                .parse(p.created_at?.take(19) ?: "")
+            val diffMs = System.currentTimeMillis() - (parsed?.time ?: System.currentTimeMillis())
+            (diffMs / (1000L * 60 * 60 * 24 * 30)).toInt().coerceAtLeast(0)
+        } catch (e: Exception) { 0 }
+
+        // Warna & gaya badge role - tiap role beda warna, admin/moderator dapet gaya "premium" (gradient + border)
         val roleBadge = when {
             p.isAdmin() -> RoleBadgeStyle("ADMINISTRATOR", goldAccent, premium = true)
             p.role == "moderator" -> RoleBadgeStyle("MODERATOR", Color(0xFFB388FF), premium = true)
-            p.role == "beta" -> RoleBadgeStyle("BETA", Color(0xFF22D3EE), premium = true)
+            p.isBeta() -> RoleBadgeStyle("BETA", Color(0xFF22D3EE), premium = true)
             else -> RoleBadgeStyle("USER", MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), premium = false)
         }
+        val isVerifiedRole = p.isAdmin() || p.role == "moderator" || p.isBeta()
 
         Column(
             modifier = Modifier
@@ -166,7 +196,7 @@ fun UserProfileScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
         ) {
-            // ── Banner (read-only) dengan fade gradient ──
+            // Banner (read-only) dengan fade gradient + pill role mengambang ala referensi
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,9 +225,28 @@ fun UserProfileScreen(
                             )
                         )
                 )
+
+                // Pill role mengambang di banner (pengganti "title" kayak di referensi,
+                // tapi isinya data role asli: ADMINISTRATOR/MODERATOR/BETA/USER)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 14.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .border(1.dp, roleBadge.color.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    if (roleBadge.premium) {
+                        Icon(Icons.Default.Star, contentDescription = null, tint = goldAccent, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    Text(roleBadge.label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                }
             }
 
-            // ── Identitas: avatar ring overlap banner, username, UID, role pill — semua center ──
+            // Identitas: avatar ring overlap banner, username, UID - semua center
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -207,8 +256,6 @@ fun UserProfileScreen(
                         .size(108.dp)
                         .offset(y = (-58).dp)
                 ) {
-                    // Ring avatar user Beta pakai warna cyan/biru khusus (beda dari
-                    // accent/gold user biasa) - identitas visual eksklusif kosmetik.
                     val ringColors = if (p.isBeta()) {
                         listOf(Color(0xFF22D3EE), Color(0xFF3B82F6), Color(0xFF22D3EE))
                     } else {
@@ -260,7 +307,7 @@ fun UserProfileScreen(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.Bottom) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         p.username.orDefault("Pengguna"),
                         fontSize = 21.sp,
@@ -269,54 +316,224 @@ fun UserProfileScreen(
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    p.user_number?.let {
+                    if (isVerifiedRole) {
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "#$it",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                        Icon(
+                            Icons.Default.VerifiedUser,
+                            contentDescription = "Terverifikasi",
+                            tint = roleBadge.color,
+                            modifier = Modifier.size(17.dp)
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                if (roleBadge.premium) {
+                val viewedClanForPill by viewModel.viewedProfileClan.collectAsState()
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    p.user_number?.let {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("#$it", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+                        }
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(Brush.linearGradient(listOf(roleBadge.color.copy(alpha = 0.16f), goldAccent.copy(alpha = 0.10f))))
-                            .border(1.dp, roleBadge.color.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
-                            .padding(horizontal = 11.dp, vertical = 5.dp)
+                            .background(accentColor.copy(alpha = 0.14f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.Default.Star, contentDescription = null, tint = goldAccent, modifier = Modifier.size(11.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(roleBadge.label, color = roleBadge.color, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accentColor))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Lv.$seasonLevel", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                     }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(roleBadge.color.copy(alpha = 0.12f))
-                            .padding(horizontal = 11.dp, vertical = 5.dp)
-                    ) {
-                        Text(roleBadge.label, color = roleBadge.color, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+                    viewedClanForPill?.let { clan ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF7B2FBF).copy(alpha = 0.16f))
+                                .clickable {
+                                    viewModel.loadClanMembers(clan.id)
+                                    showClanMembers = true
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = Color(0xFFBA68C8), modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(clan.tag, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBA68C8))
+                        }
                     }
                 }
             }
 
-            // ── Konten ──
+            // Konten
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(top = 18.dp, bottom = 26.dp),
+                    .padding(top = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
 
-                // Level card — progress bar gradient teranimasi
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    ProfileStatCell(value = "$monthsJoined", label = "bulan\nbergabung", modifier = Modifier.weight(1f))
+                    ProfileStatCell(value = "${comments.size}", label = "jumlah\nkomentar", modifier = Modifier.weight(1f))
+                    ProfileStatCell(value = "${bookmarks.size}", label = "jumlah\nfavorit", modifier = Modifier.weight(1f))
+                    ProfileStatCell(value = "${watchHistory.size}", label = "jumlah\nriwayat", modifier = Modifier.weight(1f))
+                }
+
+                if (isOwnProfile) {
+                    Button(
+                        onClick = onEditOwnProfile,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    val showBanButton = canModerate
+                    val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin
+
+                    var showGiveDialog by remember { mutableStateOf(false) }
+                    var giveAmountText by remember { mutableStateOf("") }
+                    var giveResultMsg by remember { mutableStateOf<String?>(null) }
+                    var giveInProgress by remember { mutableStateOf(false) }
+
+                    if (showBanButton || showDiamondButton) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            if (showBanButton) {
+                                val isBanned = p.is_banned == true
+                                Button(
+                                    onClick = { viewModel.toggleUserBanStatus(p) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                                    contentPadding = PaddingValues(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(if (showDiamondButton) 1.4f else 1f)
+                                        .height(52.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.linearGradient(
+                                                    if (isBanned) listOf(Color(0xFF1B7A3D), Color(0xFF145C2D))
+                                                    else listOf(Color(0xFFB71C1C), Color(0xFF7F1414))
+                                                ),
+                                                RoundedCornerShape(16.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                if (isBanned) "Aktifkan Kembali" else "Banned User",
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.5.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (showDiamondButton) {
+                                OutlinedButton(
+                                    onClick = { showGiveDialog = true },
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF4FD8E8).copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color(0xFF4FD8E8).copy(alpha = 0.08f),
+                                        contentColor = Color(0xFF4FD8E8)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp)
+                                ) {
+                                    Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                    if (showGiveDialog) {
+                        AlertDialog(
+                            onDismissRequest = { if (!giveInProgress) showGiveDialog = false },
+                            title = { Text("Beri Diamond ke ${p.username}") },
+                            text = {
+                                Column {
+                                    Text(
+                                        "Maksimal 200 DM per hari (gabungan semua penerima).",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = giveAmountText,
+                                        onValueChange = { giveAmountText = it.filter { c -> c.isDigit() } },
+                                        label = { Text("Jumlah DM") },
+                                        singleLine = true,
+                                        enabled = !giveInProgress,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (giveResultMsg != null) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(giveResultMsg ?: "", color = Color(0xFFE57373), fontSize = 12.sp)
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = !giveInProgress && giveAmountText.toIntOrNull()?.let { it > 0 } == true,
+                                    onClick = {
+                                        val amount = giveAmountText.toIntOrNull() ?: return@TextButton
+                                        val targetUsername = p.username ?: return@TextButton
+                                        giveInProgress = true
+                                        giveResultMsg = null
+                                        viewModel.giveDiamond(targetUsername, amount) { success, error ->
+                                            giveInProgress = false
+                                            if (success) {
+                                                showGiveDialog = false
+                                                giveAmountText = ""
+                                            } else {
+                                                giveResultMsg = error
+                                            }
+                                        }
+                                    }
+                                ) { Text(if (giveInProgress) "Mengirim..." else "Kirim") }
+                            },
+                            dismissButton = {
+                                TextButton(
+                                    enabled = !giveInProgress,
+                                    onClick = { showGiveDialog = false }
+                                ) { Text("Batal") }
+                            }
+                        )
+                    }
+                }
+
+                // Level card - progress bar gradient teranimasi
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     shape = RoundedCornerShape(20.dp),
@@ -371,7 +588,6 @@ fun UserProfileScreen(
                     }
                 }
 
-                // Section: Clan (cuma tampil kalau user ini tergabung di clan)
                 val viewedClan by viewModel.viewedProfileClan.collectAsState()
                 viewedClan?.let { clan ->
                     val memberRank = remember(clanMembersForDialog, userId) {
@@ -386,7 +602,6 @@ fun UserProfileScreen(
                         else -> Color(0xFF2FA8BF)
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -479,12 +694,10 @@ fun UserProfileScreen(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // Section: Statistik
                 Text(
-                    "STATISTIK",
+                    "STATISTIK LAINNYA",
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -545,7 +758,6 @@ fun UserProfileScreen(
                     }
                 }
 
-                // Section: Info Akun
                 Text(
                     "INFO AKUN",
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
@@ -594,154 +806,20 @@ fun UserProfileScreen(
                     }
                 }
 
-                if (isOwnProfile) {
-                    OutlinedButton(
-                        onClick = onEditOwnProfile,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp)
-                    ) {
-                        Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    // Tombol "Banned User" (canModerate) dan "Beri Diamond" (beta/mod/admin)
-                    // digabung jadi satu row/grid biar rapih, ga ada satu tombol nyempil sendiri
-                    // dengan jarak gede di bawah. Masing-masing tetap independen kondisinya.
-                    val showBanButton = canModerate
-                    val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin
-
-                    var showGiveDialog by remember { mutableStateOf(false) }
-                    var giveAmountText by remember { mutableStateOf("") }
-                    var giveResultMsg by remember { mutableStateOf<String?>(null) }
-                    var giveInProgress by remember { mutableStateOf(false) }
-
-                    if (showBanButton || showDiamondButton) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (showBanButton) {
-                                val isBanned = p.is_banned == true
-                                Button(
-                                    onClick = { viewModel.toggleUserBanStatus(p) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                                    contentPadding = PaddingValues(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    modifier = Modifier
-                                        .weight(if (showDiamondButton) 1.4f else 1f)
-                                        .height(52.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.linearGradient(
-                                                    if (isBanned) listOf(Color(0xFF1B7A3D), Color(0xFF145C2D))
-                                                    else listOf(Color(0xFFB71C1C), Color(0xFF7F1414))
-                                                ),
-                                                RoundedCornerShape(14.dp)
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                if (isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                if (isBanned) "Aktifkan Kembali" else "Banned User",
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.5.sp,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Tombol "Beri Diamond" - eksklusif buat role beta/moderator/admin,
-                            // cuma nongol pas liat profil ORANG LAIN (bukan profil sendiri).
-                            // Validasi asli (limit harian, saldo) tetap dicek ulang di server.
-                            if (showDiamondButton) {
-                                OutlinedButton(
-                                    onClick = { showGiveDialog = true },
-                                    shape = RoundedCornerShape(14.dp),
-                                    border = BorderStroke(1.dp, Color(0xFF4FD8E8).copy(alpha = 0.5f)),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color(0xFF4FD8E8).copy(alpha = 0.08f),
-                                        contentColor = Color(0xFF4FD8E8)
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 12.dp),
-                                    modifier = Modifier
-                                        .weight(if (showBanButton) 1f else 1f)
-                                        .height(52.dp)
-                                ) {
-                                    Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FD8E8), modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                    if (showGiveDialog) {
-                        AlertDialog(
-                            onDismissRequest = { if (!giveInProgress) showGiveDialog = false },
-                            title = { Text("Beri Diamond ke ${p.username}") },
-                            text = {
-                                Column {
-                                    Text(
-                                        "Maksimal 200 DM per hari (gabungan semua penerima).",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    OutlinedTextField(
-                                        value = giveAmountText,
-                                        onValueChange = { giveAmountText = it.filter { c -> c.isDigit() } },
-                                        label = { Text("Jumlah DM") },
-                                        singleLine = true,
-                                        enabled = !giveInProgress,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    if (giveResultMsg != null) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(giveResultMsg ?: "", color = Color(0xFFE57373), fontSize = 12.sp)
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(
-                                    enabled = !giveInProgress && giveAmountText.toIntOrNull()?.let { it > 0 } == true,
-                                    onClick = {
-                                        val amount = giveAmountText.toIntOrNull() ?: return@TextButton
-                                        val targetUsername = p.username ?: return@TextButton
-                                        giveInProgress = true
-                                        giveResultMsg = null
-                                        viewModel.giveDiamond(targetUsername, amount) { success, error ->
-                                            giveInProgress = false
-                                            if (success) {
-                                                showGiveDialog = false
-                                                giveAmountText = ""
-                                            } else {
-                                                giveResultMsg = error
-                                            }
-                                        }
-                                    }
-                                ) { Text(if (giveInProgress) "Mengirim..." else "Kirim") }
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    enabled = !giveInProgress,
-                                    onClick = { showGiveDialog = false }
-                                ) { Text("Batal") }
-                            }
-                        )
-                    }
-                }
+                Spacer(modifier = Modifier.height(6.dp))
             }
+
+            // Tab swipeable ala referensi: Komentar / Favorit / Histori
+            ProfileActivityTabs(
+                comments = comments,
+                bookmarks = bookmarks,
+                watchHistory = watchHistory,
+                isLoading = isActivityLoading,
+                accentColor = accentColor,
+                onNavigateToAnime = onNavigateToAnime
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
@@ -798,6 +876,318 @@ fun UserProfileScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     TextButton(onClick = { showClanMembers = false }, modifier = Modifier.align(Alignment.End)) {
                         Text("Tutup", color = Color.White.copy(alpha = 0.6f))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileStatCell(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(value, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            label,
+            fontSize = 10.5.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            lineHeight = 12.sp
+        )
+    }
+}
+
+/**
+ * Tab swipeable Komentar / Favorit / Histori ala referensi.
+ * Tingginya auto-menyesuaikan konten tab yang lagi aktif, biar bisa ikut nyatu
+ * di dalam scroll utama profil tanpa konflik nested-scroll antar list.
+ */
+@Composable
+private fun ProfileActivityTabs(
+    comments: List<EpisodeComment>,
+    bookmarks: List<UserBookmarkDto>,
+    watchHistory: List<UserWatchHistoryDto>,
+    isLoading: Boolean,
+    accentColor: Color,
+    onNavigateToAnime: (String) -> Unit
+) {
+    val tabTitles = listOf("Komentar", "Favorit", "Histori")
+    val pagerState = rememberPagerState(pageCount = { tabTitles.size })
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val pageHeightsPx = remember { mutableStateMapOf<Int, Int>() }
+    val currentHeightPx = pageHeightsPx[pagerState.currentPage] ?: 0
+    val animatedHeight by animateDpAsState(
+        targetValue = if (currentHeightPx > 0) with(density) { currentHeightPx.toDp() } else 160.dp,
+        label = "profile_tabs_height"
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            tabTitles.forEachIndexed { index, title ->
+                val isSelected = pagerState.currentPage == index
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        }
+                        .padding(vertical = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        title,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onBackground
+                        else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .height(2.5.dp)
+                            .width(if (isSelected) 28.dp else 0.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (isSelected) accentColor else Color.Transparent)
+                    )
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(animatedHeight)
+        ) { page ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coords ->
+                        pageHeightsPx[page] = coords.size.height
+                    }
+                    .padding(top = 12.dp)
+            ) {
+                when (page) {
+                    0 -> CommentsTabContent(comments, isLoading, accentColor, onNavigateToAnime)
+                    1 -> FavoritesTabContent(bookmarks, isLoading, onNavigateToAnime)
+                    else -> HistoryTabContent(watchHistory, isLoading, accentColor, onNavigateToAnime)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyTabState(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp, horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f), modifier = Modifier.size(40.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(text, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+private fun CommentsTabContent(
+    comments: List<EpisodeComment>,
+    isLoading: Boolean,
+    accentColor: Color,
+    onNavigateToAnime: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (isLoading && comments.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+            }
+        } else if (comments.isEmpty()) {
+            EmptyTabState(Icons.Default.ChatBubbleOutline, "Belum ada komentar dari user ini.")
+        } else {
+            comments.forEach { comment ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = comment.anime_slug != null) {
+                            comment.anime_slug?.let { onNavigateToAnime(it) }
+                        }
+                ) {
+                    Row(modifier = Modifier.padding(14.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(accentColor.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = accentColor, modifier = Modifier.size(17.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    comment.anime_title ?: "Anime",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                comment.message,
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoritesTabContent(
+    bookmarks: List<UserBookmarkDto>,
+    isLoading: Boolean,
+    onNavigateToAnime: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (isLoading && bookmarks.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(28.dp))
+            }
+        } else if (bookmarks.isEmpty()) {
+            EmptyTabState(Icons.Default.FavoriteBorder, "Belum ada anime favorit.")
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(bookmarks, key = { it.anime_slug }) { bm ->
+                    Column(
+                        modifier = Modifier
+                            .width(110.dp)
+                            .clickable { onNavigateToAnime(bm.anime_slug) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(2f / 3f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            AsyncImage(
+                                model = bm.poster,
+                                contentDescription = bm.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            bm.title,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryTabContent(
+    watchHistory: List<UserWatchHistoryDto>,
+    isLoading: Boolean,
+    accentColor: Color,
+    onNavigateToAnime: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (isLoading && watchHistory.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+            }
+        } else if (watchHistory.isEmpty()) {
+            EmptyTabState(Icons.Default.History, "Belum ada riwayat tontonan.")
+        } else {
+            watchHistory.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNavigateToAnime(item.anime_slug) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 54.dp, height = 76.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        AsyncImage(
+                            model = item.anime_poster,
+                            contentDescription = item.anime_title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(item.anime_title, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(accentColor.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    item.episode_title ?: item.episode_slug,
+                                    color = accentColor,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "${relativeTimeShort(item.watched_at ?: "")} lalu",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                        )
                     }
                 }
             }

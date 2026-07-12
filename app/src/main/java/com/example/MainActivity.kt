@@ -1015,7 +1015,8 @@ class MainActivity : FragmentActivity() {
                                 onBack = { navController.popBackStack() },
                                 onEditOwnProfile = {
                                     navController.navigate("profile")
-                                }
+                                },
+                                onNavigateToAnime = { slug -> navController.navigate("detail/$slug") }
                             )
                         }
                         composable("user_list") {

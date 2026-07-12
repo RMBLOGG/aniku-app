@@ -1472,3 +1472,47 @@ data class EpisodeCommentRequest(
     val parent_comment_id: String? = null,
     val reply_to_username: String? = null
 )
+
+// ── Favorit (bookmark) & Riwayat Tontonan — versi Supabase, biar bisa dibaca dari profil publik user lain ──
+data class UserBookmarkDto(
+    val id: Long? = null,
+    val user_id: String? = null,
+    val anime_slug: String,
+    val title: String,
+    val poster: String? = null,
+    val type: String? = null,
+    val episode: String? = null,
+    val created_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class UserBookmarkRequest(
+    val user_id: String,
+    val anime_slug: String,
+    val title: String,
+    val poster: String? = null,
+    val type: String? = null,
+    val episode: String? = null
+)
+
+data class UserWatchHistoryDto(
+    val id: Long? = null,
+    val user_id: String? = null,
+    val anime_slug: String,
+    val anime_title: String,
+    val anime_poster: String? = null,
+    val episode_slug: String,
+    val episode_title: String? = null,
+    val watched_at: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class UserWatchHistoryRequest(
+    val user_id: String,
+    val anime_slug: String,
+    val anime_title: String,
+    val anime_poster: String? = null,
+    val episode_slug: String,
+    val episode_title: String? = null,
+    val watched_at: String? = null
+)

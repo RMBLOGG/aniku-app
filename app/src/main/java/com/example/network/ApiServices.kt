@@ -935,6 +935,69 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
+
+    // ─── Komentar milik 1 user (buat tab "Komentar" di profil publik) ───
+    @GET("rest/v1/episode_comments")
+    suspend fun getUserComments(
+        @Query("user_id") userIdQuery: String,
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 50,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<EpisodeComment>
+
+    // ─── Favorit (bookmark) — disinkron ke Supabase biar keliatan di profil publik ───
+    @GET("rest/v1/user_bookmarks")
+    suspend fun getUserBookmarks(
+        @Query("user_id") userIdQuery: String,
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 100,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<UserBookmarkDto>
+
+    @POST("rest/v1/user_bookmarks")
+    suspend fun upsertUserBookmark(
+        @Body data: UserBookmarkRequest,
+        @Query("on_conflict") onConflict: String = "user_id,anime_slug",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=representation"
+    ): List<UserBookmarkDto>
+
+    @DELETE("rest/v1/user_bookmarks")
+    suspend fun deleteUserBookmark(
+        @Query("user_id") userIdQuery: String,
+        @Query("anime_slug") animeSlugQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    // ─── Riwayat Tontonan — disinkron ke Supabase biar keliatan di profil publik ───
+    @GET("rest/v1/user_watch_history")
+    suspend fun getUserWatchHistory(
+        @Query("user_id") userIdQuery: String,
+        @Query("order") order: String = "watched_at.desc",
+        @Query("limit") limit: Int = 50,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<UserWatchHistoryDto>
+
+    @POST("rest/v1/user_watch_history")
+    suspend fun upsertUserWatchHistory(
+        @Body data: UserWatchHistoryRequest,
+        @Query("on_conflict") onConflict: String = "user_id,episode_slug",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=representation"
+    ): List<UserWatchHistoryDto>
+
+    @DELETE("rest/v1/user_watch_history")
+    suspend fun deleteAllUserWatchHistory(
+        @Query("user_id") userIdQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
 }
 
 interface CloudinaryApi {
