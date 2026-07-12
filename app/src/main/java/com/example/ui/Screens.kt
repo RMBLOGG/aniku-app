@@ -1781,12 +1781,21 @@ fun HomeScreen(
                         )
                 ) {
                     Column {
+                        Spacer(modifier = Modifier.statusBarsPadding())
+                        // ── Profile card (avatar + level + exp) ──
+                        Column(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp, vertical = 12.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        ) {
                         // ── Profile row ──
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                                .fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
@@ -1937,68 +1946,72 @@ fun HomeScreen(
                             }
                         }
 
-                        // ── EXP bar + Diamond + Clan pill ──
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            if (isLoggedIn) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Exp", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("$xpIntoLevel/$xpNeededForLevel", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
+                        // ── EXP bar (masih di dalam profile card) ──
+                        if (isLoggedIn) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Exp", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("$xpIntoLevel/$xpNeededForLevel", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.12f))
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
+                                        .fillMaxWidth(xpProgress)
+                                        .fillMaxHeight()
                                         .clip(RoundedCornerShape(50))
-                                        .background(Color.White.copy(alpha = 0.12f))
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(xpProgress)
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(50))
-                                            .background(Brush.horizontalGradient(listOf(accentColor.copy(alpha = 0.7f), accentColor)))
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(12.dp))
+                                        .background(Brush.horizontalGradient(listOf(accentColor.copy(alpha = 0.7f), accentColor)))
+                                )
+                            }
+                        }
+                        } // tutup profile card
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // ── Diamond + Clan pill ──
+                        Row(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable { navController.navigate("diamond_topup") }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(15.dp))
+                                Text("$diamondBalance", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                Text("Diamond", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
                             }
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Brush.horizontalGradient(listOf(Color(0xFF641015), Color(0xFF8C1A20))))
+                                    .clickable { if (isLoggedIn) navController.navigate("clans") else onShowLoginDialog() }
+                                    .padding(vertical = 9.dp)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color.White.copy(alpha = 0.08f))
-                                        .clickable { navController.navigate("diamond_topup") }
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                                ) {
-                                    Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(15.dp))
-                                    Text("$diamondBalance", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                                    Text("Diamond", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF641015), Color(0xFF8C1A20))))
-                                        .clickable { if (isLoggedIn) navController.navigate("clans") else onShowLoginDialog() }
-                                        .padding(vertical = 9.dp)
-                                ) {
-                                    Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Clan", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                                }
+                                Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Clan", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -2161,7 +2174,15 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(18.dp))
 
                         // ── Global chat preview ──
-                        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .padding(horizontal = 20.dp)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 14.dp, vertical = 12.dp)
+                        ) {
                             Text(
                                 text = "GLOBAL CHAT",
                                 color = Color.White.copy(alpha = 0.4f),
