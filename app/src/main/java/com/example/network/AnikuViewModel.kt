@@ -241,6 +241,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
         UserSession(null, null, null, null, null, null, false, false, false, null, false)
     )
 
+    init {
+        // Begitu userId muncul (login/restore session), langsung sync FCM token
+        // yang tersimpan di SharedPreferences (diisi MainActivity/FCM service).
+        viewModelScope.launch {
+            session.collect { s ->
+                if (!s.userId.isNullOrBlank()) {
+                    val prefs = appContext.getSharedPreferences("aniku_fcm", Context.MODE_PRIVATE)
+                    val token = prefs.getString("fcm_token", null)
+                    if (!token.isNullOrBlank()) syncPushToken(token)
+                }
+            }
+        }
+    }
+
+    /** Upsert FCM token ke Supabase, dipakai buat targeted notif private chat. */
+    fun syncPushToken(token: String) {
+        val myId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.upsertPushToken(
+                    data = PushTokenUpsertRequest(user_id = myId, fcm_token = token),
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "syncPushToken gagal: ${e.message}")
+            }
+        }
+    }
+
     // Update check state
     private val _updateAvailable = MutableStateFlow(false)
     val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
@@ -4867,9 +4897,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val myId = session.value.userId ?: return
         val chatId = _activePrivateChatId.value ?: return
         val otherUserId = _activePrivateChatOtherUserId.value ?: return
+        val myUsername = session.value.username.orDefault("Seseorang")
         viewModelScope.launch {
             try {
                 PrivateChatManager.sendMessage(chatId, myId, otherUserId, text)
+
+                // Kirim push notif ke penerima (targeted, bukan broadcast topic).
+                // Gagal kirim notif jangan sampai bikin pesan gagal dianggap error.
+                try {
+                    NetworkClient.supabaseFunctionsApi.sendPrivateChatNotification(
+                        request = PrivateChatNotifRequest(
+                            recipientUserId = otherUserId,
+                            senderId = myId,
+                            senderName = myUsername,
+                            messageText = text
+                        ),
+                        apiKey = SUPABASE_ANON_KEY,
+                        authHeader = getAuthHeader()
+                    )
+                } catch (notifEx: Exception) {
+                    Log.e("AnikuVM", "sendPrivateChatNotification gagal: ${notifEx.message}")
+                }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "sendPrivateMessage error: ${e.message}")
             }

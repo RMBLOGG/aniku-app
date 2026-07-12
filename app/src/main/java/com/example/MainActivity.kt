@@ -150,6 +150,9 @@ class MainActivity : FragmentActivity() {
                 val prefs = getSharedPreferences("aniku_fcm", android.content.Context.MODE_PRIVATE)
                 prefs.edit().putString("fcm_token", token).apply()
                 android.util.Log.d("FCM", "Token: $token")
+                // Kalau user udah login duluan, langsung sync sekarang.
+                // Kalau belum, viewModel bakal auto-sync pas session login masuk.
+                viewModel.syncPushToken(token)
             }
 
         // Subscribe ke topic feed_updates
@@ -170,6 +173,10 @@ class MainActivity : FragmentActivity() {
         val deepLinkRoute = when {
             intent?.data?.scheme == "aniku" && intent.data?.host == "feed" -> "feed"
             intent?.data?.scheme == "aniku" && intent.data?.host == "chat" -> "chat"
+            intent?.data?.scheme == "aniku" && intent.data?.host == "private_chat" -> {
+                val otherUserId = intent.data?.lastPathSegment
+                if (!otherUserId.isNullOrBlank()) "private_chat/$otherUserId" else "chat"
+            }
             intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password" -> "reset_password"
             else -> null
         }

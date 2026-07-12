@@ -147,6 +147,27 @@ data class IpGuardRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class PushTokenUpsertRequest(
+    val user_id: String,
+    val fcm_token: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PrivateChatNotifRequest(
+    val recipientUserId: String,
+    val senderId: String,
+    val senderName: String,
+    val messageText: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PrivateChatNotifResponse(
+    val success: Boolean? = null,
+    val skipped: String? = null,
+    val error: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class IpGuardResponse(
     val banned: Boolean?,
     val reason: String?,

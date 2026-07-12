@@ -225,6 +225,13 @@ interface SupabaseFunctionsApi {
         @Header("apikey") apiKey: String,
         @Header("Authorization") authHeader: String
     ): IpGuardResponse
+
+    @POST("functions/v1/send-private-chat-notification")
+    suspend fun sendPrivateChatNotification(
+        @Body request: PrivateChatNotifRequest,
+        @Header("apikey") apiKey: String,
+        @Header("Authorization") authHeader: String
+    ): PrivateChatNotifResponse
 }
 
 interface SupabaseAuthApi {
@@ -718,6 +725,15 @@ interface SupabaseDbApi {
     @POST("rest/v1/user_presence")
     suspend fun upsertPresence(
         @Body data: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
+    ): retrofit2.Response<Unit>
+
+    // ─── Push token (buat notif private chat targeted) ───
+    @POST("rest/v1/push_tokens")
+    suspend fun upsertPushToken(
+        @Body data: PushTokenUpsertRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
