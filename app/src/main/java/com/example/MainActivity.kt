@@ -520,6 +520,7 @@ class MainActivity : FragmentActivity() {
                     Triple("top_supporter", "Top Supporter", Icons.Default.EmojiEvents),
                     Triple("user_list", "Pengguna", Icons.Default.People),
                     Triple("clans", "Clan", Icons.Default.Diamond),
+                    Triple("gacha", "Gacha Karakter", Icons.Default.Casino),
                     Triple("request_anime", "Anime Request", Icons.Default.VideoLibrary),
                 ).filter { (route, _, _) ->
                     when (route) {
@@ -595,6 +596,7 @@ class MainActivity : FragmentActivity() {
                             "top_supporter" to "Daftar donatur terbaik Aniku",
                             "user_list" to "Cari & lihat profil pengguna",
                             "clans" to "Buat clan & kumpulin Diamond",
+                            "gacha" to "Tukar Diamond buat dapetin karakter anime favoritmu",
                             "request_anime" to "Anime hasil request user",
                         )
 

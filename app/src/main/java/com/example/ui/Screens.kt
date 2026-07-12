@@ -1900,7 +1900,7 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.width(10.dp))
 
-                            // Notifikasi
+                            // Pengaturan
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
@@ -1910,8 +1910,8 @@ fun HomeScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    Icons.Default.NotificationsNone,
-                                    contentDescription = "Notifikasi",
+                                    Icons.Default.Settings,
+                                    contentDescription = "Pengaturan",
                                     tint = Color.White.copy(alpha = 0.9f),
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -2039,21 +2039,6 @@ fun HomeScreen(
                                 )
                             }
                             Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // ── Gacha Karakter quick card ──
-                        Box(modifier = Modifier.padding(horizontal = 20.dp)) {
-                            HomeQuickActionCard(
-                                modifier = Modifier.fillMaxWidth(),
-                                title = "Gacha Karakter",
-                                subtitle = "Tukar Diamond buat dapetin karakter anime favoritmu",
-                                icon = Icons.Default.Diamond,
-                                accent = Color(0xFFFFC93C),
-                                gradientColors = listOf(Color(0xFF2A1B4D), Color(0xFF1B2E4D)),
-                                onClick = { if (isLoggedIn) navController.navigate("gacha") else onShowLoginDialog() }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))
