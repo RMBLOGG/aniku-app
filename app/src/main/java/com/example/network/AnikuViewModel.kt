@@ -3649,6 +3649,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         message: String,
         animeSlug: String? = null,
         animeTitle: String? = null,
+        animePoster: String? = null,
         parentCommentId: String? = null,
         replyToUsername: String? = null
     ) {
@@ -3673,6 +3674,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         source = sourceLabel,
                         anime_slug = animeSlug,
                         anime_title = animeTitle,
+                        anime_poster = animePoster,
                         parent_comment_id = parentCommentId,
                         reply_to_username = replyToUsername
                     ),

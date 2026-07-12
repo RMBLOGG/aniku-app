@@ -5,8 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -14,7 +19,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
@@ -42,9 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -533,6 +535,17 @@ fun UserProfileScreen(
                     }
                 }
 
+                // Tab swipeable ala referensi: Komentar / Favorit / Histori
+                // (dipindah ke sini, tepat di bawah tombol aksi, sesuai posisi di referensi)
+                ProfileActivityTabs(
+                    comments = comments,
+                    bookmarks = bookmarks,
+                    watchHistory = watchHistory,
+                    isLoading = isActivityLoading,
+                    accentColor = accentColor,
+                    onNavigateToAnime = onNavigateToAnime
+                )
+
                 // Level card - progress bar gradient teranimasi
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -809,16 +822,6 @@ fun UserProfileScreen(
                 Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // Tab swipeable ala referensi: Komentar / Favorit / Histori
-            ProfileActivityTabs(
-                comments = comments,
-                bookmarks = bookmarks,
-                watchHistory = watchHistory,
-                isLoading = isActivityLoading,
-                accentColor = accentColor,
-                onNavigateToAnime = onNavigateToAnime
-            )
-
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -903,8 +906,8 @@ private fun ProfileStatCell(value: String, label: String, modifier: Modifier = M
 
 /**
  * Tab swipeable Komentar / Favorit / Histori ala referensi.
- * Tingginya auto-menyesuaikan konten tab yang lagi aktif, biar bisa ikut nyatu
- * di dalam scroll utama profil tanpa konflik nested-scroll antar list.
+ * Tingginya FIXED (gak ikut memanjang ke bawah) - tiap tab pakai LazyColumn/LazyVerticalGrid
+ * sendiri buat scroll vertikal internal kalau isinya lebih panjang dari area yang disediakan.
  */
 @Composable
 private fun ProfileActivityTabs(
@@ -918,13 +921,7 @@ private fun ProfileActivityTabs(
     val tabTitles = listOf("Komentar", "Favorit", "Histori")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val pageHeightsPx = remember { mutableStateMapOf<Int, Int>() }
-    val currentHeightPx = pageHeightsPx[pagerState.currentPage] ?: 0
-    val animatedHeight by animateDpAsState(
-        targetValue = if (currentHeightPx > 0) with(density) { currentHeightPx.toDp() } else 160.dp,
-        label = "profile_tabs_height"
-    )
+    val tabsAreaHeight = 440.dp
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -963,21 +960,12 @@ private fun ProfileActivityTabs(
             state = pagerState,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(animatedHeight)
+                .height(tabsAreaHeight)
         ) { page ->
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coords ->
-                        pageHeightsPx[page] = coords.size.height
-                    }
-                    .padding(top = 12.dp)
-            ) {
-                when (page) {
-                    0 -> CommentsTabContent(comments, isLoading, accentColor, onNavigateToAnime)
-                    1 -> FavoritesTabContent(bookmarks, isLoading, onNavigateToAnime)
-                    else -> HistoryTabContent(watchHistory, isLoading, accentColor, onNavigateToAnime)
-                }
+            when (page) {
+                0 -> CommentsTabContent(comments, isLoading, accentColor, onNavigateToAnime)
+                1 -> FavoritesTabContent(bookmarks, isLoading, onNavigateToAnime)
+                else -> HistoryTabContent(watchHistory, isLoading, accentColor, onNavigateToAnime)
             }
         }
     }
@@ -987,9 +975,10 @@ private fun ProfileActivityTabs(
 private fun EmptyTabState(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 40.dp, horizontal = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f), modifier = Modifier.size(40.dp))
         Spacer(modifier = Modifier.height(10.dp))
@@ -1004,68 +993,81 @@ private fun CommentsTabContent(
     accentColor: Color,
     onNavigateToAnime: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+    if (isLoading && comments.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+        }
+        return
+    }
+    if (comments.isEmpty()) {
+        EmptyTabState(Icons.Default.ChatBubbleOutline, "Belum ada komentar dari user ini.")
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (isLoading && comments.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
-            }
-        } else if (comments.isEmpty()) {
-            EmptyTabState(Icons.Default.ChatBubbleOutline, "Belum ada komentar dari user ini.")
-        } else {
-            comments.forEach { comment ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = comment.anime_slug != null) {
-                            comment.anime_slug?.let { onNavigateToAnime(it) }
-                        }
-                ) {
-                    Row(modifier = Modifier.padding(14.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(accentColor.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
+        items(comments, key = { it.id }) { comment ->
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = comment.anime_slug != null) {
+                        comment.anime_slug?.let { onNavigateToAnime(it) }
+                    }
+            ) {
+                Row(modifier = Modifier.padding(14.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 40.dp, height = 54.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(accentColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!comment.anime_poster.isNullOrBlank()) {
+                            AsyncImage(
+                                model = comment.anime_poster,
+                                contentDescription = comment.anime_title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                            )
+                        } else {
                             Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = accentColor, modifier = Modifier.size(17.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    comment.anime_title ?: "Anime",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                comment.message,
-                                fontSize = 12.5.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
+                                comment.anime_title ?: "Anime",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
                             )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            comment.message,
+                            fontSize = 12.5.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
         }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
     }
 }
 
@@ -1075,51 +1077,53 @@ private fun FavoritesTabContent(
     isLoading: Boolean,
     onNavigateToAnime: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (isLoading && bookmarks.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(modifier = Modifier.size(28.dp))
-            }
-        } else if (bookmarks.isEmpty()) {
-            EmptyTabState(Icons.Default.FavoriteBorder, "Belum ada anime favorit.")
-        } else {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+    if (isLoading && bookmarks.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+        }
+        return
+    }
+    if (bookmarks.isEmpty()) {
+        EmptyTabState(Icons.Default.FavoriteBorder, "Belum ada anime favorit.")
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(bookmarks, key = { it.anime_slug }) { bm ->
+            Column(
+                modifier = Modifier.clickable { onNavigateToAnime(bm.anime_slug) }
             ) {
-                items(bookmarks, key = { it.anime_slug }) { bm ->
-                    Column(
-                        modifier = Modifier
-                            .width(110.dp)
-                            .clickable { onNavigateToAnime(bm.anime_slug) }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(2f / 3f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            AsyncImage(
-                                model = bm.poster,
-                                contentDescription = bm.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            bm.title,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            lineHeight = 14.sp
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    AsyncImage(
+                        model = bm.poster,
+                        contentDescription = bm.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    bm.title,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp
+                )
             }
         }
+        item(span = { GridItemSpan(maxLineSpan) }) { Spacer(modifier = Modifier.height(4.dp)) }
     }
 }
 
@@ -1130,67 +1134,71 @@ private fun HistoryTabContent(
     accentColor: Color,
     onNavigateToAnime: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+    if (isLoading && watchHistory.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
+        }
+        return
+    }
+    if (watchHistory.isEmpty()) {
+        EmptyTabState(Icons.Default.History, "Belum ada riwayat tontonan.")
+        return
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (isLoading && watchHistory.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
-            }
-        } else if (watchHistory.isEmpty()) {
-            EmptyTabState(Icons.Default.History, "Belum ada riwayat tontonan.")
-        } else {
-            watchHistory.forEach { item ->
-                Row(
+        items(watchHistory, key = { "${it.anime_slug}_${it.episode_slug}" }) { item ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToAnime(item.anime_slug) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onNavigateToAnime(item.anime_slug) },
-                    verticalAlignment = Alignment.CenterVertically
+                        .size(width = 54.dp, height = 76.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 54.dp, height = 76.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        AsyncImage(
-                            model = item.anime_poster,
-                            contentDescription = item.anime_title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(item.anime_title, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(accentColor.copy(alpha = 0.15f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    item.episode_title ?: item.episode_slug,
-                                    color = accentColor,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                    AsyncImage(
+                        model = item.anime_poster,
+                        contentDescription = item.anime_title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.anime_title, fontWeight = FontWeight.Bold, fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(accentColor.copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                item.episode_title ?: item.episode_slug,
+                                color = accentColor,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "${relativeTimeShort(item.watched_at ?: "")} lalu",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                        )
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "${relativeTimeShort(item.watched_at ?: "")} lalu",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                    )
                 }
             }
         }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
     }
 }

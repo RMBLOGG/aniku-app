@@ -6872,6 +6872,7 @@ fun WatchScreen(
                                             commentInput,
                                             currentAnimeSlug,
                                             animeTitle,
+                                            animePoster = detail?.poster,
                                             parentCommentId = replyTarget?.first,
                                             replyToUsername = replyTarget?.second
                                         )

@@ -1453,6 +1453,7 @@ data class EpisodeComment(
     val source: String? = null,
     val anime_title: String? = null,
     val anime_slug: String? = null,
+    val anime_poster: String? = null,
     val parent_comment_id: String? = null,
     val reply_to_username: String? = null
 )
@@ -1469,6 +1470,7 @@ data class EpisodeCommentRequest(
     val source: String? = null,
     val anime_title: String? = null,
     val anime_slug: String? = null,
+    val anime_poster: String? = null,
     val parent_comment_id: String? = null,
     val reply_to_username: String? = null
 )
