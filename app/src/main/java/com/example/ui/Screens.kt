@@ -2173,6 +2173,42 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(18.dp))
 
+                        // ── Top Leaderboard / Top Supporter ──
+                        val topUsers = remember(userDirectory) {
+                            userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
+                        }
+                        val donationsForHome by viewModel.donations.collectAsState()
+                        val topSupporters = remember(donationsForHome, userDirectory) {
+                            donationsForHome
+                                .groupBy { it.supporter_name }
+                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
+                                .sortedByDescending { it.second }
+                                .take(5)
+                                .map { (name, amount) ->
+                                    val matchedUser = userDirectory.firstOrNull {
+                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
+                                    }
+                                    SupporterEntry(
+                                        name = name,
+                                        amount = amount,
+                                        avatarUrl = matchedUser?.avatar_url
+                                    )
+                                }
+                        }
+
+                        if (topUsers.isNotEmpty()) {
+                            TopLeaderboardCard(
+                                topUsers = topUsers,
+                                topSupporters = topSupporters,
+                                accentColor = accentColor,
+                                onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
+                                onSeeAllClick = { navController.navigate("user_list") },
+                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
                         // ── Global chat preview ──
                         Column(
                             modifier = Modifier
@@ -2246,42 +2282,6 @@ fun HomeScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // ── Top Leaderboard / Top Supporter ──
-                        val topUsers = remember(userDirectory) {
-                            userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
-                        }
-                        val donationsForHome by viewModel.donations.collectAsState()
-                        val topSupporters = remember(donationsForHome, userDirectory) {
-                            donationsForHome
-                                .groupBy { it.supporter_name }
-                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
-                                .sortedByDescending { it.second }
-                                .take(5)
-                                .map { (name, amount) ->
-                                    val matchedUser = userDirectory.firstOrNull {
-                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
-                                    }
-                                    SupporterEntry(
-                                        name = name,
-                                        amount = amount,
-                                        avatarUrl = matchedUser?.avatar_url
-                                    )
-                                }
-                        }
-
-                        if (topUsers.isNotEmpty()) {
-                            TopLeaderboardCard(
-                                topUsers = topUsers,
-                                topSupporters = topSupporters,
-                                accentColor = accentColor,
-                                onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
-                                onSeeAllClick = { navController.navigate("user_list") },
-                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
