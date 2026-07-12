@@ -6,8 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -343,7 +343,7 @@ fun UserProfileScreen(
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text("#$it", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+                            GlossyGradientText(text = "#$it", colors = idGradientColors, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Row(
@@ -355,7 +355,7 @@ fun UserProfileScreen(
                     ) {
                         Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(accentColor))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Lv.$seasonLevel", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        GlossyGradientText(text = "Lv.$seasonLevel", colors = levelGradientColors, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     viewedClanForPill?.let { clan ->
                         Row(
@@ -543,6 +543,10 @@ fun UserProfileScreen(
                     watchHistory = watchHistory,
                     isLoading = isActivityLoading,
                     accentColor = accentColor,
+                    profileUsername = p.username.orDefault("Pengguna"),
+                    profileAvatarUrl = p.avatar_url,
+                    profileIsAdmin = p.isAdmin(),
+                    profileIsModerator = p.role == "moderator",
                     onNavigateToAnime = onNavigateToAnime
                 )
 
@@ -916,6 +920,10 @@ private fun ProfileActivityTabs(
     watchHistory: List<UserWatchHistoryDto>,
     isLoading: Boolean,
     accentColor: Color,
+    profileUsername: String,
+    profileAvatarUrl: String?,
+    profileIsAdmin: Boolean,
+    profileIsModerator: Boolean,
     onNavigateToAnime: (String) -> Unit
 ) {
     val tabTitles = listOf("Komentar", "Favorit", "Histori")
@@ -963,7 +971,11 @@ private fun ProfileActivityTabs(
                 .height(tabsAreaHeight)
         ) { page ->
             when (page) {
-                0 -> CommentsTabContent(comments, isLoading, accentColor, onNavigateToAnime)
+                0 -> CommentsTabContent(
+                    comments, isLoading, accentColor,
+                    profileUsername, profileAvatarUrl, profileIsAdmin, profileIsModerator,
+                    onNavigateToAnime
+                )
                 1 -> FavoritesTabContent(bookmarks, isLoading, onNavigateToAnime)
                 else -> HistoryTabContent(watchHistory, isLoading, accentColor, onNavigateToAnime)
             }
@@ -986,11 +998,17 @@ private fun EmptyTabState(icon: androidx.compose.ui.graphics.vector.ImageVector,
     }
 }
 
+// Kartu komentar ala feed asli Aniku - borderless + GlossyGradientText, senada sama
+// gaya komentar episode (EpisodeCommentRow) & chat, bukan kotak flat abu-abu generik.
 @Composable
 private fun CommentsTabContent(
     comments: List<EpisodeComment>,
     isLoading: Boolean,
     accentColor: Color,
+    profileUsername: String,
+    profileAvatarUrl: String?,
+    profileIsAdmin: Boolean,
+    profileIsModerator: Boolean,
     onNavigateToAnime: (String) -> Unit
 ) {
     if (isLoading && comments.isEmpty()) {
@@ -1003,67 +1021,115 @@ private fun CommentsTabContent(
         EmptyTabState(Icons.Default.ChatBubbleOutline, "Belum ada komentar dari user ini.")
         return
     }
+    val nameGradient = when {
+        profileIsAdmin -> adminGradientColors
+        profileIsModerator -> moderatorGradientColors
+        else -> defaultNameGradientColors
+    }
+    val ringColor = when {
+        profileIsAdmin -> Color(0xFFFFC107)
+        profileIsModerator -> Color(0xFFB388FF)
+        else -> Color.Transparent
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(comments, key = { it.id }) { comment ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
+        itemsIndexed(comments, key = { _, c -> c.id }) { index, comment ->
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(enabled = comment.anime_slug != null) {
                         comment.anime_slug?.let { onNavigateToAnime(it) }
                     }
             ) {
-                Row(modifier = Modifier.padding(14.dp)) {
+                // Baris identitas: avatar + username gradient + timestamp (mirip EpisodeCommentRow)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(width = 40.dp, height = 54.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(accentColor.copy(alpha = 0.15f)),
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .then(
+                                if (ringColor != Color.Transparent)
+                                    Modifier.border(1.5.dp, ringColor, CircleShape).padding(1.5.dp)
+                                else Modifier
+                            )
+                            .clip(CircleShape)
+                            .background(accentColor),
                         contentAlignment = Alignment.Center
+                    ) {
+                        if (!profileAvatarUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = profileAvatarUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Text(profileUsername.take(1).uppercase(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(9.dp))
+                    GlossyGradientText(text = profileUsername, colors = nameGradient, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Baris anime: poster + judul, mirip kartu "sedang ditonton" di referensi
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 46.dp, height = 64.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         if (!comment.anime_poster.isNullOrBlank()) {
                             AsyncImage(
                                 model = comment.anime_poster,
                                 contentDescription = comment.anime_title,
                                 contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                                modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = accentColor, modifier = Modifier.size(17.dp))
+                            Icon(
+                                Icons.Default.ChatBubbleOutline,
+                                contentDescription = null,
+                                tint = accentColor.copy(alpha = 0.6f),
+                                modifier = Modifier.align(Alignment.Center).size(18.dp)
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                comment.anime_title ?: "Anime",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            comment.anime_title ?: "Anime",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(5.dp))
                         Text(
                             comment.message,
                             fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+
+                if (index != comments.lastIndex) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                 }
             }
         }
