@@ -1,7 +1,15 @@
 package com.example.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +26,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,48 +70,45 @@ fun FriendsScreen(
     fun chatFor(otherId: String): ChatPreview? = userChats.firstOrNull { it.otherUserId == otherId }
 
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Teman", "Permintaan")
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Pertemanan", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+            Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+                TopAppBar(
+                    title = { Text("Pertemanan", fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                        }
                     }
-                }
-            )
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
+                                )
+                            )
+                        )
+                )
+            }
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(title)
-                                if (index == 1 && incomingRequests.isNotEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.error)
-                                            .padding(horizontal = 7.dp, vertical = 1.dp)
-                                    ) {
-                                        Text("${incomingRequests.size}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    )
-                }
-            }
+            FriendTabSwitcher(
+                selectedTab = selectedTab,
+                onSelect = { selectedTab = it },
+                requestCount = incomingRequests.size
+            )
 
             if (isLoading && friendships.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
                 return@Column
             }
@@ -119,19 +128,30 @@ fun FriendsScreen(
                                 val chat = chatFor(otherId)
                                 val isUnread = chat != null && chat.lastSenderId.isNotBlank() &&
                                     chat.lastSenderId != myId && chat.lastMessageAt > chat.lastReadAt
-                                FriendRow(
-                                    profile = profile,
-                                    fallbackId = otherId,
-                                    chat = chat,
-                                    myId = myId,
-                                    isUnread = isUnread,
-                                    onClick = { onOpenChat(otherId) },
-                                    trailing = {
-                                        TextButton(onClick = { fs.id?.let { viewModel.removeFriendOrCancelRequest(it) } }) {
-                                            Text("Hapus", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                AnimatedVisibility(
+                                    visible = true,
+                                    modifier = Modifier.animateItem(placementSpec = tween(240)),
+                                    enter = fadeIn(tween(240)) + slideInVertically(
+                                        initialOffsetY = { it / 5 },
+                                        animationSpec = tween(240)
+                                    )
+                                ) {
+                                    FriendRow(
+                                        profile = profile,
+                                        fallbackId = otherId,
+                                        chat = chat,
+                                        myId = myId,
+                                        isUnread = isUnread,
+                                        onClick = { onOpenChat(otherId) },
+                                        trailing = {
+                                            PillActionButton(
+                                                label = "Hapus",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                onClick = { fs.id?.let { viewModel.removeFriendOrCancelRequest(it) } }
+                                            )
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
@@ -146,36 +166,41 @@ fun FriendsScreen(
                         ) {
                             items(incomingRequests, key = { it.id ?: "" }) { fs ->
                                 val profile = profileFor(fs.requester_id)
-                                FriendRow(
-                                    profile = profile,
-                                    fallbackId = fs.requester_id,
-                                    chat = null,
-                                    myId = myId,
-                                    isUnread = false,
-                                    onClick = {},
-                                    trailing = {
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            IconButton(
-                                                onClick = { fs.id?.let { viewModel.respondToFriendRequest(it, accept = true) } },
-                                                modifier = Modifier
-                                                    .size(38.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xFF1B7A3D).copy(alpha = 0.2f))
-                                            ) {
-                                                Icon(Icons.Default.Check, contentDescription = "Terima", tint = Color(0xFF4CAF50))
-                                            }
-                                            IconButton(
-                                                onClick = { fs.id?.let { viewModel.respondToFriendRequest(it, accept = false) } },
-                                                modifier = Modifier
-                                                    .size(38.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f))
-                                            ) {
-                                                Icon(Icons.Default.Close, contentDescription = "Tolak", tint = MaterialTheme.colorScheme.error)
+                                AnimatedVisibility(
+                                    visible = true,
+                                    modifier = Modifier.animateItem(placementSpec = tween(240)),
+                                    enter = fadeIn(tween(240)) + slideInVertically(
+                                        initialOffsetY = { it / 5 },
+                                        animationSpec = tween(240)
+                                    )
+                                ) {
+                                    FriendRow(
+                                        profile = profile,
+                                        fallbackId = fs.requester_id,
+                                        chat = null,
+                                        myId = myId,
+                                        isUnread = false,
+                                        onClick = {},
+                                        trailing = {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                AnimatedIconButton(
+                                                    icon = Icons.Filled.Check,
+                                                    background = Color(0xFF1B7A3D).copy(alpha = 0.18f),
+                                                    tint = Color(0xFF4CAF50),
+                                                    contentDescription = "Terima",
+                                                    onClick = { fs.id?.let { viewModel.respondToFriendRequest(it, accept = true) } }
+                                                )
+                                                AnimatedIconButton(
+                                                    icon = Icons.Filled.Close,
+                                                    background = MaterialTheme.colorScheme.error.copy(alpha = 0.15f),
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                    contentDescription = "Tolak",
+                                                    onClick = { fs.id?.let { viewModel.respondToFriendRequest(it, accept = false) } }
+                                                )
                                             }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
@@ -183,6 +208,119 @@ fun FriendsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun FriendTabSwitcher(
+    selectedTab: Int,
+    onSelect: (Int) -> Unit,
+    requestCount: Int
+) {
+    val tabs = listOf("Teman", "Permintaan")
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(4.dp)
+    ) {
+        val tabWidth = maxWidth / 2
+        val indicatorOffset by animateDpAsState(
+            targetValue = tabWidth * selectedTab,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+            label = "tabIndicator"
+        )
+        Box(
+            modifier = Modifier
+                .offset(x = indicatorOffset)
+                .width(tabWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            tabs.forEachIndexed { index, title ->
+                val selected = selectedTab == index
+                val textColor by animateColorAsState(
+                    if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    label = "tabText"
+                )
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onSelect(index) }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(title, color = textColor, fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                    if (index == 1 && requestCount > 0) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(if (selected) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.error)
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                        ) {
+                            Text("$requestCount", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedIconButton(
+    icon: ImageVector,
+    background: Color,
+    tint: Color,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.85f else 1f, label = "iconBtnScale")
+    Box(
+        modifier = Modifier
+            .size(38.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(background)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint)
+    }
+}
+
+@Composable
+private fun PillActionButton(
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, label = "pillScale")
+    Text(
+        label,
+        color = tint,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(10.dp))
+            .background(tint.copy(alpha = 0.1f))
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @Composable
@@ -201,29 +339,41 @@ private fun FriendRow(
         profile?.isBeta() == true -> Color(0xFF22D3EE) to "BETA"
         else -> null to null
     }
-    val ringColor = roleColor ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    val ringColor = roleColor ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, animationSpec = spring(stiffness = Spring.StiffnessLow), label = "rowScale")
+    val rowShape = RoundedCornerShape(18.dp)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .shadow(elevation = if (isUnread) 3.dp else 1.dp, shape = rowShape, clip = false)
+            .clip(rowShape)
+            .background(
+                if (isUnread) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier.size(44.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.size(46.dp), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(CircleShape)
-                    .background(ringColor)
-                    .padding(1.8.dp)
+                    .background(
+                        Brush.sweepGradient(listOf(ringColor, ringColor.copy(alpha = 0.2f), ringColor))
+                    )
+                    .padding(2.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(1.6.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (!profile?.avatar_url.isNullOrEmpty()) {
@@ -245,9 +395,9 @@ private fun FriendRow(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(13.dp)
+                        .size(14.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(MaterialTheme.colorScheme.background)
                         .padding(2.dp)
                 ) {
                     Box(
@@ -307,11 +457,27 @@ private fun FriendRow(
 }
 
 @Composable
-private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
+private fun EmptyState(icon: ImageVector, message: String) {
+    val infiniteTransition = rememberInfiniteTransition(label = "emptyPulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "emptyScale"
+    )
     Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
-            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f), modifier = Modifier.size(34.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 message,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
