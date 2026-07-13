@@ -1514,31 +1514,52 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
                     _streams.value = streamList
                     if (streamList.isNotEmpty()) {
-                        val auto = autoResolveSamehadakuServers(streamList)
-                        if (auto != null) {
-                            val (idx, resolved, embedUrl) = auto
-                            _selectedStreamIndex.value = idx
-                            _activeStreamUrl.value = resolved.url
-                            _resolvedHeaders.value = resolved.headers
-                            _isDirectStream.value = true
-                            _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = buildResolvedInfoText(embedUrl, resolved)
-                        } else {
-                            _selectedStreamIndex.value = 0
+                        _selectedStreamIndex.value = 0
+                        // Resolve first server URL
+                        val firstUrl = streamList[0].url
+                        if (firstUrl.startsWith("samehadaku_server:")) {
+                            val serverId = firstUrl.removePrefix("samehadaku_server:")
                             try {
-                                val firstServerId = streamList[0].url.removePrefix("samehadaku_server:")
-                                val linkRes = retryIO { samehadakuApi.getServerLink(firstServerId) }
-                                val fallbackEmbed = linkRes.data?.url ?: streamList[0].url
-                                _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(
-                                    fallbackEmbed, "https://v2.samehadaku.how/"
-                                )
+                                val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
+                                val resolvedUrl = linkRes.data?.url ?: firstUrl
+                                if (isDirectUrl(resolvedUrl)) {
+                                    _activeStreamUrl.value = resolvedUrl
+                                    _resolvedHeaders.value = mapOf(
+                                        "Referer" to "https://v2.samehadaku.how/",
+                                        "Origin" to "https://v2.samehadaku.how"
+                                    )
+                                    _isDirectStream.value = true
+                                } else {
+                                    val extracted = withContext(Dispatchers.IO) {
+                                        VideoExtractor.resolve(resolvedUrl, "https://v2.samehadaku.how/", appContext)
+                                    }
+                                    if (extracted != null) {
+                                        _activeStreamUrl.value = extracted.url
+                                        _resolvedHeaders.value = extracted.headers
+                                        _isDirectStream.value = true
+                                        _extractDebugInfo.value = null
+                                        _lastResolvedUrlInfo.value = buildResolvedInfoText(resolvedUrl, extracted)
+                                    } else {
+                                        // Ekstraksi gagal — jangan pakai resolvedUrl mentah kalau itu
+                                        // shortlink (short.ink/short.icu/dll) yang DNS-nya di-block ISP,
+                                        // WebView bisa ERR_NAME_NOT_RESOLVED. Follow redirect-nya dulu.
+                                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(
+                                            resolvedUrl, "https://v2.samehadaku.how/"
+                                        )
+                                        _resolvedHeaders.value = emptyMap()
+                                        _isDirectStream.value = false
+                                        _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                                        _lastResolvedUrlInfo.value = "embedUrl: $resolvedUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                _activeStreamUrl.value = firstUrl
                                 _resolvedHeaders.value = emptyMap()
                                 _isDirectStream.value = false
-                                _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
-                                _lastResolvedUrlInfo.value = "Semua server gagal di-resolve ExoPlayer -> fallback WebView: ${_activeStreamUrl.value}"
-                            } catch (e: Exception) {
-                                _streamError.value = "Semua server gagal dimuat. Coba lagi beberapa saat lagi atau pilih anime lain."
                             }
+                        } else {
+                            _activeStreamUrl.value = firstUrl
+                            _isDirectStream.value = isDirectUrl(firstUrl)
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1558,18 +1579,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _streams.value = streamList
 
                     if (streamList.isNotEmpty()) {
-                        val auto = autoResolveGenericServers(streamList, null)
-                        if (auto != null) {
-                            val (idx, resolved, embedUrl) = auto
-                            _selectedStreamIndex.value = idx
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = buildResolvedInfoText(embedUrl, resolved)
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
-                            _selectedStreamIndex.value = 0
-                            applyWebViewFallback(streamList[0].url, null)
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1587,18 +1613,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _streams.value = streamList
 
                     if (streamList.isNotEmpty()) {
-                        val auto = autoResolveGenericServers(streamList, null)
-                        if (auto != null) {
-                            val (idx, resolved, embedUrl) = auto
-                            _selectedStreamIndex.value = idx
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = buildResolvedInfoText(embedUrl, resolved)
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
-                            _selectedStreamIndex.value = 0
-                            applyWebViewFallback(streamList[0].url, null)
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1609,18 +1640,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val streamList = res.streams ?: emptyList()
                     _streams.value = streamList
                     if (streamList.isNotEmpty()) {
-                        val auto = autoResolveGenericServers(streamList, null)
-                        if (auto != null) {
-                            val (idx, resolved, embedUrl) = auto
-                            _selectedStreamIndex.value = idx
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
                             _activeStreamUrl.value = resolved.url
                             _resolvedHeaders.value = resolved.headers
                             _isDirectStream.value = true
                             _extractDebugInfo.value = null
-                            _lastResolvedUrlInfo.value = buildResolvedInfoText(embedUrl, resolved)
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
-                            _selectedStreamIndex.value = 0
-                            applyWebViewFallback(streamList[0].url, null)
+                            _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(firstUrl, null)
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                            _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                            _lastResolvedUrlInfo.value = "embedUrl: $firstUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                         }
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
@@ -1635,86 +1671,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    /**
-     * Auto-deteksi server: coba SEMUA server di streamList satu-satu (bukan cuma
-     * yang pertama), berhenti di server PERTAMA yang berhasil di-resolve
-     * VideoExtractor (artinya main langsung di ExoPlayer, tanpa WebView).
-     * Return null kalau seluruh server di source ini gagal di-resolve semua.
-     */
-    private suspend fun autoResolveGenericServers(
-        streamList: List<StreamRaw>,
-        referer: String? = null
-    ): Triple<Int, ResolvedStream, String>? {
-        for ((idx, stream) in streamList.withIndex()) {
-            try {
-                val resolved = withContext(Dispatchers.IO) {
-                    VideoExtractor.resolve(stream.url, referer, appContext)
-                }
-                if (resolved != null) return Triple(idx, resolved, stream.url)
-            } catch (e: Exception) {
-                Log.w("AnikuVM", "Auto-resolve gagal utk ${stream.url}: ${e.message}")
-            }
-        }
-        return null
-    }
-
-    /**
-     * Sama seperti di atas, tapi khusus Dayynime-v2 (Samehadaku) yang server-nya
-     * berupa id ("samehadaku_server:XXX") - butuh 1 API call getServerLink() dulu
-     * buat dapetin embed URL asli sebelum bisa di-resolve VideoExtractor.
-     */
-    private suspend fun autoResolveSamehadakuServers(
-        streamList: List<StreamRaw>
-    ): Triple<Int, ResolvedStream, String>? {
-        val referer = "https://v2.samehadaku.how/"
-        for ((idx, stream) in streamList.withIndex()) {
-            val rawUrl = stream.url
-            if (!rawUrl.startsWith("samehadaku_server:")) continue
-            val serverId = rawUrl.removePrefix("samehadaku_server:")
-            try {
-                val linkRes = retryIO { samehadakuApi.getServerLink(serverId) }
-                val resolvedUrl = linkRes.data?.url ?: continue
-                if (isDirectUrl(resolvedUrl)) {
-                    return Triple(
-                        idx,
-                        ResolvedStream(
-                            url = resolvedUrl,
-                            isHls = resolvedUrl.contains(".m3u8"),
-                            headers = mapOf("Referer" to referer, "Origin" to "https://v2.samehadaku.how")
-                        ),
-                        rawUrl
-                    )
-                }
-                val extracted = withContext(Dispatchers.IO) {
-                    VideoExtractor.resolve(resolvedUrl, referer, appContext)
-                }
-                if (extracted != null) return Triple(idx, extracted, rawUrl)
-            } catch (e: Exception) {
-                Log.w("AnikuVM", "Auto-resolve gagal utk server $serverId: ${e.message}")
-            }
-        }
-        return null
-    }
-
-    /**
-     * Dipanggil HANYA kalau autoResolveGenericServers/autoResolveSamehadakuServers gagal
-     * di SEMUA server (jarang - biasanya cuma kejadian di source yang seluruh server-nya
-     * emang Blogger/Abyss dkk yang butuh JS render). Ini fallback terakhir ke WebView biar
-     * video tetap bisa diputar, bukan langsung nyerah nampilin error ke user.
-     */
-    private suspend fun applyWebViewFallback(embedUrl: String, referer: String?) {
-        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(embedUrl, referer)
-        _resolvedHeaders.value = emptyMap()
-        _isDirectStream.value = false
-        _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
-        _lastResolvedUrlInfo.value = "Semua server gagal di-resolve ExoPlayer -> fallback WebView: ${_activeStreamUrl.value}"
-    }
-
     fun selectStreamQuality(index: Int) {
         val streamList = _streams.value
         if (index in streamList.indices) {
             _selectedStreamIndex.value = index
-            _streamError.value = null
             val rawUrl = streamList[index].url
             if (rawUrl.startsWith("samehadaku_server:")) {
                 val serverId = rawUrl.removePrefix("samehadaku_server:")
@@ -1742,16 +1702,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                     _resolvedHeaders.value = extracted.headers
                                     _isDirectStream.value = true
                                 } else {
-                                    applyWebViewFallback(resolvedUrl, "https://v2.samehadaku.how/")
+                                    _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(
+                                        resolvedUrl, "https://v2.samehadaku.how/"
+                                    )
+                                    _resolvedHeaders.value = emptyMap()
+                                    _isDirectStream.value = false
                                 }
                             }
                         } else {
-                            Log.w("AnikuVM", "Server $serverId returned empty url")
-                            _streamError.value = "Server ini gagal dimuat, coba server lain."
+                            Log.w("AnikuVM", "Server $serverId returned empty url, using raw")
+                            _activeStreamUrl.value = rawUrl
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = false
                         }
                     } catch (e: Exception) {
                         Log.e("AnikuVM", "Failed resolve server $serverId: ${e.message}", e)
-                        _streamError.value = "Server ini gagal dimuat, coba server lain."
+                        _activeStreamUrl.value = rawUrl
+                        _resolvedHeaders.value = emptyMap()
+                        _isDirectStream.value = false
                     } finally {
                         _isStreamLoading.value = false
                     }
@@ -1777,7 +1745,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _extractDebugInfo.value = null
                         _lastResolvedUrlInfo.value = buildResolvedInfoText(rawUrl, resolved)
                     } else {
-                        applyWebViewFallback(rawUrl, null)
+                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
+                        _resolvedHeaders.value = emptyMap()
+                        _isDirectStream.value = isDirectUrl(rawUrl)
+                        _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
+                        _lastResolvedUrlInfo.value = "embedUrl: $rawUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
                     }
                     _isStreamLoading.value = false
                 }
