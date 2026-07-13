@@ -99,8 +99,8 @@ private fun rarityShimmerColors(rarity: String): List<Color> = when (rarity) {
 
 private fun isPremiumRarity(rarity: String) = rarity == "Mythic" || rarity == "Legendary" || rarity == "Epic"
 
-private const val GACHA_COST_SINGLE = 50
-private const val GACHA_COST_MULTI = 300 // x6, sedikit lebih murah per-tarikan dibanding satuan
+private const val GACHA_COST_SINGLE = 250
+private const val GACHA_COST_MULTI = 1350 // x6, diskon 10% dibanding beli satuan (250x6=1500)
 private const val GACHA_MULTI_COUNT = 6
 
 // ── Border "glossy": outline gradient diam + kilau kaca yang meluncur pelan di sepanjang sisinya ──
