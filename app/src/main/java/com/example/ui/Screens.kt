@@ -1931,19 +1931,24 @@ fun HomeScreen(
 
                             // Pertemanan / Private Chat
                             Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
-                                    .clickable { if (isLoggedIn) navController.navigate("friends") else onShowLoginDialog() },
+                                modifier = Modifier.size(42.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.ChatBubbleOutline,
-                                    contentDescription = "Pertemanan",
-                                    tint = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier.size(19.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clickable { if (isLoggedIn) navController.navigate("friends") else onShowLoginDialog() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.ChatBubbleOutline,
+                                        contentDescription = "Pertemanan",
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
                                 if (unreadPrivateChatCount > 0) {
                                     Box(
                                         modifier = Modifier
