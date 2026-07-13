@@ -25,9 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
+import com.example.network.ChatPreview
 import com.example.network.FriendshipDto
 import com.example.network.ProfileDto
 import com.example.util.orDefault
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +46,7 @@ fun FriendsScreen(
     val incomingRequests by viewModel.incomingFriendRequests.collectAsState()
     val isLoading by viewModel.isFriendshipsLoading.collectAsState()
     val userDirectory by viewModel.userDirectory.collectAsState()
+    val userChats by viewModel.userChats.collectAsState()
     val myId = session.userId
 
     LaunchedEffect(Unit) {
@@ -50,6 +55,7 @@ fun FriendsScreen(
     }
 
     fun profileFor(userId: String): ProfileDto? = userDirectory.firstOrNull { it.id == userId }
+    fun chatFor(otherId: String): ChatPreview? = userChats.firstOrNull { it.otherUserId == otherId }
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Teman", "Permintaan")
@@ -110,9 +116,15 @@ fun FriendsScreen(
                             items(friendsList, key = { it.id ?: "" }) { fs ->
                                 val otherId = if (fs.requester_id == myId) fs.addressee_id else fs.requester_id
                                 val profile = profileFor(otherId)
+                                val chat = chatFor(otherId)
+                                val isUnread = chat != null && chat.lastSenderId.isNotBlank() &&
+                                    chat.lastSenderId != myId && chat.lastMessageAt > chat.lastReadAt
                                 FriendRow(
                                     profile = profile,
                                     fallbackId = otherId,
+                                    chat = chat,
+                                    myId = myId,
+                                    isUnread = isUnread,
                                     onClick = { onOpenChat(otherId) },
                                     trailing = {
                                         TextButton(onClick = { fs.id?.let { viewModel.removeFriendOrCancelRequest(it) } }) {
@@ -137,6 +149,9 @@ fun FriendsScreen(
                                 FriendRow(
                                     profile = profile,
                                     fallbackId = fs.requester_id,
+                                    chat = null,
+                                    myId = myId,
+                                    isUnread = false,
                                     onClick = {},
                                     trailing = {
                                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -174,9 +189,20 @@ fun FriendsScreen(
 private fun FriendRow(
     profile: ProfileDto?,
     fallbackId: String,
+    chat: ChatPreview?,
+    myId: String?,
+    isUnread: Boolean,
     onClick: () -> Unit,
     trailing: @Composable () -> Unit
 ) {
+    val (roleColor, roleLabel) = when {
+        profile?.isAdmin() == true -> Color(0xFFFFD200) to "ADMIN"
+        profile?.isModerator() == true -> Color(0xFFB388FF) to "MODERATOR"
+        profile?.isBeta() == true -> Color(0xFF22D3EE) to "BETA"
+        else -> null to null
+    }
+    val ringColor = roleColor ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -187,38 +213,94 @@ private fun FriendRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+            modifier = Modifier.size(44.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (!profile?.avatar_url.isNullOrEmpty()) {
-                AsyncImage(
-                    model = profile?.avatar_url,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(CircleShape)
-                )
-            } else {
-                Text(
-                    text = (profile?.username?.take(1)?.uppercase()) ?: "?",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(ringColor)
+                    .padding(1.8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!profile?.avatar_url.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = profile?.avatar_url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                    )
+                } else {
+                    Text(
+                        text = (profile?.username?.take(1)?.uppercase()) ?: "?",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (isUnread) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(13.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error)
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
+            if (roleLabel != null && roleColor != null) {
+                Text(
+                    text = roleLabel,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = roleColor,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+            }
             Text(
                 text = profile?.username.orDefault("User"),
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (isUnread) FontWeight.Bold else FontWeight.SemiBold,
                 fontSize = 14.5.sp,
                 maxLines = 1
             )
-            profile?.user_number?.let {
-                Text("#$it", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (chat != null && chat.lastMessage.isNotBlank()) {
+                val prefix = if (chat.lastSenderId == myId) "Kamu: " else ""
+                Text(
+                    text = "$prefix${chat.lastMessage}",
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isUnread) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                profile?.user_number?.let {
+                    Text("#$it", fontSize = 11.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
+        }
+        if (chat != null && chat.lastMessageAt > 0L) {
+            Text(
+                text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(chat.lastMessageAt)),
+                fontSize = 10.5.sp,
+                color = if (isUnread) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.padding(end = 6.dp)
+            )
         }
         trailing()
     }

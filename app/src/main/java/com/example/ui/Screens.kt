@@ -1412,6 +1412,7 @@ fun HomeScreen(
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
+    val unreadPrivateChatCount by viewModel.unreadPrivateChatCount.collectAsState()
     val watchHistory by viewModel.watchHistory.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
@@ -1928,21 +1929,46 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            // Room Chat
+                            // Pertemanan / Private Chat
                             Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.08f))
-                                    .clickable { if (isLoggedIn) navController.navigate("chat") else onShowLoginDialog() },
+                                modifier = Modifier.size(42.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    Icons.Default.ChatBubbleOutline,
-                                    contentDescription = "Room Chat",
-                                    tint = Color.White.copy(alpha = 0.9f),
-                                    modifier = Modifier.size(19.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.08f))
+                                        .clickable { if (isLoggedIn) navController.navigate("friends") else onShowLoginDialog() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.ChatBubbleOutline,
+                                        contentDescription = "Pertemanan",
+                                        tint = Color.White.copy(alpha = 0.9f),
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                                if (unreadPrivateChatCount > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 3.dp, y = (-3).dp)
+                                            .heightIn(min = 16.dp)
+                                            .widthIn(min = 16.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.error)
+                                            .padding(horizontal = 3.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (unreadPrivateChatCount > 9) "9+" else "$unreadPrivateChatCount",
+                                            color = Color.White,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -2173,6 +2199,42 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(18.dp))
 
+                        // ── Top Leaderboard / Top Supporter ──
+                        val topUsers = remember(userDirectory) {
+                            userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
+                        }
+                        val donationsForHome by viewModel.donations.collectAsState()
+                        val topSupporters = remember(donationsForHome, userDirectory) {
+                            donationsForHome
+                                .groupBy { it.supporter_name }
+                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
+                                .sortedByDescending { it.second }
+                                .take(5)
+                                .map { (name, amount) ->
+                                    val matchedUser = userDirectory.firstOrNull {
+                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
+                                    }
+                                    SupporterEntry(
+                                        name = name,
+                                        amount = amount,
+                                        avatarUrl = matchedUser?.avatar_url
+                                    )
+                                }
+                        }
+
+                        if (topUsers.isNotEmpty()) {
+                            TopLeaderboardCard(
+                                topUsers = topUsers,
+                                topSupporters = topSupporters,
+                                accentColor = accentColor,
+                                onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
+                                onSeeAllClick = { navController.navigate("user_list") },
+                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
                         // ── Global chat preview ──
                         Column(
                             modifier = Modifier
@@ -2246,42 +2308,6 @@ fun HomeScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // ── Top Leaderboard / Top Supporter ──
-                        val topUsers = remember(userDirectory) {
-                            userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
-                        }
-                        val donationsForHome by viewModel.donations.collectAsState()
-                        val topSupporters = remember(donationsForHome, userDirectory) {
-                            donationsForHome
-                                .groupBy { it.supporter_name }
-                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
-                                .sortedByDescending { it.second }
-                                .take(5)
-                                .map { (name, amount) ->
-                                    val matchedUser = userDirectory.firstOrNull {
-                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
-                                    }
-                                    SupporterEntry(
-                                        name = name,
-                                        amount = amount,
-                                        avatarUrl = matchedUser?.avatar_url
-                                    )
-                                }
-                        }
-
-                        if (topUsers.isNotEmpty()) {
-                            TopLeaderboardCard(
-                                topUsers = topUsers,
-                                topSupporters = topSupporters,
-                                accentColor = accentColor,
-                                onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
-                                onSeeAllClick = { navController.navigate("user_list") },
-                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))

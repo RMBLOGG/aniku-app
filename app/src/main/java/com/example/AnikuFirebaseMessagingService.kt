@@ -23,9 +23,11 @@ class AnikuFirebaseMessagingService : FirebaseMessagingService() {
             ?: "Ada postingan baru di Feed Aniku"
 
         val screen = remoteMessage.data["screen"] ?: "feed"
+        val senderId = remoteMessage.data["senderId"]
 
-        // Kalau notif chat tapi user udah matiin toggle notif chat, skip
-        if (screen == "chat") {
+        // Kalau notif chat (global atau private) tapi user udah matiin toggle
+        // notif chat, skip. Toggle yang ada sekarang cuma satu buat semua chat.
+        if (screen == "chat" || screen == "private_chat") {
             val prefs = getSharedPreferences("aniku_settings_cache", Context.MODE_PRIVATE)
             val chatNotifEnabled = prefs.getBoolean("chat_notif_enabled", true)
             if (!chatNotifEnabled) return
@@ -33,6 +35,7 @@ class AnikuFirebaseMessagingService : FirebaseMessagingService() {
 
         val deepLink = when (screen) {
             "chat" -> "aniku://chat"
+            "private_chat" -> if (!senderId.isNullOrBlank()) "aniku://private_chat/$senderId" else "aniku://chat"
             else -> "aniku://feed"
         }
         sendNotification(title, body, deepLink)

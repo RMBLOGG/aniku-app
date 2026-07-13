@@ -147,6 +147,27 @@ data class IpGuardRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class PushTokenUpsertRequest(
+    val user_id: String,
+    val fcm_token: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PrivateChatNotifRequest(
+    val recipientUserId: String,
+    val senderId: String,
+    val senderName: String,
+    val messageText: String
+)
+
+@JsonClass(generateAdapter = true)
+data class PrivateChatNotifResponse(
+    val success: Boolean? = null,
+    val skipped: String? = null,
+    val error: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class IpGuardResponse(
     val banned: Boolean?,
     val reason: String?,
@@ -1517,4 +1538,25 @@ data class UserWatchHistoryRequest(
     val episode_slug: String,
     val episode_title: String? = null,
     val watched_at: String? = null
+)
+
+// ─── Pertemanan (Add Teman) ───
+data class FriendshipDto(
+    val id: String? = null,
+    val requester_id: String,
+    val addressee_id: String,
+    val status: String,
+    val created_at: String? = null,
+    val responded_at: String? = null
+)
+
+data class FriendshipRequest(
+    val requester_id: String,
+    val addressee_id: String,
+    val status: String = "pending"
+)
+
+data class FriendshipStatusUpdate(
+    val status: String,
+    val responded_at: String? = null
 )
