@@ -2004,26 +2004,27 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // ── Diamond + Clan pill ──
+                        // ── Diamond + Clan + Gacha ──
                         Row(
                             modifier = Modifier
                                 .padding(horizontal = 20.dp)
                                 .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Diamond dibikin compact (cuma ikon+angka, tanpa label "Diamond")
+                            // biar dua tombol aksi di sebelahnya tetep dapet ruang yang layak.
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.08f))
                                     .clickable { navController.navigate("diamond_topup") }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(horizontal = 11.dp, vertical = 9.dp)
                             ) {
-                                Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(15.dp))
-                                Text("$diamondBalance", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-                                Text("Diamond", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
+                                Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF4FC3F7), modifier = Modifier.size(14.dp))
+                                Text("$diamondBalance", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
 
                             Row(
@@ -2036,9 +2037,24 @@ fun HomeScreen(
                                     .clickable { if (isLoggedIn) navController.navigate("clans") else onShowLoginDialog() }
                                     .padding(vertical = 9.dp)
                             ) {
-                                Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Clan", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("Clan", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Brush.horizontalGradient(listOf(Color(0xFF4A1B8C), Color(0xFF7B2FD6))))
+                                    .clickable { if (isLoggedIn) navController.navigate("gacha") else onShowLoginDialog() }
+                                    .padding(vertical = 9.dp)
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text("Gacha", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
