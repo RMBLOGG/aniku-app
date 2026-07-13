@@ -225,13 +225,6 @@ interface SupabaseFunctionsApi {
         @Header("apikey") apiKey: String,
         @Header("Authorization") authHeader: String
     ): IpGuardResponse
-
-    @POST("functions/v1/bright-processor")
-    suspend fun sendPrivateChatNotification(
-        @Body request: PrivateChatNotifRequest,
-        @Header("apikey") apiKey: String,
-        @Header("Authorization") authHeader: String
-    ): PrivateChatNotifResponse
 }
 
 interface SupabaseAuthApi {
@@ -730,15 +723,6 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
     ): retrofit2.Response<Unit>
 
-    // ─── Push token (buat notif private chat targeted) ───
-    @POST("rest/v1/push_tokens")
-    suspend fun upsertPushToken(
-        @Body data: PushTokenUpsertRequest,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "resolution=merge-duplicates,return=minimal"
-    ): retrofit2.Response<Unit>
-
     // ─── Typing indicator chat room ───
     @GET("rest/v1/chat_typing")
     suspend fun getTypingUsers(
@@ -1011,38 +995,6 @@ interface SupabaseDbApi {
     @DELETE("rest/v1/user_watch_history")
     suspend fun deleteAllUserWatchHistory(
         @Query("user_id") userIdQuery: String,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String
-    ): retrofit2.Response<Unit>
-
-    // ─── Pertemanan (Add Teman) ───
-    @GET("rest/v1/friendships")
-    suspend fun getFriendships(
-        @Query("or") orQuery: String,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String
-    ): List<FriendshipDto>
-
-    @POST("rest/v1/friendships")
-    suspend fun sendFriendRequest(
-        @Body data: FriendshipRequest,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "return=representation"
-    ): List<FriendshipDto>
-
-    @PATCH("rest/v1/friendships")
-    suspend fun updateFriendshipStatus(
-        @Query("id") idQuery: String,
-        @Body data: FriendshipStatusUpdate,
-        @Header("Authorization") authHeader: String,
-        @Header("apikey") apiKey: String,
-        @Header("Prefer") prefer: String = "return=representation"
-    ): List<FriendshipDto>
-
-    @DELETE("rest/v1/friendships")
-    suspend fun deleteFriendship(
-        @Query("id") idQuery: String,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>

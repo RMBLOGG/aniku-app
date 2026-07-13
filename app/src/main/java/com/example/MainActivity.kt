@@ -150,9 +150,6 @@ class MainActivity : FragmentActivity() {
                 val prefs = getSharedPreferences("aniku_fcm", android.content.Context.MODE_PRIVATE)
                 prefs.edit().putString("fcm_token", token).apply()
                 android.util.Log.d("FCM", "Token: $token")
-                // Kalau user udah login duluan, langsung sync sekarang.
-                // Kalau belum, viewModel bakal auto-sync pas session login masuk.
-                viewModel.syncPushToken(token)
             }
 
         // Subscribe ke topic feed_updates
@@ -173,10 +170,6 @@ class MainActivity : FragmentActivity() {
         val deepLinkRoute = when {
             intent?.data?.scheme == "aniku" && intent.data?.host == "feed" -> "feed"
             intent?.data?.scheme == "aniku" && intent.data?.host == "chat" -> "chat"
-            intent?.data?.scheme == "aniku" && intent.data?.host == "private_chat" -> {
-                val otherUserId = intent.data?.lastPathSegment
-                if (!otherUserId.isNullOrBlank()) "private_chat/$otherUserId" else "chat"
-            }
             intent?.data?.scheme == "aniku" && intent.data?.host == "reset-password" -> "reset_password"
             else -> null
         }
@@ -520,7 +513,6 @@ class MainActivity : FragmentActivity() {
                 )
                 val sheetNavItems = listOf(
                     Triple("chat", "Chat", Icons.Default.Chat),
-                    Triple("friends", "Teman", Icons.Default.People),
                     Triple("feed", "Feed", Icons.Default.GridView),
                     Triple("nobar_list", "Nobar", Icons.Default.Groups),
                     Triple("schedule", "Jadwal", Icons.Default.DateRange),
@@ -597,7 +589,6 @@ class MainActivity : FragmentActivity() {
                         )
                         val sheetDescriptions = mapOf(
                             "chat" to "Ngobrol bareng komunitas",
-                            "friends" to "Daftar teman & permintaan pertemanan",
                             "feed" to "Postingan dari pengguna",
                             "nobar_list" to "Nonton bareng, real-time",
                             "schedule" to "Jadwal tayang anime",
@@ -1027,8 +1018,7 @@ class MainActivity : FragmentActivity() {
                                 onEditOwnProfile = {
                                     navController.navigate("profile")
                                 },
-                                onNavigateToAnime = { slug -> navController.navigate("detail/$slug") },
-                                onOpenPrivateChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") }
+                                onNavigateToAnime = { slug -> navController.navigate("detail/$slug") }
                             )
                         }
                         composable("user_list") {
@@ -1036,26 +1026,6 @@ class MainActivity : FragmentActivity() {
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
                                 onUserClick = { userId -> navController.navigate("user_profile/$userId") }
-                            )
-                        }
-                        composable("friends") {
-                            FriendsScreen(
-                                viewModel = viewModel,
-                                onBack = { navController.popBackStack() },
-                                onOpenChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") }
-                            )
-                        }
-                        composable(
-                            route = "private_chat/{userId}",
-                            arguments = listOf(
-                                navArgument("userId") { type = NavType.StringType }
-                            )
-                        ) { backStackEntry ->
-                            val otherUserId = backStackEntry.arguments?.getString("userId") ?: ""
-                            PrivateChatScreen(
-                                viewModel = viewModel,
-                                otherUserId = otherUserId,
-                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("clans") {

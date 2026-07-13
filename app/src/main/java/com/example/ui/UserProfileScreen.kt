@@ -23,11 +23,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Diamond
@@ -36,7 +34,6 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MilitaryTech
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -85,8 +82,7 @@ fun UserProfileScreen(
     userId: String,
     onBack: () -> Unit,
     onEditOwnProfile: () -> Unit,
-    onNavigateToAnime: (String) -> Unit = {},
-    onOpenPrivateChat: (String) -> Unit = {}
+    onNavigateToAnime: (String) -> Unit = {}
 ) {
     val session by viewModel.session.collectAsState()
     val profile by viewModel.viewedProfile.collectAsState()
@@ -97,16 +93,11 @@ fun UserProfileScreen(
     val bookmarks by viewModel.viewedProfileBookmarks.collectAsState()
     val watchHistory by viewModel.viewedProfileWatchHistory.collectAsState()
     val isActivityLoading by viewModel.isViewedProfileActivityLoading.collectAsState()
-    val friendshipStatus by viewModel.friendships.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val goldAccent = Color(0xFFFFC24B)
     val context = LocalContext.current
 
     val isOwnProfile = session.userId == userId
-
-    LaunchedEffect(userId) {
-        viewModel.loadFriendships()
-    }
     val canModerate = session.canModerate()
 
     val banStatusMessage by viewModel.banStatusMessage.collectAsState()
@@ -541,58 +532,6 @@ fun UserProfileScreen(
                                 ) { Text("Batal") }
                             }
                         )
-                    }
-
-                    // ── Add Teman / Kirim Pesan ──
-                    Spacer(modifier = Modifier.height(10.dp))
-                    val myFriendStatus = remember(friendshipStatus, userId) { viewModel.friendshipStatusWith(userId) }
-                    when (myFriendStatus) {
-                        "accepted" -> {
-                            Button(
-                                onClick = { onOpenPrivateChat(userId) },
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(52.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Kirim Pesan", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        "pending_sent" -> {
-                            OutlinedButton(
-                                onClick = {},
-                                enabled = false,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(52.dp)
-                            ) {
-                                Text("Menunggu Konfirmasi", fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                        "pending_received" -> {
-                            Button(
-                                onClick = {
-                                    val fs = viewModel.friendshipWith(userId)
-                                    fs?.id?.let { viewModel.respondToFriendRequest(it, accept = true) }
-                                },
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(52.dp)
-                            ) {
-                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Terima Permintaan Teman", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        else -> {
-                            Button(
-                                onClick = { viewModel.sendFriendRequest(userId) },
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth().height(52.dp)
-                            ) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Add Teman", fontWeight = FontWeight.Bold)
-                            }
-                        }
                     }
                 }
 
