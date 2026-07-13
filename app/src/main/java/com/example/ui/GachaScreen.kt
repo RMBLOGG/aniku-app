@@ -22,13 +22,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
@@ -98,6 +101,71 @@ private fun rarityShimmerColors(rarity: String): List<Color> = when (rarity) {
 }
 
 private fun isPremiumRarity(rarity: String) = rarity == "Mythic" || rarity == "Legendary" || rarity == "Epic"
+
+private fun rarityIcon(rarity: String) = when (rarity) {
+    "Mythic" -> Icons.Default.Whatshot
+    "Legendary" -> Icons.Default.WorkspacePremium
+    "Epic" -> Icons.Default.AutoAwesome
+    "Rare" -> Icons.Default.Bolt
+    else -> Icons.Default.Circle
+}
+
+// ── Badge rarity "ala gamer": ikon + gradient + glow blur berdenyut (Epic ke atas) + kilau kaca ──
+// Dipakai di grid koleksi & kartu reveal, biar konsisten dan gak flat kayak label teks biasa.
+@Composable
+private fun RarityBadge(rarity: String, compact: Boolean = false, modifier: Modifier = Modifier) {
+    val color = rarityColor(rarity)
+    val premium = isPremiumRarity(rarity)
+    val shine = if (premium) rememberGlossyShine(1600) else 0f
+    val icon = rarityIcon(rarity)
+    val iconSize = if (compact) 8.dp else 11.dp
+    val fontSize = if (compact) 8.sp else 10.sp
+    val hPad = if (compact) 6.dp else 9.dp
+    val vPad = if (compact) 2.dp else 4.dp
+
+    val infinite = rememberInfiniteTransition(label = "badgePulse")
+    val glowAlpha by infinite.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "badgeGlow"
+    )
+
+    Box(modifier = modifier) {
+        if (premium) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(color.copy(alpha = glowAlpha))
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(Brush.horizontalGradient(listOf(color, color.copy(alpha = 0.72f))))
+                .then(
+                    if (premium) {
+                        Modifier.glossyBorder(
+                            colors = rarityShimmerColors(rarity),
+                            shine = shine,
+                            cornerRadius = 50.dp,
+                            strokeWidth = 1.dp
+                        )
+                    } else {
+                        Modifier.border(0.6.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
+                    }
+                )
+                .padding(horizontal = hPad, vertical = vPad)
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(iconSize))
+            Spacer(modifier = Modifier.width(3.dp))
+            Text(rarity.uppercase(), color = Color.White, fontSize = fontSize, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
+        }
+    }
+}
 
 private const val GACHA_COST_SINGLE = 250
 private const val GACHA_COST_MULTI = 1350 // x6, diskon 10% dibanding beli satuan (250x6=1500)
@@ -737,17 +805,10 @@ private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: 
                         .fillMaxSize()
                         .holoSweep(active = premium, delayMillis = index * 100)
                 )
-                Text(
-                    rarity.uppercase(),
-                    color = Color.White,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(5.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(color.copy(alpha = 0.9f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                RarityBadge(
+                    rarity = rarity,
+                    compact = true,
+                    modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
                 )
                 if (count > 1) {
                     Text(
@@ -766,11 +827,6 @@ private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: 
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(color))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(rarity, color = color, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
@@ -918,7 +974,6 @@ private fun GachaRevealDialog(results: List<GachaRollResult>, onDismiss: () -> U
 private fun GachaResultCard(result: GachaRollResult, big: Boolean) {
     val width = if (big) 210.dp else 122.dp
     val rarity = result.rarity
-    val color = rarityColor(rarity)
     val premium = isPremiumRarity(rarity)
     val shine = if (premium) rememberGlossyShine(2200) else 0f
 
@@ -978,8 +1033,15 @@ private fun GachaResultCard(result: GachaRollResult, big: Boolean) {
                 )
             }
         }
-        Column(modifier = Modifier.padding(9.dp)) {
-            Text(result.rarity.uppercase(), color = Color.White, fontSize = if (big) 13.sp else 10.sp, fontWeight = FontWeight.Black)
+        Column(
+            modifier = Modifier
+                .padding(9.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Neon.CardBase.copy(alpha = 0.92f))
+                .padding(horizontal = 9.dp, vertical = 8.dp)
+        ) {
+            RarityBadge(rarity = rarity, compact = !big)
+            Spacer(modifier = Modifier.height(6.dp))
             Text(result.name, color = Color.White, fontSize = if (big) 15.sp else 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
             result.anime_title?.let {
                 Text(it, color = Color.White.copy(alpha = 0.65f), fontSize = if (big) 11.sp else 9.sp, maxLines = 1)
