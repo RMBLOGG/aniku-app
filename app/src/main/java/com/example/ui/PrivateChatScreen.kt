@@ -75,6 +75,7 @@ fun PrivateChatScreen(
     var input by remember { mutableStateOf("") }
     var menuForMessage by remember { mutableStateOf<PrivateMessage?>(null) }
     val listState = rememberLazyListState()
+    val appearedIds = remember { mutableStateSetOf<String>() }
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -142,15 +143,23 @@ fun PrivateChatScreen(
                 ) {
                     items(messages, key = { it.id }) { msg ->
                         val isMine = msg.senderId == myId
-                        var appeared by remember(msg.id) { mutableStateOf(false) }
-                        LaunchedEffect(msg.id) { appeared = true }
+                        val alreadyAppeared = remember(msg.id) { appearedIds.contains(msg.id) }
+                        var appeared by remember(msg.id) { mutableStateOf(alreadyAppeared) }
+                        LaunchedEffect(msg.id) {
+                            appearedIds.add(msg.id)
+                            appeared = true
+                        }
                         AnimatedVisibility(
                             visible = appeared,
                             modifier = Modifier.animateItem(placementSpec = tween(260)),
-                            enter = fadeIn(tween(260)) + slideInVertically(
-                                initialOffsetY = { full -> full / 4 },
-                                animationSpec = tween(260, easing = FastOutSlowInEasing)
-                            )
+                            enter = if (alreadyAppeared) {
+                                fadeIn(tween(0))
+                            } else {
+                                fadeIn(tween(260)) + slideInVertically(
+                                    initialOffsetY = { full -> full / 4 },
+                                    animationSpec = tween(260, easing = FastOutSlowInEasing)
+                                )
+                            }
                         ) {
                             Box {
                                 PrivateMessageBubble(
