@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -233,6 +234,7 @@ fun PrivateChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PrivateMessageBubble(
     message: PrivateMessage,
