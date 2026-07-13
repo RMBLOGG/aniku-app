@@ -70,6 +70,7 @@ fun FriendsScreen(
     fun chatFor(otherId: String): ChatPreview? = userChats.firstOrNull { it.otherUserId == otherId }
 
     var selectedTab by remember { mutableStateOf(0) }
+    val seenFriendIds = remember { mutableSetOf<String>() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -128,13 +129,22 @@ fun FriendsScreen(
                                 val chat = chatFor(otherId)
                                 val isUnread = chat != null && chat.lastSenderId.isNotBlank() &&
                                     chat.lastSenderId != myId && chat.lastMessageAt > chat.lastReadAt
-                                AnimatedVisibility(
-                                    visible = true,
-                                    modifier = Modifier.animateItem(placementSpec = tween(240)),
-                                    enter = fadeIn(tween(240)) + slideInVertically(
-                                        initialOffsetY = { it / 5 },
-                                        animationSpec = tween(240)
-                                    )
+                                val rowKey = fs.id ?: otherId
+                                val alreadySeen = remember(rowKey) { rowKey in seenFriendIds }
+                                val anim = remember(rowKey) { Animatable(if (alreadySeen) 1f else 0f) }
+                                LaunchedEffect(rowKey) {
+                                    seenFriendIds.add(rowKey)
+                                    if (!alreadySeen) {
+                                        anim.animateTo(1f, animationSpec = tween(240))
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .animateItem(placementSpec = tween(240))
+                                        .graphicsLayer {
+                                            alpha = anim.value
+                                            translationY = (1f - anim.value) * 30f
+                                        }
                                 ) {
                                     FriendRow(
                                         profile = profile,
@@ -166,13 +176,22 @@ fun FriendsScreen(
                         ) {
                             items(incomingRequests, key = { it.id ?: "" }) { fs ->
                                 val profile = profileFor(fs.requester_id)
-                                AnimatedVisibility(
-                                    visible = true,
-                                    modifier = Modifier.animateItem(placementSpec = tween(240)),
-                                    enter = fadeIn(tween(240)) + slideInVertically(
-                                        initialOffsetY = { it / 5 },
-                                        animationSpec = tween(240)
-                                    )
+                                val rowKey = fs.id ?: fs.requester_id
+                                val alreadySeen = remember(rowKey) { rowKey in seenFriendIds }
+                                val anim = remember(rowKey) { Animatable(if (alreadySeen) 1f else 0f) }
+                                LaunchedEffect(rowKey) {
+                                    seenFriendIds.add(rowKey)
+                                    if (!alreadySeen) {
+                                        anim.animateTo(1f, animationSpec = tween(240))
+                                    }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .animateItem(placementSpec = tween(240))
+                                        .graphicsLayer {
+                                            alpha = anim.value
+                                            translationY = (1f - anim.value) * 30f
+                                        }
                                 ) {
                                     FriendRow(
                                         profile = profile,

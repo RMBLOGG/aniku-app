@@ -75,10 +75,10 @@ fun PrivateChatScreen(
     var input by remember { mutableStateOf("") }
     var menuForMessage by remember { mutableStateOf<PrivateMessage?>(null) }
     val listState = rememberLazyListState()
-    val appearedIds = remember { mutableStateSetOf<String>() }
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val seenMessageIds = remember { mutableSetOf<String>() }
 
     LaunchedEffect(otherUserId) {
         viewModel.openPrivateChat(otherUserId)
@@ -143,50 +143,46 @@ fun PrivateChatScreen(
                 ) {
                     items(messages, key = { it.id }) { msg ->
                         val isMine = msg.senderId == myId
-                        val alreadyAppeared = remember(msg.id) { appearedIds.contains(msg.id) }
-                        var appeared by remember(msg.id) { mutableStateOf(alreadyAppeared) }
+                        val alreadySeen = remember(msg.id) { msg.id in seenMessageIds }
+                        val anim = remember(msg.id) { Animatable(if (alreadySeen) 1f else 0f) }
                         LaunchedEffect(msg.id) {
-                            appearedIds.add(msg.id)
-                            appeared = true
+                            seenMessageIds.add(msg.id)
+                            if (!alreadySeen) {
+                                anim.animateTo(1f, animationSpec = tween(240, easing = FastOutSlowInEasing))
+                            }
                         }
-                        AnimatedVisibility(
-                            visible = appeared,
-                            modifier = Modifier.animateItem(placementSpec = tween(260)),
-                            enter = if (alreadyAppeared) {
-                                fadeIn(tween(0))
-                            } else {
-                                fadeIn(tween(260)) + slideInVertically(
-                                    initialOffsetY = { full -> full / 4 },
-                                    animationSpec = tween(260, easing = FastOutSlowInEasing)
-                                )
-                            }
+                        Box(
+                            modifier = Modifier
+                                .animateItem(placementSpec = tween(260))
+                                .graphicsLayer {
+                                    alpha = anim.value
+                                    translationY = (1f - anim.value) * 40f
+                                }
                         ) {
-                            Box {
-                                PrivateMessageBubble(
-                                    message = msg,
-                                    isMine = isMine,
-                                    otherUsername = otherUsername,
-                                    onLongPress = { if (!msg.deleted) menuForMessage = msg }
-                                )
-                                ChatContextMenu(
-                                    expanded = menuForMessage?.id == msg.id,
-                                    isMine = isMine,
-                                    onDismiss = { menuForMessage = null },
-                                    onReply = {
-                                        viewModel.setReplyTarget(msg)
-                                        menuForMessage = null
-                                    },
-                                    onCopy = {
-                                        clipboard.setText(AnnotatedString(msg.text))
-                                        menuForMessage = null
-                                        scope.launch { snackbarHostState.showSnackbar("Pesan disalin") }
-                                    },
-                                    onDelete = {
-                                        viewModel.deletePrivateMessage(msg.id)
-                                        menuForMessage = null
-                                    }
-                                )
-                            }
+                            PrivateMessageBubble(
+                                message = msg,
+                                isMine = isMine,
+                                otherUsername = otherUsername,
+                                onLongPress = { if (!msg.deleted) menuForMessage = msg }
+                            )
+                            ChatContextMenu(
+                                expanded = menuForMessage?.id == msg.id,
+                                isMine = isMine,
+                                onDismiss = { menuForMessage = null },
+                                onReply = {
+                                    viewModel.setReplyTarget(msg)
+                                    menuForMessage = null
+                                },
+                                onCopy = {
+                                    clipboard.setText(AnnotatedString(msg.text))
+                                    menuForMessage = null
+                                    scope.launch { snackbarHostState.showSnackbar("Pesan disalin") }
+                                },
+                                onDelete = {
+                                    viewModel.deletePrivateMessage(msg.id)
+                                    menuForMessage = null
+                                }
+                            )
                         }
                     }
                 }
