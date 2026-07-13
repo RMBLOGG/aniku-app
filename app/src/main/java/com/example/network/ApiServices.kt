@@ -226,7 +226,7 @@ interface SupabaseFunctionsApi {
         @Header("Authorization") authHeader: String
     ): IpGuardResponse
 
-    @POST("functions/v1/send-private-chat-notification")
+    @POST("functions/v1/bright-processor")
     suspend fun sendPrivateChatNotification(
         @Body request: PrivateChatNotifRequest,
         @Header("apikey") apiKey: String,
