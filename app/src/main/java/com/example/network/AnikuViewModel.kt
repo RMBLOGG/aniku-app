@@ -4860,6 +4860,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     private var privateChatListenJob: kotlinx.coroutines.Job? = null
 
+    /** Pesan yang lagi di-reply di PrivateChatScreen (null = ga ada reply aktif). */
+    private val _replyingToMessage = MutableStateFlow<PrivateMessage?>(null)
+    val replyingToMessage: StateFlow<PrivateMessage?> = _replyingToMessage.asStateFlow()
+
     private val _userChats = MutableStateFlow<List<ChatPreview>>(emptyList())
     val userChats: StateFlow<List<ChatPreview>> = _userChats.asStateFlow()
     private var userChatsListenJob: kotlinx.coroutines.Job? = null
@@ -4918,6 +4922,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _activePrivateChatId.value = null
         _activePrivateChatOtherUserId.value = null
         _privateChatMessages.value = emptyList()
+        _replyingToMessage.value = null
+    }
+
+    /** Set pesan yang mau di-reply (dipanggil dari long-press bubble). */
+    fun setReplyTarget(message: PrivateMessage) {
+        _replyingToMessage.value = message
+    }
+
+    /** Batalin reply yang lagi aktif (tombol X di preview reply). */
+    fun clearReplyTarget() {
+        _replyingToMessage.value = null
     }
 
     fun sendPrivateMessage(text: String) {
@@ -4925,9 +4940,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
         val chatId = _activePrivateChatId.value ?: return
         val otherUserId = _activePrivateChatOtherUserId.value ?: return
         val myUsername = session.value.username.orDefault("Seseorang")
+        val replyTo = _replyingToMessage.value
+        _replyingToMessage.value = null
         viewModelScope.launch {
             try {
-                PrivateChatManager.sendMessage(chatId, myId, otherUserId, text)
+                PrivateChatManager.sendMessage(chatId, myId, otherUserId, text, replyTo)
 
                 // Kirim push notif ke penerima (targeted, bukan broadcast topic).
                 // Gagal kirim notif jangan sampai bikin pesan gagal dianggap error.
@@ -4947,6 +4964,22 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "sendPrivateMessage error: ${e.message}")
+            }
+        }
+    }
+
+    /** Hapus pesan (soft delete, kayak WA "Hapus untuk semua"). Cuma pengirim yang bisa hapus. */
+    fun deletePrivateMessage(messageId: String) {
+        val myId = session.value.userId ?: return
+        val chatId = _activePrivateChatId.value ?: return
+        if (_replyingToMessage.value?.id == messageId) {
+            _replyingToMessage.value = null
+        }
+        viewModelScope.launch {
+            try {
+                PrivateChatManager.deleteMessage(chatId, messageId, myId)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "deletePrivateMessage error: ${e.message}")
             }
         }
     }

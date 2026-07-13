@@ -31,7 +31,11 @@ data class PrivateMessage(
     val id: String = "",
     val senderId: String = "",
     val text: String = "",
-    val timestamp: Long = 0L
+    val timestamp: Long = 0L,
+    val deleted: Boolean = false,
+    val replyToId: String? = null,
+    val replyToSenderId: String? = null,
+    val replyToText: String? = null
 )
 
 data class ChatPreview(
@@ -62,7 +66,11 @@ object PrivateChatManager {
                             id = child.key ?: "",
                             senderId = child.child("senderId").getValue(String::class.java) ?: "",
                             text = child.child("text").getValue(String::class.java) ?: "",
-                            timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L
+                            timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L,
+                            deleted = child.child("deleted").getValue(Boolean::class.java) ?: false,
+                            replyToId = child.child("replyToId").getValue(String::class.java),
+                            replyToSenderId = child.child("replyToSenderId").getValue(String::class.java),
+                            replyToText = child.child("replyToText").getValue(String::class.java)
                         )
                     } catch (e: Exception) {
                         null
@@ -108,19 +116,30 @@ object PrivateChatManager {
         awaitClose { ref.removeEventListener(listener) }
     }
 
-    suspend fun sendMessage(chatId: String, senderId: String, receiverId: String, text: String) {
+    suspend fun sendMessage(
+        chatId: String,
+        senderId: String,
+        receiverId: String,
+        text: String,
+        replyTo: PrivateMessage? = null
+    ) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         val timestamp = System.currentTimeMillis()
 
         val msgRef = database.getReference("private_chats/$chatId/messages").push()
-        msgRef.setValue(
-            mapOf(
-                "senderId" to senderId,
-                "text" to trimmed,
-                "timestamp" to timestamp
-            )
-        ).await()
+        val payload = mutableMapOf<String, Any>(
+            "senderId" to senderId,
+            "text" to trimmed,
+            "timestamp" to timestamp
+        )
+        if (replyTo != null) {
+            payload["replyToId"] = replyTo.id
+            payload["replyToSenderId"] = replyTo.senderId
+            // Preview singkat aja, biar hemat, kayak WA.
+            payload["replyToText"] = if (replyTo.deleted) "Pesan telah dihapus" else replyTo.text.take(120)
+        }
+        msgRef.setValue(payload).await()
 
         // Pakai updateChildren (bukan setValue) biar field lastReadAt yang udah ada
         // gak ikut ke-wipe tiap kali ada pesan baru.
@@ -141,6 +160,26 @@ object PrivateChatManager {
                 "lastMessage" to trimmed,
                 "lastMessageAt" to timestamp,
                 "lastSenderId" to senderId
+            )
+        ).await()
+    }
+
+    /**
+     * Soft delete kayak WA: teks diganti placeholder & flag `deleted` di-set true,
+     * bukan dihapus fisik dari DB. Cuma pengirim pesan yang boleh hapus.
+     */
+    suspend fun deleteMessage(chatId: String, messageId: String, requesterId: String) {
+        val msgRef = database.getReference("private_chats/$chatId/messages/$messageId")
+        val snapshot = msgRef.get().await()
+        val senderId = snapshot.child("senderId").getValue(String::class.java) ?: ""
+        if (senderId != requesterId) {
+            Log.w(TAG, "deleteMessage ditolak: $requesterId bukan pengirim pesan $messageId")
+            return
+        }
+        msgRef.updateChildren(
+            mapOf(
+                "text" to "",
+                "deleted" to true
             )
         ).await()
     }
