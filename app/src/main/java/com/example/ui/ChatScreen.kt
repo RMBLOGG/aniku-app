@@ -37,6 +37,9 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.ChatMessage
+import com.example.network.ChatPreview
+import com.example.network.ClanChatMessage
+import com.example.network.ProfileDto
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -195,6 +198,68 @@ internal fun ClanTagBadge(tag: String) {
     }
 }
 
+// Reuse ChatBubble/list logic Global buat Clan tab: field-nya identik,
+// cuma ClanChatMessage punya tambahan clan_id yang gak dipakai buat render.
+private fun ClanChatMessage.toChatMessage() = ChatMessage(
+    id = id,
+    user_id = user_id,
+    username = username,
+    avatar_url = avatar_url,
+    role = role,
+    is_admin = is_admin,
+    custom_name_color = custom_name_color,
+    user_number = user_number,
+    season_level = season_level,
+    message = message,
+    created_at = created_at,
+    reply_to_id = reply_to_id,
+    reply_to_username = reply_to_username,
+    reply_to_message = reply_to_message,
+    image_url = image_url
+)
+
+@Composable
+private fun DiscussionTabRow(
+    selectedTab: Int,
+    onSelect: (Int) -> Unit,
+    friendUnreadCount: Int
+) {
+    val tabs = listOf("Global", "Clan", "Teman")
+    TabRow(
+        selectedTabIndex = selectedTab,
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.primary
+    ) {
+        tabs.forEachIndexed { index, label ->
+            Tab(
+                selected = selectedTab == index,
+                onClick = { onSelect(index) },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(label, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Medium, fontSize = 13.sp)
+                        if (index == 2 && friendUnreadCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (friendUnreadCount > 9) "9+" else "$friendUnreadCount",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -232,6 +297,34 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var isInitialLoad by remember { mutableStateOf(true) }
 
+    // ── Tab: Global / Clan / Teman ──
+    var selectedTab by remember { mutableStateOf(0) }
+
+    // Clan tab state
+    val myClanMembership by viewModel.myClanMembership.collectAsState()
+    val myClanDetail by viewModel.myClanDetail.collectAsState()
+    val clanChatMessagesRaw by viewModel.clanChatMessages.collectAsState()
+    val clanChatMessages = remember(clanChatMessagesRaw) { clanChatMessagesRaw.map { it.toChatMessage() } }
+    val isClanChatLoading by viewModel.isClanChatLoading.collectAsState()
+    val clanChatError by viewModel.clanChatError.collectAsState()
+    var clanInputText by remember { mutableStateOf("") }
+    var clanReplyTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    val clanListState = rememberLazyListState()
+
+    // Teman tab state (daftar DM 1-on-1 yang sudah ada, dipindah ke sini)
+    val friendsList by viewModel.friendsList.collectAsState()
+    val userDirectory by viewModel.userDirectory.collectAsState()
+    val userChats by viewModel.userChats.collectAsState()
+    val friendUnreadCount = remember(friendsList, userChats, currentUserId) {
+        friendsList.count { fs ->
+            val otherId = if (fs.requester_id == currentUserId) fs.addressee_id else fs.requester_id
+            val chat = userChats.firstOrNull { it.otherUserId == otherId }
+            chat != null && chat.lastSenderId.isNotBlank() && chat.lastSenderId != currentUserId && chat.lastMessageAt > chat.lastReadAt
+        }
+    }
+    fun profileForFriend(userId: String): ProfileDto? = userDirectory.firstOrNull { it.id == userId }
+    fun chatForFriend(otherId: String): ChatPreview? = userChats.firstOrNull { it.otherUserId == otherId }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -247,6 +340,26 @@ fun ChatScreen(
             delay(5000)
             viewModel.loadChatMessages()
             viewModel.markChatRead()
+        }
+    }
+
+    // Tab Clan: auto-poll pesan clan cuma pas tab-nya lagi kebuka & user punya clan
+    LaunchedEffect(selectedTab, myClanMembership?.clan_id) {
+        val clanId = myClanMembership?.clan_id
+        if (selectedTab == 1 && clanId != null) {
+            viewModel.loadClanChatMessages(clanId)
+            while (true) {
+                delay(5000)
+                viewModel.loadClanChatMessages(clanId)
+            }
+        }
+    }
+
+    // Tab Teman: muat daftar pertemanan pas tab-nya dibuka
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 2) {
+            viewModel.loadFriendships()
+            viewModel.loadUserDirectory()
         }
     }
 
@@ -280,6 +393,19 @@ fun ChatScreen(
         chatError?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearChatError()
+        }
+    }
+
+    LaunchedEffect(clanChatError) {
+        clanChatError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearClanChatError()
+        }
+    }
+
+    LaunchedEffect(clanChatMessages.size) {
+        if (clanChatMessages.isNotEmpty() && selectedTab == 1) {
+            clanListState.animateScrollToItem(clanChatMessages.size - 1)
         }
     }
 
@@ -347,8 +473,13 @@ fun ChatScreen(
                         containerColor = MaterialTheme.colorScheme.background
                     )
                 )
+                DiscussionTabRow(
+                    selectedTab = selectedTab,
+                    onSelect = { selectedTab = it },
+                    friendUnreadCount = friendUnreadCount
+                )
                 AnimatedVisibility(
-                    visible = typingUsers.isNotEmpty(),
+                    visible = typingUsers.isNotEmpty() && selectedTab == 0,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
@@ -396,6 +527,8 @@ fun ChatScreen(
             }
         },
         bottomBar = {
+            when (selectedTab) {
+                0 -> {
             if (chatRoomEnabled) {
             Column {
                 Divider()
@@ -614,6 +747,101 @@ fun ChatScreen(
                 }
             }
             }
+                }
+                1 -> {
+                    val clanId = myClanMembership?.clan_id
+                    if (clanId != null) {
+                        Column {
+                            Divider()
+                            AnimatedVisibility(
+                                visible = clanReplyTarget != null,
+                                enter = slideInVertically { it } + fadeIn(),
+                                exit = slideOutVertically { it } + fadeOut()
+                            ) {
+                                clanReplyTarget?.let { target ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(3.dp)
+                                                .height(36.dp)
+                                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(target.username, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                                            Text(target.message, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                        IconButton(onClick = { clanReplyTarget = null }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Batal reply", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                                        }
+                                    }
+                                }
+                            }
+                            if (isLoggedIn) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                        .navigationBarsPadding(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = clanInputText,
+                                        onValueChange = { if (it.length <= 300) clanInputText = it },
+                                        placeholder = { Text(if (clanReplyTarget != null) "Balas ${clanReplyTarget!!.username}..." else "Ketik pesan ke clan...") },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(24.dp),
+                                        maxLines = 3,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    FilledIconButton(
+                                        onClick = {
+                                            val msg = clanInputText.trim()
+                                            if (msg.isNotEmpty()) {
+                                                viewModel.sendClanChatMessage(
+                                                    clanId = clanId,
+                                                    message = msg,
+                                                    replyToId = clanReplyTarget?.id,
+                                                    replyToUsername = clanReplyTarget?.username,
+                                                    replyToMessage = clanReplyTarget?.message
+                                                )
+                                                clanInputText = ""
+                                                clanReplyTarget = null
+                                            }
+                                        },
+                                        enabled = clanInputText.trim().isNotEmpty(),
+                                        modifier = Modifier.size(48.dp)
+                                    ) {
+                                        Icon(Icons.Default.Send, contentDescription = "Kirim", modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Login untuk ikut chat clan", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 14.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // Tab Teman: cuma daftar DM, ga ada input bar di sini - kirim pesan
+                    // dilakuin di PrivateChatScreen pas tap salah satu teman.
+                }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -621,6 +849,8 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            when (selectedTab) {
+                0 -> {
             when {
                 !chatRoomEnabled -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -703,6 +933,94 @@ fun ChatScreen(
                             }
                         }
                         item { Spacer(modifier = Modifier.height(4.dp)) }
+                    }
+                }
+            }
+                }
+                1 -> {
+                    val clanId = myClanMembership?.clan_id
+                    when {
+                        clanId == null -> {
+                            EmptyState(
+                                Icons.Default.Shield,
+                                "Kamu belum join clan.\nJoin atau bikin clan dulu buat bisa chat di sini!"
+                            )
+                        }
+                        isClanChatLoading && clanChatMessages.isEmpty() -> {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        clanChatMessages.isEmpty() -> {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("\uD83D\uDEE1\uFE0F", fontSize = 48.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Belum ada obrolan di clan${myClanDetail?.name?.let { " $it" } ?: ""}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        if (isLoggedIn) "Jadilah yang pertama chat di clan!" else "Login untuk mulai chat",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    )
+                                }
+                            }
+                        }
+                        else -> {
+                            LazyColumn(
+                                state = clanListState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                items(clanChatMessages, key = { it.id }) { message ->
+                                    val isOwn = message.user_id == currentUserId
+                                    ChatBubble(
+                                        message = message,
+                                        isOwnMessage = isOwn,
+                                        navController = navController,
+                                        clanTagMap = clanTagMap,
+                                        onReply = if (isLoggedIn) { { clanReplyTarget = message } } else null,
+                                        onDelete = if (isOwn || session.canModerate()) {
+                                            { viewModel.deleteClanChatMessage(message.id) }
+                                        } else null
+                                    )
+                                }
+                                item { Spacer(modifier = Modifier.height(4.dp)) }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // Tab Teman: daftar DM 1-on-1, tap buka PrivateChatScreen
+                    if (friendsList.isEmpty()) {
+                        EmptyState(Icons.Default.People, "Belum ada teman.\nCari user lain terus kirim permintaan pertemanan!")
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(friendsList, key = { it.id ?: "" }) { fs ->
+                                val otherId = if (fs.requester_id == currentUserId) fs.addressee_id else fs.requester_id
+                                val profile = profileForFriend(otherId)
+                                val chat = chatForFriend(otherId)
+                                val isUnread = chat != null && chat.lastSenderId.isNotBlank() &&
+                                    chat.lastSenderId != currentUserId && chat.lastMessageAt > chat.lastReadAt
+                                FriendRow(
+                                    profile = profile,
+                                    fallbackId = otherId,
+                                    chat = chat,
+                                    myId = currentUserId,
+                                    isUnread = isUnread,
+                                    onClick = { navController.navigate("private_chat/$otherId") },
+                                    trailing = {}
+                                )
+                            }
+                        }
                     }
                 }
             }

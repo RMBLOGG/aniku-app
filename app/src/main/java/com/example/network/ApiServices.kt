@@ -713,6 +713,31 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // ─── Chat khusus clan ───
+    @GET("rest/v1/clan_chat_messages")
+    suspend fun getClanChatMessages(
+        @Query("clan_id") clanIdQuery: String,
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 100,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ClanChatMessage>
+
+    @POST("rest/v1/clan_chat_messages")
+    suspend fun insertClanChatMessage(
+        @Body data: ClanChatMessageRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): List<ClanChatMessage>
+
+    @DELETE("rest/v1/clan_chat_messages")
+    suspend fun deleteClanChatMessage(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     // ─── Presence: total user online di seluruh aplikasi ───
     @GET("rest/v1/user_presence")
     suspend fun getOnlinePresence(

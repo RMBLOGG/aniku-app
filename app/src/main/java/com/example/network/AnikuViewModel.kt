@@ -4067,6 +4067,112 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // --- CLAN CHAT (chat khusus member clan, di-scope per clan_id) ---
+    private val _clanChatMessages = MutableStateFlow<List<ClanChatMessage>>(emptyList())
+    val clanChatMessages: StateFlow<List<ClanChatMessage>> = _clanChatMessages.asStateFlow()
+
+    private val _isClanChatLoading = MutableStateFlow(false)
+    val isClanChatLoading: StateFlow<Boolean> = _isClanChatLoading.asStateFlow()
+
+    private val _clanChatError = MutableStateFlow<String?>(null)
+    val clanChatError: StateFlow<String?> = _clanChatError.asStateFlow()
+
+    fun clearClanChatError() { _clanChatError.value = null }
+
+    fun loadClanChatMessages(clanId: String) {
+        viewModelScope.launch {
+            _isClanChatLoading.value = true
+            try {
+                val messagesDeferred = NetworkClient.supabaseDbApi.getClanChatMessages(
+                    clanIdQuery = "eq.$clanId",
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                // Sama kayak chat global: API return terbaru dulu (desc), lalu di-reverse
+                // di sini jadi kronologis (lama -> baru) buat ditampilin.
+                _clanChatMessages.value = messagesDeferred.reversed()
+            } catch (e: retrofit2.HttpException) {
+                val errBody = e.response()?.errorBody()?.string() ?: "no body"
+                _clanChatError.value = "HTTP ${e.code()}: $errBody"
+                Log.e("AnikuVM", "loadClanChatMessages failed: HTTP ${e.code()} - $errBody")
+            } catch (e: Exception) {
+                _clanChatError.value = "Gagal memuat chat clan: ${e.message}"
+                Log.e("AnikuVM", "loadClanChatMessages failed", e)
+            } finally {
+                _isClanChatLoading.value = false
+            }
+        }
+    }
+
+    fun sendClanChatMessage(
+        clanId: String,
+        message: String,
+        replyToId: String? = null,
+        replyToUsername: String? = null,
+        replyToMessage: String? = null,
+        imageUrl: String? = null
+    ) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            _clanChatError.value = "Kamu harus login untuk mengirim pesan"
+            return
+        }
+        if (currentSession.isBanned) {
+            _clanChatError.value = "Akunmu dibanned dari chat"
+            return
+        }
+        val trimmed = message.trim()
+        if (trimmed.isEmpty() && imageUrl == null) return
+        if (trimmed.length > 300) return
+
+        viewModelScope.launch {
+            try {
+                withValidToken { token ->
+                    NetworkClient.supabaseDbApi.insertClanChatMessage(
+                        data = ClanChatMessageRequest(
+                            clan_id = clanId,
+                            user_id = currentSession.userId ?: "",
+                            username = currentSession.username.nullIfBlank() ?: currentSession.email?.substringBefore("@") ?: "Anonymous",
+                            avatar_url = currentSession.avatarUrl,
+                            role = when { currentSession.isAdmin -> "admin"; currentSession.isModerator -> "moderator"; currentSession.isBeta -> "beta"; else -> "user" },
+                            is_admin = currentSession.isAdmin,
+                            custom_name_color = currentSession.customNameColor,
+                            user_number = currentSession.userNumber,
+                            message = trimmed,
+                            reply_to_id = replyToId,
+                            reply_to_username = replyToUsername,
+                            reply_to_message = replyToMessage,
+                            image_url = imageUrl
+                        ),
+                        authHeader = "Bearer $token",
+                        apiKey = SUPABASE_ANON_KEY
+                    )
+                }
+                loadClanChatMessages(clanId)
+            } catch (e: Exception) {
+                _clanChatError.value = "Gagal kirim pesan: ${e.message}"
+            }
+        }
+    }
+
+    fun deleteClanChatMessage(messageId: String) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) return
+
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteClanChatMessage(
+                    idQuery = "eq.$messageId",
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _clanChatMessages.value = _clanChatMessages.value.filter { it.id != messageId }
+            } catch (e: Exception) {
+                _clanChatError.value = "Gagal hapus pesan: ${e.message}"
+            }
+        }
+    }
+
     // ─────────────── FEED ───────────────
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts.asStateFlow()

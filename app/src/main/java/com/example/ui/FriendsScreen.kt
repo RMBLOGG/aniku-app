@@ -344,7 +344,7 @@ private fun PillActionButton(
 }
 
 @Composable
-private fun FriendRow(
+internal fun FriendRow(
     profile: ProfileDto?,
     fallbackId: String,
     chat: ChatPreview?,
@@ -477,7 +477,7 @@ private fun FriendRow(
 }
 
 @Composable
-private fun EmptyState(icon: ImageVector, message: String) {
+internal fun EmptyState(icon: ImageVector, message: String) {
     val infiniteTransition = rememberInfiniteTransition(label = "emptyPulse")
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.94f,

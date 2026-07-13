@@ -415,6 +415,44 @@ data class ChatMessage(
     val image_url: String? = null
 )
 
+// Chat khusus clan - struktur sama kayak ChatMessage tapi ada clan_id
+@JsonClass(generateAdapter = true)
+data class ClanChatMessage(
+    val id: String,
+    val clan_id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val role: String? = "user",
+    val is_admin: Boolean? = false,
+    val custom_name_color: String? = null,
+    val user_number: Int? = null,
+    val season_level: Int? = null,
+    val message: String,
+    val created_at: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val reply_to_message: String? = null,
+    val image_url: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ClanChatMessageRequest(
+    val clan_id: String,
+    val user_id: String,
+    val username: String,
+    val avatar_url: String? = null,
+    val role: String? = "user",
+    val is_admin: Boolean? = false,
+    val custom_name_color: String? = null,
+    val user_number: Int? = null,
+    val message: String,
+    val reply_to_id: String? = null,
+    val reply_to_username: String? = null,
+    val reply_to_message: String? = null,
+    val image_url: String? = null
+)
+
 @JsonClass(generateAdapter = true)
 data class ProfileNumberDto(
     val user_number: Int? = null
