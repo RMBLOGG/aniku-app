@@ -1412,6 +1412,7 @@ fun HomeScreen(
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val session by viewModel.session.collectAsState()
     val isLoggedIn = session.token != null
+    val unreadPrivateChatCount by viewModel.unreadPrivateChatCount.collectAsState()
     val watchHistory by viewModel.watchHistory.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
@@ -1928,21 +1929,41 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            // Room Chat
+                            // Pertemanan / Private Chat
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.08f))
-                                    .clickable { if (isLoggedIn) navController.navigate("chat") else onShowLoginDialog() },
+                                    .clickable { if (isLoggedIn) navController.navigate("friends") else onShowLoginDialog() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Default.ChatBubbleOutline,
-                                    contentDescription = "Room Chat",
+                                    contentDescription = "Pertemanan",
                                     tint = Color.White.copy(alpha = 0.9f),
                                     modifier = Modifier.size(19.dp)
                                 )
+                                if (unreadPrivateChatCount > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = 3.dp, y = (-3).dp)
+                                            .heightIn(min = 16.dp)
+                                            .widthIn(min = 16.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.error)
+                                            .padding(horizontal = 3.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (unreadPrivateChatCount > 9) "9+" else "$unreadPrivateChatCount",
+                                            color = Color.White,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
                         }
 

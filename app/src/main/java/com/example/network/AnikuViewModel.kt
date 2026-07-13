@@ -253,6 +253,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
             }
         }
+        // Dengerin daftar chat pribadi secara global begitu login/logout,
+        // biar badge unread di home nyala real-time gak cuma pas FriendsScreen dibuka.
+        viewModelScope.launch {
+            session.map { it.userId }.distinctUntilChanged().collect { userId ->
+                if (!userId.isNullOrBlank()) {
+                    startListeningUserChats()
+                } else {
+                    stopListeningUserChats()
+                }
+            }
+        }
     }
 
     /** Upsert FCM token ke Supabase, dipakai buat targeted notif private chat. */
@@ -4853,6 +4864,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val userChats: StateFlow<List<ChatPreview>> = _userChats.asStateFlow()
     private var userChatsListenJob: kotlinx.coroutines.Job? = null
 
+    /** Jumlah chat pribadi yang belum dibaca, real-time — dipakai buat badge di icon chat home. */
+    val unreadPrivateChatCount: StateFlow<Int> = combine(_userChats, session) { chats, sess ->
+        val myId = sess.userId
+        if (myId.isNullOrBlank()) return@combine 0
+        chats.count { it.lastSenderId.isNotBlank() && it.lastSenderId != myId && it.lastMessageAt > it.lastReadAt }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
     /** Mulai dengerin daftar chat (dipanggil sekali pas FriendsScreen/ChatList dibuka). */
     fun startListeningUserChats() {
         val myId = session.value.userId ?: return
@@ -4881,6 +4899,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
         privateChatListenJob = viewModelScope.launch {
             PrivateChatManager.listenMessages(chatId).collect { messages ->
                 _privateChatMessages.value = messages
+                // Tandai selalu terbaca selama chat ini lagi kebuka, termasuk pas
+                // ada pesan baru masuk saat user masih di layar ini.
+                if (messages.isNotEmpty()) {
+                    try {
+                        PrivateChatManager.markChatAsRead(myId, chatId)
+                    } catch (e: Exception) {
+                        Log.e("AnikuVM", "markChatAsRead error: ${e.message}")
+                    }
+                }
             }
         }
     }

@@ -39,7 +39,8 @@ data class ChatPreview(
     val otherUserId: String = "",
     val lastMessage: String = "",
     val lastMessageAt: Long = 0L,
-    val lastSenderId: String = ""
+    val lastSenderId: String = "",
+    val lastReadAt: Long = 0L
 )
 
 object PrivateChatManager {
@@ -89,7 +90,8 @@ object PrivateChatManager {
                             otherUserId = child.child("otherUserId").getValue(String::class.java) ?: "",
                             lastMessage = child.child("lastMessage").getValue(String::class.java) ?: "",
                             lastMessageAt = child.child("lastMessageAt").getValue(Long::class.java) ?: 0L,
-                            lastSenderId = child.child("lastSenderId").getValue(String::class.java) ?: ""
+                            lastSenderId = child.child("lastSenderId").getValue(String::class.java) ?: "",
+                            lastReadAt = child.child("lastReadAt").getValue(Long::class.java) ?: 0L
                         )
                     } catch (e: Exception) {
                         null
@@ -120,7 +122,9 @@ object PrivateChatManager {
             )
         ).await()
 
-        database.getReference("user_chats/$senderId/$chatId").setValue(
+        // Pakai updateChildren (bukan setValue) biar field lastReadAt yang udah ada
+        // gak ikut ke-wipe tiap kali ada pesan baru.
+        database.getReference("user_chats/$senderId/$chatId").updateChildren(
             mapOf(
                 "chatId" to chatId,
                 "otherUserId" to receiverId,
@@ -130,7 +134,7 @@ object PrivateChatManager {
             )
         ).await()
 
-        database.getReference("user_chats/$receiverId/$chatId").setValue(
+        database.getReference("user_chats/$receiverId/$chatId").updateChildren(
             mapOf(
                 "chatId" to chatId,
                 "otherUserId" to senderId,
@@ -138,6 +142,13 @@ object PrivateChatManager {
                 "lastMessageAt" to timestamp,
                 "lastSenderId" to senderId
             )
+        ).await()
+    }
+
+    /** Tandai chat ini udah dibaca oleh userId (dipanggil pas buka/lagi di dalam PrivateChatScreen). */
+    suspend fun markChatAsRead(userId: String, chatId: String) {
+        database.getReference("user_chats/$userId/$chatId").updateChildren(
+            mapOf("lastReadAt" to System.currentTimeMillis())
         ).await()
     }
 }
