@@ -6,9 +6,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -22,7 +25,10 @@ import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
@@ -297,8 +303,9 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var isInitialLoad by remember { mutableStateOf(true) }
 
-    // ── Tab: Global / Clan / Teman ──
-    var selectedTab by remember { mutableStateOf(0) }
+    // ── Tab: Global / Clan / Teman ── (HorizontalPager biar bisa di-swipe)
+    val pagerState = rememberPagerState(pageCount = { 3 })
+    val selectedTab = pagerState.currentPage
 
     // Clan tab state
     val myClanMembership by viewModel.myClanMembership.collectAsState()
@@ -475,7 +482,9 @@ fun ChatScreen(
                 )
                 DiscussionTabRow(
                     selectedTab = selectedTab,
-                    onSelect = { selectedTab = it },
+                    onSelect = { index ->
+                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                    },
                     friendUnreadCount = friendUnreadCount
                 )
                 AnimatedVisibility(
@@ -849,7 +858,11 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (selectedTab) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+            when (page) {
                 0 -> {
             when {
                 !chatRoomEnabled -> {
@@ -1024,6 +1037,7 @@ fun ChatScreen(
                     }
                 }
             }
+            }
         }
     }
 }
@@ -1138,24 +1152,58 @@ private fun ChatBubble(
         else -> null
     }
 
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     val dragModifier = Modifier
         .fillMaxWidth()
         .pointerInput(onReply) {
-            detectHorizontalDragGestures(
-                onDragEnd = {
-                    if (swipeOffset > swipeThreshold && onReply != null) {
-                        onReply()
+            // Deteksi arah drag secara manual: baru dianggap "swipe reply" (horizontal)
+            // kalau pergerakan dx udah jelas lebih dominan dibanding dy. Sebelum arah
+            // kekunci, event *tidak* di-consume, jadi LazyColumn di atasnya tetap bisa
+            // nangkep drag vertikal buat scroll walau jari nyentuh di tengah bubble
+            // (sebelumnya detectHorizontalDragGestures selalu nangkep dx duluan,
+            // makanya scroll cuma jalan kalau jari bener-bener di pinggir layar).
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                var lockedHorizontal: Boolean? = null
+                var accDx = 0f
+                var accDy = 0f
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (change.changedToUpIgnoreConsumed()) {
+                        if (lockedHorizontal == true) {
+                            if (swipeOffset > swipeThreshold && onReply != null) {
+                                onReply()
+                            }
+                        }
+                        swipeOffset = 0f
+                        break
                     }
-                    swipeOffset = 0f
-                },
-                onDragCancel = { swipeOffset = 0f },
-                onHorizontalDrag = { _, dragAmount ->
-                    val delta = if (isOwnMessage) -dragAmount else dragAmount
-                    if (delta > 0) {
-                        swipeOffset = (swipeOffset + delta).coerceAtMost(swipeThreshold * 1.2f)
+                    val pos = change.positionChange()
+                    if (lockedHorizontal == null) {
+                        accDx += pos.x
+                        accDy += pos.y
+                        val absDx = kotlin.math.abs(accDx)
+                        val absDy = kotlin.math.abs(accDy)
+                        if (absDx > touchSlop || absDy > touchSlop) {
+                            lockedHorizontal = absDx > absDy * 1.5f
+                            if (lockedHorizontal == false) {
+                                // Gerakan ini vertikal (scroll) - jangan consume,
+                                // biarin LazyColumn di parent yang nangkep.
+                                swipeOffset = 0f
+                                break
+                            }
+                        }
+                    }
+                    if (lockedHorizontal == true) {
+                        change.consume()
+                        val delta = if (isOwnMessage) -pos.x else pos.x
+                        if (delta > 0) {
+                            swipeOffset = (swipeOffset + delta).coerceAtMost(swipeThreshold * 1.2f)
+                        }
                     }
                 }
-            )
+            }
         }
         .combinedClickable(
             onClick = {},
