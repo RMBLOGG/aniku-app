@@ -773,7 +773,8 @@ private fun TopLeaderboardCard(
     accentColor: Color,
     onUserClick: (ProfileDto) -> Unit,
     onSeeAllClick: () -> Unit,
-    onSeeAllSupportersClick: () -> Unit = onSeeAllClick
+    onSeeAllSupportersClick: () -> Unit = onSeeAllClick,
+    modifier: Modifier = Modifier
 ) {
     if (topUsers.isEmpty()) return
 
@@ -790,7 +791,7 @@ private fun TopLeaderboardCard(
     val isOnSupporterPage = hasSupporterPage && pagerState.currentPage == 0
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(
@@ -2229,7 +2230,8 @@ fun HomeScreen(
                                 accentColor = accentColor,
                                 onUserClick = { user -> navController.navigate("user_profile/${user.id}") },
                                 onSeeAllClick = { navController.navigate("user_list") },
-                                onSeeAllSupportersClick = { navController.navigate("top_supporter") }
+                                onSeeAllSupportersClick = { navController.navigate("top_supporter") },
+                                modifier = Modifier.padding(horizontal = 20.dp)
                             )
                         }
 
