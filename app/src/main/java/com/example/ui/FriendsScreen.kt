@@ -220,6 +220,7 @@ private fun FriendTabSwitcher(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
+            .height(50.dp)
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -239,7 +240,7 @@ private fun FriendTabSwitcher(
                 .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.primary)
         )
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
             tabs.forEachIndexed { index, title ->
                 val selected = selectedTab == index
                 val textColor by animateColorAsState(
@@ -249,12 +250,12 @@ private fun FriendTabSwitcher(
                 Row(
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
                         .clip(RoundedCornerShape(14.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
-                        ) { onSelect(index) }
-                        .padding(vertical = 10.dp),
+                        ) { onSelect(index) },
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
