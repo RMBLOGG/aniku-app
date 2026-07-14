@@ -13,6 +13,7 @@ import com.example.ui.theme.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -3295,6 +3296,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
 
+    private val _gachaCollection = MutableStateFlow<List<UserCharacterEntry>>(emptyList())
     val gachaCollection: StateFlow<List<UserCharacterEntry>> = _gachaCollection.asStateFlow()
 
     // Ambil koleksi karakter user sendiri, di-join langsung sama tabel characters
