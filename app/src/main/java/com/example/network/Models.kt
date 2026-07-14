@@ -538,6 +538,41 @@ data class GachaRollResult(
     val remaining_balance: Int
 )
 
+// ─────────────── Quiz "Tebak Anime dari Poster" ───────────────
+// Request buat RPC play_quiz_round - dipanggil SEBELUM soal ditampilkan,
+// buat ngecek eligibility (wajib punya clan) + motong jatah harian/Diamond.
+@JsonClass(generateAdapter = true)
+data class PlayQuizRoundRequest(
+    val p_cost: Int = 5000
+)
+
+// Hasil play_quiz_round - persis sama kayak jsonb_build_object di
+// supabase/quiz_system.sql
+@JsonClass(generateAdapter = true)
+data class PlayQuizRoundResult(
+    val is_free: Boolean,
+    val play_count_today: Int,
+    val free_remaining: Int,
+    val remaining_balance: Int
+)
+
+// Request buat RPC submit_quiz_answer - dipanggil SETELAH user milih jawaban.
+@JsonClass(generateAdapter = true)
+data class SubmitQuizAnswerRequest(
+    val p_correct: Boolean,
+    val p_fast: Boolean = false
+)
+
+// Hasil submit_quiz_answer - persis sama kayak jsonb_build_object di
+// supabase/quiz_system.sql
+@JsonClass(generateAdapter = true)
+data class SubmitQuizAnswerResult(
+    val self_xp_awarded: Int,
+    val mate_xp_awarded: Int,
+    val perfect_bonus_awarded: Boolean,
+    val correct_count_today: Int
+)
+
 // Dipake buat nampilin 1 karakter (tanpa info kepemilikan) di dalam koleksi -
 // field-nya sengaja cuma subset dari tabel characters yang perlu ditampilin di UI.
 @JsonClass(generateAdapter = true)
@@ -1597,4 +1632,13 @@ data class FriendshipRequest(
 data class FriendshipStatusUpdate(
     val status: String,
     val responded_at: String? = null
+)
+
+// ─────────────── Jikan API (MyAnimeList) - dipake ulang buat quiz ───────────────
+// Response dari GET https://api.jikan.moe/v4/random/anime - reuse JikanAnimeData/
+// JikanImages/JikanImageUrl yang udah didefinisiin di atas, cuma beda wrapper-nya:
+// "data" di sini objek tunggal, bukan List seperti JikanSearchResponse.
+@JsonClass(generateAdapter = true)
+data class JikanRandomAnimeResponse(
+    val data: JikanAnimeData?
 )

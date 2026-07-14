@@ -1062,13 +1062,22 @@ class MainActivity : FragmentActivity() {
                             ClanScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
-                                onTopUpClick = { navController.navigate("diamond_topup") }
+                                onTopUpClick = { navController.navigate("diamond_topup") },
+                                onQuizClick = { navController.navigate("quiz") }
                             )
                         }
                         composable("gacha") {
                             GachaScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
+                                onTopUpClick = { navController.navigate("diamond_topup") }
+                            )
+                        }
+                        composable("quiz") {
+                            QuizScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() },
+                                onJoinClanClick = { navController.navigate("clans") },
                                 onTopUpClick = { navController.navigate("diamond_topup") }
                             )
                         }

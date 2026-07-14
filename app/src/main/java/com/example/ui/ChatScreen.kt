@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -263,6 +264,42 @@ private fun DiscussionTabRow(
                 }
             )
         }
+    }
+}
+
+// Banner kecil di atas clan chat - ngingetin & ngajak main quiz "Tebak Anime dari
+// Poster". Cuma dimunculin kalau user emang udah punya clan (quiz wajib clan).
+@Composable
+private fun ClanQuizBanner(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .background(Color(0xFF3A2A0F))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("🎬", fontSize = 16.sp)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Tebak Anime dari Poster",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+            Text(
+                "Jawab bener nambah XP kamu & clan-mu",
+                color = Color.White.copy(alpha = 0.65f),
+                fontSize = 11.sp
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            contentDescription = null,
+            tint = Color(0xFFFFB020),
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 
@@ -952,6 +989,11 @@ fun ChatScreen(
                 }
                 1 -> {
                     val clanId = myClanMembership?.clan_id
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (clanId != null) {
+                            ClanQuizBanner(onClick = { navController.navigate("quiz") })
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
                     when {
                         clanId == null -> {
                             EmptyState(
@@ -1007,6 +1049,8 @@ fun ChatScreen(
                             }
                         }
                     }
+                        }
+                    }
                 }
                 else -> {
                     // Tab Teman: daftar DM 1-on-1, tap buka PrivateChatScreen
@@ -1014,6 +1058,7 @@ fun ChatScreen(
                         EmptyState(Icons.Default.People, "Belum ada teman.\nCari user lain terus kirim permintaan pertemanan!")
                     } else {
                         LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {

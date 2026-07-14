@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -58,7 +59,8 @@ private val AnimeGradient = Brush.linearGradient(listOf(Color(0xFF7B2FBF), Color
 fun ClanScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit,
-    onTopUpClick: () -> Unit
+    onTopUpClick: () -> Unit,
+    onQuizClick: () -> Unit = {}
 ) {
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val topClans by viewModel.topClans.collectAsState()
@@ -138,6 +140,8 @@ fun ClanScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item { DiamondBalanceCard(diamondBalance, onTopUpClick) }
+
+            item { QuizEntryCard(onClick = onQuizClick) }
 
             clanActionError?.let { err ->
                 item {
@@ -336,6 +340,48 @@ fun ClanScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun QuizEntryCard(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF3A2A0F), Color(0xFF1F1508))))
+            .clickable { onClick() }
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFB020).copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🎬", fontSize = 20.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Tebak Anime dari Poster", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(
+                    "Jawab bener nambah XP kamu & clan",
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 12.sp
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                contentDescription = null,
+                tint = Color(0xFFFFB020),
+                modifier = Modifier.size(16.dp)
+            )
+        }
     }
 }
 

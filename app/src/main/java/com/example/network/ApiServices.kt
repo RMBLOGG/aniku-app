@@ -678,6 +678,28 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=representation"
     ): GachaRollResult
 
+    // Quiz "Tebak Anime dari Poster" - dipanggil SEBELUM soal ditampilkan.
+    // Ngecek wajib punya clan + motong jatah harian/Diamond di server lewat
+    // function play_quiz_round (SECURITY DEFINER), lihat supabase/quiz_system.sql.
+    @POST("rest/v1/rpc/play_quiz_round")
+    suspend fun playQuizRound(
+        @Body body: PlayQuizRoundRequest = PlayQuizRoundRequest(),
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): PlayQuizRoundResult
+
+    // Quiz "Tebak Anime dari Poster" - dipanggil SETELAH user milih jawaban.
+    // Ngasih XP ke diri sendiri + semua member clan lain lewat function
+    // submit_quiz_answer (SECURITY DEFINER).
+    @POST("rest/v1/rpc/submit_quiz_answer")
+    suspend fun submitQuizAnswer(
+        @Body body: SubmitQuizAnswerRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): SubmitQuizAnswerResult
+
     // Koleksi karakter user sendiri - RLS di tabel user_characters udah mastiin
     // cuma baris milik user yang login yang keliatan (auth.uid() = user_id),
     // jadi gak perlu filter user_id manual di sini.
@@ -1099,6 +1121,11 @@ interface JikanApi {
         @Query("q") query: String,
         @Query("limit") limit: Int = 5
     ): JikanSearchResponse
+
+    // Dipake buat quiz "Tebak Anime dari Poster" - ambil 1 anime random
+    // (lengkap poster + judul) buat dijadiin soal.
+    @GET("v4/random/anime")
+    suspend fun randomAnime(): JikanRandomAnimeResponse
 }
 
 // ─── Cache Interceptor untuk Anime API (Sanka) ───────────────────────────────

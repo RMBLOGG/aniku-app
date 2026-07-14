@@ -3184,7 +3184,117 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    private val _gachaCollection = MutableStateFlow<List<UserCharacterEntry>>(emptyList())
+    // ─────────────── Quiz "Tebak Anime dari Poster" ───────────────
+
+    // Ngecek eligibility (wajib punya clan) + motong jatah harian/Diamond di server
+    // lewat function play_quiz_round. HARUS dipanggil sebelum nampilin soal ke user -
+    // kalau gagal (mis. belum join clan / DM gak cukup), jangan tampilkan soalnya.
+    fun playQuizRound(cost: Int = 5000, onResult: (PlayQuizRoundResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.playQuizRound(
+                    body = PlayQuizRoundRequest(p_cost = cost),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal mulai quiz (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "playQuizRound error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Dipanggil setelah user milih jawaban. Kalau bener, server ngasih XP ke diri
+    // sendiri (penuh) + semua member clan lain (setengah) lewat function
+    // submit_quiz_answer - semua logic hitung XP jalan di server, gak bisa
+    // dicurangin dari client.
+    fun submitQuizAnswer(correct: Boolean, fast: Boolean, onResult: (SubmitQuizAnswerResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.submitQuizAnswer(
+                    body = SubmitQuizAnswerRequest(p_correct = correct, p_fast = fast),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                // Refresh XP/level sendiri biar badge di chat & profile langsung update
+                if (correct) refreshProfile()
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal submit jawaban (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "submitQuizAnswer error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Ambil 1 anime random dari Jikan buat jadi soal (poster + judul benar), plus
+    // beberapa anime random lain buat dijadiin pilihan jawaban salah (decoy).
+    // Jikan kadang balikin null data / rate-limit (429) buat request beruntun,
+    // makanya ada retry dikit + delay kecil antar request.
+    fun fetchQuizQuestion(
+        decoyCount: Int = 3,
+        onResult: (correctAnswer: JikanAnimeData?, decoys: List<String>, error: String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                var correct: JikanAnimeData? = null
+                var attempts = 0
+                while (correct == null && attempts < 5) {
+                    attempts++
+                    val res = NetworkClient.jikanApi.randomAnime()
+                    // Poster wajib ada, kalau kosong coba tarik ulang
+                    val hasPoster = !res.data?.images?.jpg?.image_url.isNullOrEmpty() ||
+                        !res.data?.images?.jpg?.large_image_url.isNullOrEmpty()
+                    if (res.data != null && hasPoster) correct = res.data
+                    else delay(300)
+                }
+
+                if (correct == null) {
+                    onResult(null, emptyList(), "Gagal ambil soal, coba lagi")
+                    return@launch
+                }
+
+                val decoys = mutableListOf<String>()
+                var decoyAttempts = 0
+                while (decoys.size < decoyCount && decoyAttempts < decoyCount * 3) {
+                    decoyAttempts++
+                    try {
+                        val res = NetworkClient.jikanApi.randomAnime()
+                        val title = res.data?.title
+                        if (!title.isNullOrBlank() && title != correct.title && !decoys.contains(title)) {
+                            decoys.add(title)
+                        }
+                    } catch (e: Exception) {
+                        // decoy gagal 1x gapapa, lanjut coba lagi - bukan fatal buat soalnya
+                    }
+                    delay(300)
+                }
+
+                onResult(correct, decoys, if (decoys.size < decoyCount) "Sebagian pilihan jawaban gagal dimuat" else null)
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "fetchQuizQuestion error", e)
+                onResult(null, emptyList(), e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+
     val gachaCollection: StateFlow<List<UserCharacterEntry>> = _gachaCollection.asStateFlow()
 
     // Ambil koleksi karakter user sendiri, di-join langsung sama tabel characters
