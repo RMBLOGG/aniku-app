@@ -79,7 +79,7 @@ private object Neon {
 }
 
 // Warna per rarity - dipake bareng di kartu reveal & grid koleksi biar konsisten
-private fun rarityColor(rarity: String): Color = when (rarity) {
+internal fun rarityColor(rarity: String): Color = when (rarity) {
     "Mythic" -> Color(0xFFFF3D6E)
     "Legendary" -> Neon.Gold
     "Epic" -> Neon.Purple
@@ -96,7 +96,7 @@ private fun rarityGradient(rarity: String): Brush = when (rarity) {
 }
 
 // Palet sapuan warna buat border berputar - dipakai khusus rarity tinggi (Epic ke atas)
-private fun rarityShimmerColors(rarity: String): List<Color> = when (rarity) {
+internal fun rarityShimmerColors(rarity: String): List<Color> = when (rarity) {
     "Mythic" -> listOf(Color(0xFFFF3D6E), Neon.Gold, Neon.Purple, Color(0xFFFF3D6E))
     "Legendary" -> listOf(Neon.Gold, Color(0xFFFFF3B0), Color(0xFFFF8A00), Neon.Gold)
     "Epic" -> listOf(Neon.Purple, Color(0xFF6C63FF), Neon.Cyan, Neon.Purple)
@@ -104,9 +104,9 @@ private fun rarityShimmerColors(rarity: String): List<Color> = when (rarity) {
     else -> listOf(Color(0xFF8E8E9A), Color(0xFF8E8E9A).copy(alpha = 0.35f), Color(0xFF8E8E9A))
 }
 
-private fun isPremiumRarity(rarity: String) = rarity == "Mythic" || rarity == "Legendary" || rarity == "Epic"
+internal fun isPremiumRarity(rarity: String) = rarity == "Mythic" || rarity == "Legendary" || rarity == "Epic"
 
-private fun rarityIcon(rarity: String) = when (rarity) {
+internal fun rarityIcon(rarity: String) = when (rarity) {
     "Mythic" -> Icons.Default.Whatshot
     "Legendary" -> Icons.Default.WorkspacePremium
     "Epic" -> Icons.Default.AutoAwesome
@@ -117,7 +117,7 @@ private fun rarityIcon(rarity: String) = when (rarity) {
 // ── Badge rarity "ala gamer": ikon + gradient + glow blur berdenyut (Epic ke atas) + kilau kaca ──
 // Dipakai di grid koleksi & kartu reveal, biar konsisten dan gak flat kayak label teks biasa.
 @Composable
-private fun RarityBadge(rarity: String, compact: Boolean = false, modifier: Modifier = Modifier) {
+internal fun RarityBadge(rarity: String, compact: Boolean = false, modifier: Modifier = Modifier) {
     val color = rarityColor(rarity)
     val premium = isPremiumRarity(rarity)
     val shine = if (premium) rememberGlossyShine(1600) else 0f
@@ -178,7 +178,7 @@ private const val GACHA_MULTI_COUNT = 6
 // ── Border "glossy": outline gradient diam + kilau kaca yang meluncur pelan di sepanjang sisinya ──
 // (pengganti border yang muter 360° — sekarang cuma kilaunya aja yang jalan, bentuknya tetap diam)
 @Composable
-private fun rememberGlossyShine(durationMillis: Int = 2600): Float {
+internal fun rememberGlossyShine(durationMillis: Int = 2600): Float {
     val infinite = rememberInfiniteTransition(label = "glossyShine")
     val shine by infinite.animateFloat(
         initialValue = -0.35f,
@@ -189,7 +189,7 @@ private fun rememberGlossyShine(durationMillis: Int = 2600): Float {
     return shine
 }
 
-private fun Modifier.glossyBorder(
+internal fun Modifier.glossyBorder(
     colors: List<Color>,
     shine: Float,
     cornerRadius: Dp,
@@ -221,7 +221,7 @@ private fun Modifier.glossyBorder(
 
 // ── Overlay holografik yang menyapu dari kiri ke kanan terus-menerus, buat kesan kartu "berkilau" ──
 @Composable
-private fun Modifier.holoSweep(active: Boolean, delayMillis: Int = 0, periodMillis: Int = 1800): Modifier {
+internal fun Modifier.holoSweep(active: Boolean, delayMillis: Int = 0, periodMillis: Int = 1800): Modifier {
     if (!active) return this
     val infinite = rememberInfiniteTransition(label = "holoSweep")
     val translate by infinite.animateFloat(
@@ -249,7 +249,7 @@ private fun Modifier.holoSweep(active: Boolean, delayMillis: Int = 0, periodMill
 
 /** Glow radial di belakang komponen manapun. */
 @Composable
-private fun BoxScope.GlowBehind(color: Color, sizeFraction: Float = 1f, baseAlpha: Float = 0.3f) {
+internal fun BoxScope.GlowBehind(color: Color, sizeFraction: Float = 1f, baseAlpha: Float = 0.3f) {
     val infinite = rememberInfiniteTransition(label = "glow")
     val pulse by infinite.animateFloat(
         initialValue = 0.85f,

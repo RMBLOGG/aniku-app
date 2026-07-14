@@ -26,9 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -43,7 +41,6 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -1346,41 +1343,9 @@ private fun HistoryTabContent(
 
 // ============================================================================
 //  KARTU DIPAJANG — karakter gacha pilihan user, tampil di profil publik.
-//  Desain ala-gamer: border gradient per rarity, glow, badge rarity ikon+teks,
-//  dan scrim gelap di bawah biar nama karakter tetap kebaca di atas foto.
+//  Desain ala-gamer: pakai efek glossy border, holo sweep, dan glow yang sama
+//  kayak di GachaScreen biar konsisten dan gak keliatan flat.
 // ============================================================================
-private fun showcaseRarityColor(rarity: String): Color = when (rarity) {
-    "Mythic" -> Color(0xFFFF3D6E)
-    "Legendary" -> Color(0xFFFFC24B)
-    "Epic" -> Color(0xFFB56BFF)
-    "Rare" -> Color(0xFF4FC3F7)
-    else -> Color(0xFF9E9E9E)
-}
-
-private fun showcaseRarityGradient(rarity: String): Brush = when (rarity) {
-    "Mythic" -> Brush.linearGradient(listOf(Color(0xFFFF3D6E), Color(0xFFFF8A3D)))
-    "Legendary" -> Brush.linearGradient(listOf(Color(0xFFFFC24B), Color(0xFFFF8A00)))
-    "Epic" -> Brush.linearGradient(listOf(Color(0xFFB56BFF), Color(0xFF6C63FF)))
-    "Rare" -> Brush.linearGradient(listOf(Color(0xFF4FC3F7), Color(0xFF3D7EFF)))
-    else -> Brush.linearGradient(listOf(Color(0xFF9E9E9E), Color(0xFF6E6E6E)))
-}
-
-private fun showcaseRarityIcon(rarity: String) = when (rarity) {
-    "Mythic" -> Icons.Default.Whatshot
-    "Legendary" -> Icons.Default.WorkspacePremium
-    "Epic" -> Icons.Default.AutoAwesome
-    "Rare" -> Icons.Default.Bolt
-    else -> Icons.Default.MilitaryTech
-}
-
-private fun showcaseRarityLabel(rarity: String): String = when (rarity) {
-    "Mythic" -> "MYTHIC"
-    "Legendary" -> "LEGENDARY"
-    "Epic" -> "EPIC"
-    "Rare" -> "RARE"
-    else -> "COMMON"
-}
-
 @Composable
 private fun ShowcaseSection(characters: List<com.example.network.CharacterInfoDto>) {
     Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
@@ -1410,116 +1375,130 @@ private fun ShowcaseSection(characters: List<com.example.network.CharacterInfoDt
                 .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            characters.forEach { char ->
-                ShowcaseCard(char)
+            characters.forEachIndexed { index, char ->
+                ShowcaseCard(char, index)
             }
         }
     }
 }
 
 @Composable
-private fun ShowcaseCard(char: com.example.network.CharacterInfoDto) {
-    val color = showcaseRarityColor(char.rarity)
-    val gradient = showcaseRarityGradient(char.rarity)
-    val label = showcaseRarityLabel(char.rarity)
+private fun ShowcaseCard(char: com.example.network.CharacterInfoDto, index: Int = 0) {
+    val color = rarityColor(char.rarity)
+    val premium = isPremiumRarity(char.rarity)
+    val shine = if (premium) rememberGlossyShine(2400) else 0f
 
     Box(
         modifier = Modifier
-            .width(102.dp)
-            .aspectRatio(0.72f)
-            .shadow(
-                elevation = 10.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = color.copy(alpha = 0.6f),
-                spotColor = color.copy(alpha = 0.6f)
-            )
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF0E0E16))
-            .border(1.5.dp, gradient, RoundedCornerShape(16.dp))
+            .width(108.dp)
+            .aspectRatio(0.7f)
     ) {
-        AsyncImage(
-            model = char.image_url,
-            contentDescription = char.name,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        // Glow radial di belakang kartu, warnanya ngikutin rarity - kesan kartu "hidup"
+        if (premium) {
+            GlowBehind(color = color, sizeFraction = 0.95f, baseAlpha = 0.45f)
+        }
 
-        // Scrim gelap dari bawah biar nama & badge tetap kontras di atas foto
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to Color.Transparent,
-                            0.55f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.88f)
+                .shadow(
+                    elevation = if (premium) 14.dp else 6.dp,
+                    shape = RoundedCornerShape(16.dp),
+                    ambientColor = color.copy(alpha = 0.7f),
+                    spotColor = color.copy(alpha = 0.7f)
+                )
+                .clip(RoundedCornerShape(16.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF17141F), Color(0xFF0B0A12))))
+                .then(
+                    if (premium) {
+                        Modifier.glossyBorder(
+                            colors = rarityShimmerColors(char.rarity),
+                            shine = shine,
+                            cornerRadius = 16.dp,
+                            strokeWidth = 2.dp
                         )
-                    )
+                    } else {
+                        Modifier.border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                    }
                 )
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(28.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
-                    )
-                )
-        )
-
-        // Badge rarity ala-gamer: pill gradient + ikon, nempel di pojok kiri atas
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(5.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(gradient)
-                .padding(horizontal = 5.dp, vertical = 2.dp)
+                .padding(4.dp)
         ) {
-            Icon(
-                showcaseRarityIcon(char.rarity),
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(9.dp)
-            )
-            Spacer(modifier = Modifier.width(2.dp))
-            Text(
-                label,
-                fontSize = 7.5.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.3.sp,
-                color = Color.White
-            )
-        }
-
-        // Nama karakter, nempel di bawah di atas scrim
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = 7.dp, vertical = 6.dp)
-        ) {
-            Text(
-                char.name,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = Color.White
-            )
-            if (!char.anime_title.isNullOrBlank()) {
-                Text(
-                    char.anime_title,
-                    fontSize = 8.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = Color.White.copy(alpha = 0.65f)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(13.dp))
+            ) {
+                AsyncImage(
+                    model = char.image_url,
+                    contentDescription = char.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .holoSweep(active = premium, delayMillis = index * 120)
                 )
+
+                // Scrim gelap dari bawah biar nama tetap kontras di atas foto
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to Color.Transparent,
+                                    0.5f to Color.Transparent,
+                                    1f to Color.Black.copy(alpha = 0.9f)
+                                )
+                            )
+                        )
+                )
+                // Kilau tipis di atas biar foto gak kelihatan flat kena badge
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(34.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent)
+                            )
+                        )
+                )
+
+                // Badge rarity asli ala-Gacha: gradient + ikon + glow berdenyut buat rarity tinggi
+                RarityBadge(
+                    rarity = char.rarity,
+                    compact = true,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                )
+
+                // Nama karakter, nempel di bawah di atas scrim
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        char.name,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = Color.White
+                    )
+                    if (!char.anime_title.isNullOrBlank()) {
+                        Text(
+                            char.anime_title,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
+                }
             }
         }
     }
