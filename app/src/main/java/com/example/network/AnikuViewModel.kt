@@ -3249,9 +3249,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // (sankavollerei.com/anime, animeApi yang udah dipake fitur lain di app), jadi
     // lebih stabil dibanding Jikan yang sering 504/timeout. Cuma butuh field
     // "poster" dan "title" dari AnimeRaw, sisanya diabaikan.
-    // Ambil 1 halaman animelist (isinya banyak anime sekaligus), lalu pilih 1
-    // acak jadi jawaban benar + beberapa lain jadi decoy - SEMUA dari 1 request
-    // doang, gak perlu banyak API call kayak pendekatan Jikan sebelumnya.
+    // NOTE: "animasu/animelist" (getAnimeList) ternyata gak pernah kepake di
+    // fitur lain di app ini, jadi belum pernah kebukti jalan - itu yang bikin
+    // quiz selalu gagal ambil soal. Endpoint yang UDAH kebukti jalan (dipake
+    // infinite-scroll di fitur Explore) adalah getOngoing/getCompleted/getMovies/
+    // getLatest, jadi quiz sekarang ambil dari situ aja - gantian tiap attempt
+    // biar poolnya bervariasi dan sekalian ada fallback kalau salah satu error.
     fun fetchQuizQuestion(
         decoyCount: Int = 3,
         onResult: (correctAnswer: AnimeRaw?, decoys: List<String>, error: String?) -> Unit
@@ -3260,11 +3263,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
             var pool: List<AnimeRaw> = emptyList()
             var attempts = 0
             var lastErrorWasTransient = false
+            val endpoints: List<suspend (Int) -> AnimesListResponse> = listOf(
+                { p -> animeApi.getOngoing(page = p) },
+                { p -> animeApi.getCompleted(page = p) },
+                { p -> animeApi.getMovies(page = p) },
+                { p -> animeApi.getLatest(page = p) }
+            )
             while (pool.size < decoyCount + 1 && attempts < 5) {
+                val fetchFn = endpoints[attempts % endpoints.size]
                 attempts++
                 try {
-                    val page = Random.nextInt(1, 30)
-                    val res = animeApi.getAnimeList(page = page)
+                    val page = Random.nextInt(1, 10)
+                    val res = fetchFn(page)
                     val validItems = res.animes?.filter {
                         it.poster.isNotBlank() && it.title.isNotBlank()
                     } ?: emptyList()
@@ -3273,7 +3283,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     }
                     lastErrorWasTransient = false
                 } catch (e: Exception) {
-                    Log.e("AnikuVM", "fetchQuizQuestion getAnimeList attempt $attempts gagal", e)
+                    Log.e("AnikuVM", "fetchQuizQuestion attempt $attempts gagal", e)
                     lastErrorWasTransient = true
                 }
                 if (pool.size < decoyCount + 1) delay(500)
