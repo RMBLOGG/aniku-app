@@ -1359,7 +1359,7 @@ private fun ShowcaseSection(characters: List<com.example.network.CharacterInfoDt
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-            modifier = Modifier.padding(horizontal = 20.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
         )
         Row(
             modifier = Modifier
