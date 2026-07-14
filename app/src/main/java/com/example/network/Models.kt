@@ -235,7 +235,10 @@ data class ProfileDto(
     val diamond_balance: Int? = 0,
     // Warna nama custom - cuma efektif kalau role beta/moderator/admin (dipaksa server-side
     // lewat trigger enforce_custom_name_color). Format hex "#RRGGBB".
-    val custom_name_color: String? = null
+    val custom_name_color: String? = null,
+    // Karakter gacha yang dipajang di profil (maks 6). Kepemilikan divalidasi
+    // server-side lewat RPC set_profile_showcase -- jangan pernah di-PATCH langsung.
+    val showcase_character_ids: List<Int>? = null
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"

@@ -24,7 +24,11 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
@@ -315,15 +319,33 @@ fun GachaScreen(
 ) {
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val collection by viewModel.gachaCollection.collectAsState()
+    val savedShowcaseIds by viewModel.myShowcaseIds.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) } // 0 = Gacha, 1 = Koleksi
     var isRolling by remember { mutableStateOf(false) }
     var revealResults by remember { mutableStateOf<List<GachaRollResult>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // Pilihan pajangan yang lagi diedit di layar ini -- dimulai dari nilai
+    // tersimpan di server, baru berubah kalau user tap kartu buat pin/unpin.
+    var editedShowcaseIds by remember { mutableStateOf<List<Int>?>(null) }
+    var isSavingShowcase by remember { mutableStateOf(false) }
+    var showcaseToast by remember { mutableStateOf<String?>(null) }
+    val currentShowcaseIds = editedShowcaseIds ?: savedShowcaseIds
+    val showcaseDirty = editedShowcaseIds != null && editedShowcaseIds != savedShowcaseIds
+
     LaunchedEffect(Unit) {
         viewModel.refreshProfile()
         viewModel.loadGachaCollection()
+        viewModel.loadMyShowcaseIds()
+    }
+
+    val ctx = LocalContext.current
+    LaunchedEffect(showcaseToast) {
+        showcaseToast?.let {
+            Toast.makeText(ctx, it, Toast.LENGTH_SHORT).show()
+            showcaseToast = null
+        }
     }
 
     fun doRoll(times: Int, costPerRoll: Int) {
@@ -423,7 +445,47 @@ fun GachaScreen(
                         RarityOddsBar()
                     }
                 } else {
-                    KoleksiGrid(collection)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Text(
+                            "Ketuk ikon bintang buat pajang kartu di profil kamu (maks 6)",
+                            color = Color.White.copy(alpha = 0.55f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                        Box(modifier = Modifier.weight(1f)) {
+                            KoleksiGrid(
+                                collection = collection,
+                                showcaseIds = currentShowcaseIds,
+                                onTogglePin = { malId ->
+                                    val current = currentShowcaseIds
+                                    editedShowcaseIds = when {
+                                        current.contains(malId) -> current - malId
+                                        current.size >= 6 -> {
+                                            showcaseToast = "Maksimal 6 karakter yang bisa dipajang"
+                                            current
+                                        }
+                                        else -> current + malId
+                                    }
+                                }
+                            )
+                        }
+                        if (showcaseDirty) {
+                            NeonPrimaryButton(
+                                label = if (isSavingShowcase) "Menyimpan..." else "Simpan Pajangan",
+                                isLoading = isSavingShowcase,
+                                enabled = !isSavingShowcase,
+                                onClick = {
+                                    isSavingShowcase = true
+                                    viewModel.saveShowcase(currentShowcaseIds) { success, error ->
+                                        isSavingShowcase = false
+                                        showcaseToast = if (success) "Pajangan disimpan!" else (error ?: "Gagal menyimpan")
+                                        if (success) editedShowcaseIds = null
+                                    }
+                                },
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -618,13 +680,13 @@ private fun HexPortal(isRolling: Boolean) {
 //  TOMBOL — neon solid & neon outline dengan glow
 // ============================================================================
 @Composable
-private fun NeonPrimaryButton(label: String, isLoading: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun NeonPrimaryButton(label: String, isLoading: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(if (pressed) 0.97f else 1f, label = "press")
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(54.dp)
             .scale(pressScale)
@@ -721,7 +783,11 @@ private fun RarityOddsBar() {
 //  TAB "KOLEKSI" — kartu holografik (logic & data sama, cuma visual)
 // ============================================================================
 @Composable
-private fun KoleksiGrid(collection: List<UserCharacterEntry>) {
+private fun KoleksiGrid(
+    collection: List<UserCharacterEntry>,
+    showcaseIds: List<Int> = emptyList(),
+    onTogglePin: (Int) -> Unit = {}
+) {
     if (collection.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Belum ada karakter. Coba gacha dulu!", color = Color.White.copy(alpha = 0.5f))
@@ -737,13 +803,29 @@ private fun KoleksiGrid(collection: List<UserCharacterEntry>) {
     ) {
         itemsIndexed(collection) { index, entry ->
             val char = entry.characters ?: return@itemsIndexed
-            KoleksiCard(name = char.name, rarity = char.rarity, imageUrl = char.image_url, count = entry.count, index = index)
+            KoleksiCard(
+                name = char.name,
+                rarity = char.rarity,
+                imageUrl = char.image_url,
+                count = entry.count,
+                index = index,
+                isPinned = showcaseIds.contains(char.mal_id),
+                onTogglePin = { onTogglePin(char.mal_id) }
+            )
         }
     }
 }
 
 @Composable
-private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: Int, index: Int) {
+private fun KoleksiCard(
+    name: String,
+    rarity: String,
+    imageUrl: String?,
+    count: Int,
+    index: Int,
+    isPinned: Boolean = false,
+    onTogglePin: (() -> Unit)? = null
+) {
     val color = rarityColor(rarity)
     val premium = isPremiumRarity(rarity)
     val interaction = remember { MutableInteractionSource() }
@@ -810,6 +892,23 @@ private fun KoleksiCard(name: String, rarity: String, imageUrl: String?, count: 
                     compact = true,
                     modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
                 )
+                if (onTogglePin != null) {
+                    Icon(
+                        imageVector = if (isPinned) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = if (isPinned) "Lepas dari pajangan" else "Pajang di profil",
+                        tint = if (isPinned) Color(0xFFFFC24B) else Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                                onTogglePin()
+                            }
+                            .padding(4.dp)
+                            .size(16.dp)
+                    )
+                }
                 if (count > 1) {
                     Text(
                         "x$count",

@@ -362,6 +362,26 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Simpan pajangan kartu karakter di profil (maks 6). Validasi kepemilikan
+    // dilakukan di server lewat RPC ini -- jangan pernah PATCH kolom
+    // showcase_character_ids langsung ke tabel profiles.
+    @POST("rest/v1/rpc/set_profile_showcase")
+    suspend fun setProfileShowcase(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    // Ambil detail karakter (nama, gambar, rarity) buat sekumpulan mal_id --
+    // dipakai buat nampilin kartu yang dipajang di profil (milik sendiri/orang lain).
+    @GET("rest/v1/characters")
+    suspend fun getCharactersByIds(
+        @Query("mal_id") malIdFilter: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "mal_id,name,image_url,anime_title,rarity"
+    ): List<CharacterInfoDto>
+
     // --- Clan & Diamond ---
     @GET("rest/v1/clan_members")
     suspend fun getUserClanMembership(

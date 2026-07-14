@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,9 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -348,141 +345,41 @@ fun ClanScreen(
 
 @Composable
 private fun QuizEntryCard(onClick: () -> Unit) {
-    val infinite = rememberInfiniteTransition(label = "quiz_banner")
-    // Border gradient yang geser terus-menerus, kesan "energi" yang mengalir
-    val borderShift by infinite.animateFloat(
-        initialValue = -1f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Restart),
-        label = "borderShift"
-    )
-    // Icon badge berdenyut
-    val iconPulse by infinite.animateFloat(
-        initialValue = 0.9f, targetValue = 1.12f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "iconPulse"
-    )
-    val iconGlow by infinite.animateFloat(
-        initialValue = 0.35f, targetValue = 0.75f,
-        animationSpec = infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "iconGlow"
-    )
-    // Kilau (shimmer) yang menyapu dari kiri ke kanan
-    val shimmer by infinite.animateFloat(
-        initialValue = -0.4f, targetValue = 1.4f,
-        animationSpec = infiniteRepeatable(tween(2400, delayMillis = 500, easing = LinearEasing), RepeatMode.Restart),
-        label = "shimmer"
-    )
-    // Panah yang "nudge" ke kanan, ngasih sinyal buat di-tap
-    val arrowNudge by infinite.animateFloat(
-        initialValue = 0f, targetValue = 5f,
-        animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "arrowNudge"
-    )
-
-    val neonBorder = Brush.linearGradient(
-        colors = listOf(Color(0xFFFF3D81), Color(0xFF7B2FBF), Color(0xFF2FE0FF), Color(0xFFFF3D81)),
-        start = Offset(borderShift * 500f, 0f),
-        end = Offset(borderShift * 500f + 400f, 260f)
-    )
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF14101F), Color(0xFF0A0812))))
-            .border(BorderStroke(1.4.dp, neonBorder), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF3A2A0F), Color(0xFF1F1508))))
             .clickable { onClick() }
+            .padding(16.dp)
     ) {
-        // Sapuan cahaya diagonal
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .clip(RoundedCornerShape(20.dp))
-                .drawWithContent {
-                    drawContent()
-                    val w = size.width
-                    val x = shimmer * w
-                    drawRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.10f), Color.Transparent),
-                            start = Offset(x - 120f, 0f),
-                            end = Offset(x + 120f, size.height)
-                        )
-                    )
-                }
-        )
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(46.dp),
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFB020).copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .graphicsLayer { scaleX = iconPulse; scaleY = iconPulse }
-                        .background(
-                            Brush.radialGradient(
-                                listOf(Color(0xFF2FE0FF).copy(alpha = iconGlow), Color.Transparent)
-                            ),
-                            CircleShape
-                        )
-                )
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF1B1430))
-                        .border(1.dp, Color(0xFF2FE0FF).copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Theaters,
-                        contentDescription = null,
-                        tint = Color(0xFF2FE0FF),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Text("🎬", fontSize = 20.sp)
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "TEBAK ANIME DARI POSTER",
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 12.5.sp,
-                    letterSpacing = 0.6.sp
-                )
-                Spacer(Modifier.height(3.dp))
+                Text("Tebak Anime dari Poster", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(
                     "Jawab bener nambah XP kamu & clan",
-                    color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 11.5.sp
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 12.sp
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF2FE0FF).copy(alpha = 0.14f))
-                    .border(1.dp, Color(0xFF2FE0FF).copy(alpha = 0.45f), RoundedCornerShape(50))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text("+XP", color = Color(0xFF2FE0FF), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            Spacer(Modifier.width(6.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                 contentDescription = null,
-                tint = Color(0xFF2FE0FF),
-                modifier = Modifier
-                    .size(14.dp)
-                    .graphicsLayer { translationX = arrowNudge }
+                tint = Color(0xFFFFB020),
+                modifier = Modifier.size(16.dp)
             )
         }
     }

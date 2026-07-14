@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -123,6 +124,11 @@ fun UserProfileScreen(
 
     LaunchedEffect(clanForDialog) {
         clanForDialog?.let { viewModel.loadClanMembers(it.id) }
+    }
+
+    val showcaseCharacters by viewModel.showcaseCharacters.collectAsState()
+    LaunchedEffect(profile?.showcase_character_ids) {
+        viewModel.loadShowcaseCharacters(profile?.showcase_character_ids ?: emptyList())
     }
 
     LaunchedEffect(banStatusMessage) {
@@ -594,6 +600,10 @@ fun UserProfileScreen(
                             }
                         }
                     }
+                }
+
+                if (showcaseCharacters.isNotEmpty()) {
+                    ShowcaseSection(characters = showcaseCharacters)
                 }
 
                 // Tab swipeable ala referensi: Komentar / Favorit / Histori
@@ -1327,5 +1337,71 @@ private fun HistoryTabContent(
             }
         }
         item { Spacer(modifier = Modifier.height(4.dp)) }
+    }
+}
+
+// ============================================================================
+//  KARTU DIPAJANG — karakter gacha pilihan user, tampil di profil publik
+// ============================================================================
+private fun showcaseRarityColor(rarity: String): Color = when (rarity) {
+    "Mythic" -> Color(0xFFFF5DA2)
+    "Legendary" -> Color(0xFFFFC24B)
+    "Epic" -> Color(0xFFB56BFF)
+    "Rare" -> Color(0xFF4FC3F7)
+    else -> Color(0xFF9E9E9E)
+}
+
+@Composable
+private fun ShowcaseSection(characters: List<com.example.network.CharacterInfoDto>) {
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+        Text(
+            "Kartu Dipajang",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
+            modifier = Modifier.padding(horizontal = 20.dp, bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            characters.forEach { char ->
+                val color = showcaseRarityColor(char.rarity)
+                Column(
+                    modifier = Modifier
+                        .width(84.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(5.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(0.8f)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        AsyncImage(
+                            model = char.image_url,
+                            contentDescription = char.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        char.name,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
+        }
     }
 }

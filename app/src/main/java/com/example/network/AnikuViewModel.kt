@@ -3335,6 +3335,91 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── Pajangan kartu karakter di profil (maks 6) ──
+
+    // id karakter yang lagi dipajang punya USER SENDIRI (buat isi awal editor di GachaScreen)
+    private val _myShowcaseIds = MutableStateFlow<List<Int>>(emptyList())
+    val myShowcaseIds: StateFlow<List<Int>> = _myShowcaseIds.asStateFlow()
+
+    // detail karakter yang dipajang -- dipakai buat nampilin di ProfileScreen/UserProfileScreen
+    // (bisa punya sendiri atau punya orang lain, makanya terima parameter ids)
+    private val _showcaseCharacters = MutableStateFlow<List<CharacterInfoDto>>(emptyList())
+    val showcaseCharacters: StateFlow<List<CharacterInfoDto>> = _showcaseCharacters.asStateFlow()
+
+    fun setMyShowcaseIds(ids: List<Int>) {
+        _myShowcaseIds.value = ids
+    }
+
+    // Ambil pajangan yang lagi aktif buat user sendiri (dipanggil pas buka GachaScreen
+    // biar toggle "dipajang/enggak" di tiap kartu koleksi sesuai kondisi terakhir).
+    fun loadMyShowcaseIds() {
+        val uid = session.value.userId ?: return
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getProfileByUserId(
+                    idQuery = "eq.$uid",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _myShowcaseIds.value = result.firstOrNull()?.showcase_character_ids ?: emptyList()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadMyShowcaseIds error", e)
+            }
+        }
+    }
+
+    // Ambil detail (nama/gambar/rarity) buat sekumpulan id karakter yang dipajang,
+    // urutannya disesuaikan sama urutan "ids" biar konsisten sama pilihan user.
+    fun loadShowcaseCharacters(ids: List<Int>) {
+        if (ids.isEmpty()) {
+            _showcaseCharacters.value = emptyList()
+            return
+        }
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val filter = "in.(${ids.joinToString(",")})"
+                val result = NetworkClient.supabaseDbApi.getCharactersByIds(
+                    malIdFilter = filter,
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val byId = result.associateBy { it.mal_id }
+                _showcaseCharacters.value = ids.mapNotNull { byId[it] }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadShowcaseCharacters error", e)
+            }
+        }
+    }
+
+    // Simpan pilihan pajangan (maks 6, validasi kepemilikan dicek ulang di server
+    // lewat RPC set_profile_showcase -- ini bukan sekadar UPDATE tabel profiles biasa).
+    fun saveShowcase(ids: List<Int>, onResult: (Boolean, String?) -> Unit) {
+        if (ids.size > 6) {
+            onResult(false, "Maksimal 6 karakter yang bisa dipajang")
+            return
+        }
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.setProfileShowcase(
+                    body = mapOf("p_character_ids" to ids),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    _myShowcaseIds.value = ids
+                    onResult(true, null)
+                } else {
+                    onResult(false, response.errorBody()?.string() ?: "Gagal menyimpan pajangan")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "saveShowcase error", e)
+                onResult(false, e.message)
+            }
+        }
+    }
 
     fun updateUserRole(profile: ProfileDto, newRole: String) {
         if (!session.value.isAdmin) return
