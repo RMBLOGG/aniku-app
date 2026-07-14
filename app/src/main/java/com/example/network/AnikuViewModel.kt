@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -3244,41 +3245,43 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Ambil 1 anime random dari Jikan buat jadi soal (poster + judul benar), plus
-    // beberapa anime random lain buat dijadiin pilihan jawaban salah (decoy).
-    // Jikan itu API pihak ketiga yang lumayan sering error transien (504, 429,
-    // timeout) - makanya SETIAP request di-retry sendiri-sendiri, bukan cuma
-    // pas hasilnya kosong. Ini penting: sebelumnya kalau 1 request doang yang
-    // gagal (mis. 504), seluruh fungsi langsung nyerah tanpa nyoba ulang.
+    // Ambil soal buat quiz dari Animasu (bukan Jikan lagi) - sumbernya API sendiri
+    // (sankavollerei.com/anime, animeApi yang udah dipake fitur lain di app), jadi
+    // lebih stabil dibanding Jikan yang sering 504/timeout. Cuma butuh field
+    // "poster" dan "title" dari AnimeRaw, sisanya diabaikan.
+    // Ambil 1 halaman animelist (isinya banyak anime sekaligus), lalu pilih 1
+    // acak jadi jawaban benar + beberapa lain jadi decoy - SEMUA dari 1 request
+    // doang, gak perlu banyak API call kayak pendekatan Jikan sebelumnya.
     fun fetchQuizQuestion(
         decoyCount: Int = 3,
-        onResult: (correctAnswer: JikanAnimeData?, decoys: List<String>, error: String?) -> Unit
+        onResult: (correctAnswer: AnimeRaw?, decoys: List<String>, error: String?) -> Unit
     ) {
         viewModelScope.launch {
-            var correct: JikanAnimeData? = null
+            var pool: List<AnimeRaw> = emptyList()
             var attempts = 0
             var lastErrorWasTransient = false
-            while (correct == null && attempts < 6) {
+            while (pool.size < decoyCount + 1 && attempts < 5) {
                 attempts++
                 try {
-                    val res = NetworkClient.jikanApi.randomAnime()
-                    // Poster wajib ada, kalau kosong coba tarik ulang
-                    val hasPoster = !res.data?.images?.jpg?.image_url.isNullOrEmpty() ||
-                        !res.data?.images?.jpg?.large_image_url.isNullOrEmpty()
-                    if (res.data != null && hasPoster) correct = res.data
+                    val page = Random.nextInt(1, 30)
+                    val res = animeApi.getAnimeList(page = page)
+                    val validItems = res.animes?.filter {
+                        it.poster.isNotBlank() && it.title.isNotBlank()
+                    } ?: emptyList()
+                    if (validItems.size >= decoyCount + 1) {
+                        pool = validItems
+                    }
                     lastErrorWasTransient = false
                 } catch (e: Exception) {
-                    // Jikan lagi gangguan (504/429/timeout) - jangan langsung nyerah,
-                    // tunggu bentar terus coba lagi.
-                    Log.e("AnikuVM", "fetchQuizQuestion randomAnime attempt $attempts gagal", e)
+                    Log.e("AnikuVM", "fetchQuizQuestion getAnimeList attempt $attempts gagal", e)
                     lastErrorWasTransient = true
                 }
-                if (correct == null) delay(500)
+                if (pool.size < decoyCount + 1) delay(500)
             }
 
-            if (correct == null) {
+            if (pool.size < decoyCount + 1) {
                 val msg = if (lastErrorWasTransient) {
-                    "Server Jikan lagi gangguan/timeout, coba lagi sebentar"
+                    "Server Animasu lagi gangguan/timeout, coba lagi sebentar"
                 } else {
                     "Gagal ambil soal, coba lagi"
                 }
@@ -3286,21 +3289,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 return@launch
             }
 
-            val decoys = mutableListOf<String>()
-            var decoyAttempts = 0
-            while (decoys.size < decoyCount && decoyAttempts < decoyCount * 4) {
-                decoyAttempts++
-                try {
-                    val res = NetworkClient.jikanApi.randomAnime()
-                    val title = res.data?.title
-                    if (!title.isNullOrBlank() && title != correct.title && !decoys.contains(title)) {
-                        decoys.add(title)
-                    }
-                } catch (e: Exception) {
-                    // decoy gagal 1x gapapa, lanjut coba lagi - bukan fatal buat soalnya
-                }
-                delay(400)
-            }
+            val shuffled = pool.shuffled(Random(System.nanoTime()))
+            val correct = shuffled[0]
+            val decoys = shuffled.drop(1)
+                .map { it.title }
+                .distinct()
+                .filter { it != correct.title }
+                .take(decoyCount)
 
             onResult(correct, decoys, if (decoys.size < decoyCount) "Sebagian pilihan jawaban gagal dimuat" else null)
         }

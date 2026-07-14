@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
-import com.example.network.JikanAnimeData
+import com.example.network.AnimeRaw
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -119,9 +119,7 @@ fun QuizScreen(
                     return@fetchQuizQuestion
                 }
                 val correctTitle = correct.title
-                val poster = correct.images?.jpg?.large_image_url
-                    ?: correct.images?.jpg?.image_url
-                    ?: ""
+                val poster = correct.poster
                 val allChoices = (decoys + correctTitle).shuffled(Random(System.nanoTime()))
                 answerStartMillis = System.currentTimeMillis()
                 secondsLeft = QUESTION_SECONDS
