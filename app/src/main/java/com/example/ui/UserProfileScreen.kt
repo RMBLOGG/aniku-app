@@ -14,10 +14,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,7 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -41,12 +43,14 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -1341,66 +1345,181 @@ private fun HistoryTabContent(
 }
 
 // ============================================================================
-//  KARTU DIPAJANG — karakter gacha pilihan user, tampil di profil publik
+//  KARTU DIPAJANG — karakter gacha pilihan user, tampil di profil publik.
+//  Desain ala-gamer: border gradient per rarity, glow, badge rarity ikon+teks,
+//  dan scrim gelap di bawah biar nama karakter tetap kebaca di atas foto.
 // ============================================================================
 private fun showcaseRarityColor(rarity: String): Color = when (rarity) {
-    "Mythic" -> Color(0xFFFF5DA2)
+    "Mythic" -> Color(0xFFFF3D6E)
     "Legendary" -> Color(0xFFFFC24B)
     "Epic" -> Color(0xFFB56BFF)
     "Rare" -> Color(0xFF4FC3F7)
     else -> Color(0xFF9E9E9E)
 }
 
+private fun showcaseRarityGradient(rarity: String): Brush = when (rarity) {
+    "Mythic" -> Brush.linearGradient(listOf(Color(0xFFFF3D6E), Color(0xFFFF8A3D)))
+    "Legendary" -> Brush.linearGradient(listOf(Color(0xFFFFC24B), Color(0xFFFF8A00)))
+    "Epic" -> Brush.linearGradient(listOf(Color(0xFFB56BFF), Color(0xFF6C63FF)))
+    "Rare" -> Brush.linearGradient(listOf(Color(0xFF4FC3F7), Color(0xFF3D7EFF)))
+    else -> Brush.linearGradient(listOf(Color(0xFF9E9E9E), Color(0xFF6E6E6E)))
+}
+
+private fun showcaseRarityIcon(rarity: String) = when (rarity) {
+    "Mythic" -> Icons.Default.Whatshot
+    "Legendary" -> Icons.Default.WorkspacePremium
+    "Epic" -> Icons.Default.AutoAwesome
+    "Rare" -> Icons.Default.Bolt
+    else -> Icons.Default.MilitaryTech
+}
+
+private fun showcaseRarityLabel(rarity: String): String = when (rarity) {
+    "Mythic" -> "MYTHIC"
+    "Legendary" -> "LEGENDARY"
+    "Epic" -> "EPIC"
+    "Rare" -> "RARE"
+    else -> "COMMON"
+}
+
 @Composable
 private fun ShowcaseSection(characters: List<com.example.network.CharacterInfoDto>) {
-    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
-        Text(
-            "Kartu Dipajang",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f),
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
-        )
+    Column(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
+        ) {
+            Icon(
+                Icons.Default.WorkspacePremium,
+                contentDescription = null,
+                tint = Color(0xFFFFC24B),
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                "KARTU DIPAJANG",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.5.sp,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.9f)
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             characters.forEach { char ->
-                val color = showcaseRarityColor(char.rarity)
-                Column(
-                    modifier = Modifier
-                        .width(84.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                        .padding(5.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.8f)
-                            .clip(RoundedCornerShape(8.dp))
-                    ) {
-                        AsyncImage(
-                            model = char.image_url,
-                            contentDescription = char.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                ShowcaseCard(char)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShowcaseCard(char: com.example.network.CharacterInfoDto) {
+    val color = showcaseRarityColor(char.rarity)
+    val gradient = showcaseRarityGradient(char.rarity)
+    val label = showcaseRarityLabel(char.rarity)
+
+    Box(
+        modifier = Modifier
+            .width(102.dp)
+            .aspectRatio(0.72f)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = color.copy(alpha = 0.6f),
+                spotColor = color.copy(alpha = 0.6f)
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF0E0E16))
+            .border(1.5.dp, gradient, RoundedCornerShape(16.dp))
+    ) {
+        AsyncImage(
+            model = char.image_url,
+            contentDescription = char.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Scrim gelap dari bawah biar nama & badge tetap kontras di atas foto
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            0.55f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.88f)
                         )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        char.name,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onBackground
                     )
-                }
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
+                    )
+                )
+        )
+
+        // Badge rarity ala-gamer: pill gradient + ikon, nempel di pojok kiri atas
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(5.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(gradient)
+                .padding(horizontal = 5.dp, vertical = 2.dp)
+        ) {
+            Icon(
+                showcaseRarityIcon(char.rarity),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(9.dp)
+            )
+            Spacer(modifier = Modifier.width(2.dp))
+            Text(
+                label,
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.3.sp,
+                color = Color.White
+            )
+        }
+
+        // Nama karakter, nempel di bawah di atas scrim
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 7.dp, vertical = 6.dp)
+        ) {
+            Text(
+                char.name,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color.White
+            )
+            if (!char.anime_title.isNullOrBlank()) {
+                Text(
+                    char.anime_title,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color.White.copy(alpha = 0.65f)
+                )
             }
         }
     }

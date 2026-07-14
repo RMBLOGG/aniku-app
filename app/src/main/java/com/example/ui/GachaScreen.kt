@@ -1,5 +1,7 @@
 package com.example.ui
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -24,8 +26,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -892,6 +892,20 @@ private fun KoleksiCard(
                     compact = true,
                     modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
                 )
+                if (count > 1) {
+                    Text(
+                        "x$count",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(5.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
                 if (onTogglePin != null) {
                     Icon(
                         imageVector = if (isPinned) Icons.Default.Star else Icons.Default.StarBorder,
@@ -907,20 +921,6 @@ private fun KoleksiCard(
                             }
                             .padding(4.dp)
                             .size(16.dp)
-                    )
-                }
-                if (count > 1) {
-                    Text(
-                        "x$count",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(5.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             }
