@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -271,34 +272,91 @@ private fun DiscussionTabRow(
 // Poster". Cuma dimunculin kalau user emang udah punya clan (quiz wajib clan).
 @Composable
 private fun ClanQuizBanner(onClick: () -> Unit) {
+    val infinite = rememberInfiniteTransition(label = "chat_quiz_banner")
+    val edgeGlow by infinite.animateFloat(
+        initialValue = 0.35f, targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "edgeGlow"
+    )
+    val iconPulse by infinite.animateFloat(
+        initialValue = 0.92f, targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "iconPulse"
+    )
+    val shimmer by infinite.animateFloat(
+        initialValue = -0.4f, targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(tween(2200, delayMillis = 400, easing = LinearEasing), RepeatMode.Restart),
+        label = "shimmer"
+    )
+    val arrowNudge by infinite.animateFloat(
+        initialValue = 0f, targetValue = 4f,
+        animationSpec = infiniteRepeatable(tween(600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "arrowNudge"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .background(Color(0xFF3A2A0F))
+            .background(Brush.verticalGradient(listOf(Color(0xFF14101F), Color(0xFF0A0812))))
+            .drawWithContent {
+                drawContent()
+                // Garis neon berdenyut di tepi kiri, bertindak sebagai "power line"
+                drawRect(
+                    color = Color(0xFF2FE0FF).copy(alpha = edgeGlow),
+                    size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)
+                )
+                // Sapuan kilau
+                val x = shimmer * size.width
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.08f), Color.Transparent),
+                        start = Offset(x - 100f, 0f),
+                        end = Offset(x + 100f, size.height)
+                    )
+                )
+            }
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("🎬", fontSize = 16.sp)
-        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .graphicsLayer { scaleX = iconPulse; scaleY = iconPulse }
+                .clip(CircleShape)
+                .background(Color(0xFF1B1430))
+                .border(1.dp, Color(0xFF2FE0FF).copy(alpha = 0.55f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Theaters,
+                contentDescription = null,
+                tint = Color(0xFF2FE0FF),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                "Tebak Anime dari Poster",
+                "TEBAK ANIME DARI POSTER",
                 color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
+                fontWeight = FontWeight.Black,
+                fontSize = 11.5.sp,
+                letterSpacing = 0.4.sp
             )
             Text(
                 "Jawab bener nambah XP kamu & clan-mu",
-                color = Color.White.copy(alpha = 0.65f),
+                color = Color.White.copy(alpha = 0.55f),
                 fontSize = 11.sp
             )
         }
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
             contentDescription = null,
-            tint = Color(0xFFFFB020),
-            modifier = Modifier.size(14.dp)
+            tint = Color(0xFF2FE0FF),
+            modifier = Modifier
+                .size(13.dp)
+                .graphicsLayer { translationX = arrowNudge }
         )
     }
 }
