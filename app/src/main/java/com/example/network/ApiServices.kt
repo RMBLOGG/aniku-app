@@ -489,6 +489,15 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Ganti singkatan/tag clan (mis. "COC") -- terpisah dari rename nama biar
+    // validasi panjang & keunikan tag gak nyampur sama validasi nama.
+    @POST("rest/v1/rpc/rename_clan_tag")
+    suspend fun renameClanTag(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/rpc/set_clan_privacy")
     suspend fun setClanPrivacy(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,

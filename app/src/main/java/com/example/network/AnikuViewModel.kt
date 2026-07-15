@@ -2884,6 +2884,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun renameClanTag(clanId: String, newTag: String) {
+        _clanActionError.value = null
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.renameClanTag(mapOf("p_clan_id" to clanId, "p_new_tag" to newTag), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) {
+                    loadMyClanMembership()
+                    loadClans()
+                    refreshProfile()
+                } else {
+                    _clanActionError.value = response.errorBody()?.string() ?: "Gagal ganti singkatan clan"
+                }
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal ganti singkatan clan"
+            }
+        }
+    }
+
     fun setClanPrivacy(clanId: String, isPrivate: Boolean) {
         viewModelScope.launch {
             try {

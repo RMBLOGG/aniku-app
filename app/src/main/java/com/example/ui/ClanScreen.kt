@@ -294,6 +294,7 @@ fun ClanScreen(
             diamondBalance = diamondBalance,
             onDismiss = { showManageDialog = false },
             onRename = { newName -> viewModel.renameClan(myClan!!.id, newName) },
+            onRenameTag = { newTag -> viewModel.renameClanTag(myClan!!.id, newTag) },
             onTogglePrivacy = { isPrivate -> viewModel.setClanPrivacy(myClan!!.id, isPrivate) },
             onApproveRequest = { reqId -> viewModel.approveJoinRequest(reqId, myClan!!.id) },
             onRejectRequest = { reqId -> viewModel.rejectJoinRequest(reqId, myClan!!.id) },
@@ -1104,12 +1105,14 @@ private fun ManageClanDialog(
     diamondBalance: Int,
     onDismiss: () -> Unit,
     onRename: (String) -> Unit,
+    onRenameTag: (String) -> Unit,
     onTogglePrivacy: (Boolean) -> Unit,
     onApproveRequest: (String) -> Unit,
     onRejectRequest: (String) -> Unit,
     onDeleteClan: () -> Unit
 ) {
     var newName by remember { mutableStateOf(clan.name) }
+    var newTag by remember { mutableStateOf(clan.tag) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     AnimeDialog(
@@ -1134,6 +1137,31 @@ private fun ManageClanDialog(
                     TextButton(
                         onClick = { if (newName.isNotBlank() && newName != clan.name) onRename(newName) },
                         enabled = newName.isNotBlank() && newName != clan.name
+                    ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("Ganti Singkatan Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                Text("Maks 6 karakter, otomatis jadi huruf kapital", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = newTag,
+                        onValueChange = { if (it.length <= 6) newTag = it.uppercase() },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF2FA8BF), unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { if (newTag.isNotBlank() && newTag != clan.tag) onRenameTag(newTag) },
+                        enabled = newTag.isNotBlank() && newTag != clan.tag
                     ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
                 }
 
