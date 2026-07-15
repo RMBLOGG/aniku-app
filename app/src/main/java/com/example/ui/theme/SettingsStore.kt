@@ -60,6 +60,13 @@ class SettingsStore(private val context: Context) {
         preferences[DATA_SOURCE] ?: "Dayynime-v1"
     }
 
+    // Nilai mentah (null kalau user belum pernah milih source sendiri). Dipakai
+    // buat bedain "belum pernah pilih" (pakai default_data_source dari remote config)
+    // vs "user emang milih Dayynime-v1" secara eksplisit.
+    val dataSourceRawFlow: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[DATA_SOURCE]
+    }
+
     val themePresetFlow: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_PRESET] ?: "Default"
     }

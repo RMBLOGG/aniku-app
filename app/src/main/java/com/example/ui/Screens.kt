@@ -10559,6 +10559,7 @@ fun SumberDataScreen(
     onBack: () -> Unit
 ) {
     val currentSource by viewModel.dataSource.collectAsState()
+    val disabledSources by viewModel.disabledDataSources.collectAsState()
     val accentColorName by viewModel.accentColorName.collectAsState()
     val accentColor = getAccentColor(accentColorName)
 
@@ -10608,22 +10609,27 @@ fun SumberDataScreen(
 
             sources.forEach { (sourceKey, sourceDesc) ->
                 val isSelected = currentSource == sourceKey
+                val isDisabled = sourceKey in disabledSources
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected)
-                            accentColor.copy(alpha = 0.12f)
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant
+                        containerColor = when {
+                            isDisabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            isSelected -> accentColor.copy(alpha = 0.12f)
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
                     ),
                     shape = RoundedCornerShape(16.dp),
-                    border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, accentColor) else null,
+                    border = if (isSelected && !isDisabled) androidx.compose.foundation.BorderStroke(1.5.dp, accentColor) else null,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            viewModel.changeDataSource(sourceKey)
-                            viewModel.loadHomeData()
-                            viewModel.loadSearchPopular()
-                        }
+                        .then(
+                            if (isDisabled) Modifier
+                            else Modifier.clickable {
+                                viewModel.changeDataSource(sourceKey)
+                                viewModel.loadHomeData()
+                                viewModel.loadSearchPopular()
+                            }
+                        )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
@@ -10632,18 +10638,20 @@ fun SumberDataScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 sourceKey,
-                                color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
+                                color = if (isDisabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    else if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             )
                             Text(
-                                sourceDesc,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                if (isDisabled) "Sementara nonaktif" else sourceDesc,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isDisabled) 0.5f else 0.8f),
                                 fontSize = 12.sp
                             )
                         }
                         Switch(
-                            checked = isSelected,
+                            checked = isSelected && !isDisabled,
+                            enabled = !isDisabled,
                             onCheckedChange = {
                                 viewModel.changeDataSource(sourceKey)
                                 viewModel.loadHomeData()

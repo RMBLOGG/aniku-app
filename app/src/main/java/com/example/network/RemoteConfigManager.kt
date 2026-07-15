@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.asStateFlow
  * - download_enabled
  * - maintenance_mode
  * - maintenance_message
+ * - default_data_source: source yang dipake user baru / kalau source aktifnya kena disable
+ *   (contoh: "Dayynime-v1")
+ * - disabled_sources: daftar source yang dimatiin, dipisah koma
+ *   (contoh: "Dayynime-v1,Dayynime-v2")
  */
 class RemoteConfigManager {
 
@@ -45,7 +49,9 @@ class RemoteConfigManager {
                     KEY_COMMENT to true,
                     KEY_DOWNLOAD to true,
                     KEY_MAINTENANCE_MODE to false,
-                    KEY_MAINTENANCE_MESSAGE to "Aniku lagi maintenance sebentar, balik lagi nanti ya!"
+                    KEY_MAINTENANCE_MESSAGE to "Aniku lagi maintenance sebentar, balik lagi nanti ya!",
+                    KEY_DEFAULT_SOURCE to "Dayynime-v1",
+                    KEY_DISABLED_SOURCES to ""
                 )
             )
         }
@@ -74,6 +80,13 @@ class RemoteConfigManager {
 
     private val _maintenanceMessage = MutableStateFlow("")
     val maintenanceMessage: StateFlow<String> = _maintenanceMessage.asStateFlow()
+
+    // Sumber Data: default buat user baru + daftar source yang dimatiin dari console
+    private val _defaultDataSource = MutableStateFlow("Dayynime-v1")
+    val defaultDataSource: StateFlow<String> = _defaultDataSource.asStateFlow()
+
+    private val _disabledSources = MutableStateFlow<Set<String>>(emptySet())
+    val disabledSources: StateFlow<Set<String>> = _disabledSources.asStateFlow()
 
     /** Fetch nilai terbaru dari server lalu update semua flag. Panggil pas app start. */
     fun fetchAndApply() {
@@ -113,6 +126,12 @@ class RemoteConfigManager {
         _downloadEnabled.value = remoteConfig.getBoolean(KEY_DOWNLOAD)
         _maintenanceMode.value = remoteConfig.getBoolean(KEY_MAINTENANCE_MODE)
         _maintenanceMessage.value = remoteConfig.getString(KEY_MAINTENANCE_MESSAGE)
+        _defaultDataSource.value = remoteConfig.getString(KEY_DEFAULT_SOURCE).ifBlank { "Dayynime-v1" }
+        _disabledSources.value = remoteConfig.getString(KEY_DISABLED_SOURCES)
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
     }
 
     companion object {
@@ -124,5 +143,7 @@ class RemoteConfigManager {
         private const val KEY_DOWNLOAD = "download_enabled"
         private const val KEY_MAINTENANCE_MODE = "maintenance_mode"
         private const val KEY_MAINTENANCE_MESSAGE = "maintenance_message"
+        private const val KEY_DEFAULT_SOURCE = "default_data_source"
+        private const val KEY_DISABLED_SOURCES = "disabled_sources"
     }
 }

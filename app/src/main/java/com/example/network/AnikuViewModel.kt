@@ -234,7 +234,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val themePreset = settingsStore.themePresetFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Default")
     val cardStyle = settingsStore.cardStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Rounded")
     val navStyle = settingsStore.navStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "IconLabel")
-    val dataSource = settingsStore.dataSourceFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
+    // Semua source yang ada di app, dipake sebagai fallback terakhir kalau
+    // default_data_source dari remote config kebetulan juga lagi disable.
+    private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4")
+
+    // Source aktif: normalnya pilihan user sendiri, TAPI kalau user belum pernah
+    // milih (raw == null) atau source pilihannya kena disable dari Firebase Remote
+    // Config, otomatis jatuh ke default_data_source (atau source pertama yang masih
+    // nyala kalau defaultnya sendiri ikut kena disable).
+    val dataSource: StateFlow<String> = combine(
+        settingsStore.dataSourceRawFlow,
+        remoteConfigManager.disabledSources,
+        remoteConfigManager.defaultDataSource
+    ) { rawSource, disabled, remoteDefault ->
+        val fallback = remoteDefault.takeIf { it.isNotBlank() && it !in disabled }
+            ?: ALL_DATA_SOURCES.firstOrNull { it !in disabled }
+            ?: "Dayynime-v1"
+        if (rawSource == null || rawSource in disabled) fallback else rawSource
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
+
+    // Dipake di SumberDataScreen buat nge-grey-out card source yang lagi dimatiin.
+    val disabledDataSources: StateFlow<Set<String>> = remoteConfigManager.disabledSources
 
     // Session flow
     val session = settingsStore.sessionFlow.stateIn(
