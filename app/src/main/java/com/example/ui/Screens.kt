@@ -8499,15 +8499,15 @@ fun AdminPanelScreen(
         if (isLoading) {
             LoadingScreen("Memuat data...")
         } else {
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
                 when (selectedTab) {
                     0 -> {
                         // Section A: Users List
+                        item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -8576,8 +8576,14 @@ fun AdminPanelScreen(
                                 )
                             }
                         }
+                        } // end header item
 
-                        filteredUsers.forEach { usr ->
+                        // Kartu tiap user dirender lewat items() (LazyColumn) supaya cuma
+                        // yang keliatan di layar yang di-compose & avatar-nya di-load --
+                        // sebelumnya pakai forEach di Column biasa, jadi SEMUA user (avatar,
+                        // dialog state, dll) ke-compose sekaligus pas panel dibuka. Kalau
+                        // usernya udah ratusan, ini yang bikin lag parah sampai crash/OOM.
+                        items(filteredUsers, key = { it.id }) { usr ->
                             val isBanned = usr.is_banned == true
                             val statusColor = if (isBanned) Color(0xFFFF5252) else Color(0xFF4CAF50)
 
@@ -8884,6 +8890,7 @@ fun AdminPanelScreen(
 
                     1 -> {
                         // Section B: Announcements Create Form
+                        item {
                         Text("Tambah Pengumuman Baru", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(10.dp))
                         
@@ -8950,8 +8957,10 @@ fun AdminPanelScreen(
                         
                         if (announcements.isEmpty()) {
                             Text("Tidak ada pengumuman.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
-                        } else {
-                            announcements.forEach { ann ->
+                        }
+                        } // end form item
+
+                        items(announcements, key = { it.id }) { ann ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
@@ -8966,12 +8975,12 @@ fun AdminPanelScreen(
                                         }
                                     }
                                 }
-                            }
                         }
                     }
 
                     2 -> {
                         // Section C: Featured Slider Overwrite Hero Manual
+                        item {
                         Text("Tambahkan Hero Banner Baru", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(10.dp))
                         
@@ -9054,8 +9063,10 @@ fun AdminPanelScreen(
                         
                         if (featured.isEmpty()) {
                             Text("Tidak ada list manual. Banner otomatis menggunakan ongoing anime.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
-                        } else {
-                            featured.forEach { ft ->
+                        }
+                        } // end form item
+
+                        items(featured, key = { it.id }) { ft ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
@@ -9076,12 +9087,12 @@ fun AdminPanelScreen(
                                         }
                                     }
                                 }
-                            }
                         }
                     }
 
                     3 -> {
                         // Section D: Blacklist Management
+                        item {
                         Text("Blacklist / Aturan Sembunyikan Anime", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(10.dp))
                         
@@ -9148,8 +9159,10 @@ fun AdminPanelScreen(
                         
                         if (blacklist.isEmpty()) {
                             Text("Tidak ada anime disembunyikan.", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(top = 10.dp))
-                        } else {
-                            blacklist.forEach { bl ->
+                        }
+                        } // end form item
+
+                        items(blacklist, key = { it.id }) { bl ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
@@ -9169,10 +9182,10 @@ fun AdminPanelScreen(
                                         }
                                     }
                                 }
-                            }
                         }
                     }
                     4 -> {
+                        item {
                         // Section E: Blacklist Genre — tinggal tap chip genre yang mau disembunyikan, gak perlu form
                         val genresListRaw by viewModel.genres.collectAsState()
                         val blacklistGenres by viewModel.adminBlacklistGenres.collectAsState()
@@ -9237,12 +9250,13 @@ fun AdminPanelScreen(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
+                        }
                     }
                     5 -> {
-                        AdminRequestAnimeSection(viewModel = viewModel)
+                        item { AdminRequestAnimeSection(viewModel = viewModel) }
                     }
                     6 -> {
-                        FeatureFlagsAdminSection(viewModel = viewModel)
+                        item { FeatureFlagsAdminSection(viewModel = viewModel) }
                     }
                 }
             }
