@@ -8583,7 +8583,7 @@ fun AdminPanelScreen(
                         // sebelumnya pakai forEach di Column biasa, jadi SEMUA user (avatar,
                         // dialog state, dll) ke-compose sekaligus pas panel dibuka. Kalau
                         // usernya udah ratusan, ini yang bikin lag parah sampai crash/OOM.
-                        items(filteredUsers, key = { it.id }) { usr ->
+                        items(filteredUsers, key = { u: com.example.network.ProfileDto -> u.id }) { usr: com.example.network.ProfileDto ->
                             val isBanned = usr.is_banned == true
                             val statusColor = if (isBanned) Color(0xFFFF5252) else Color(0xFF4CAF50)
 
@@ -8775,7 +8775,7 @@ fun AdminPanelScreen(
                                                                     .heightIn(max = 320.dp),
                                                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                                                             ) {
-                                                                items(swapTargets, key = { it.id }) { target ->
+                                                                items(swapTargets, key = { t: com.example.network.ProfileDto -> t.id }) { target: com.example.network.ProfileDto ->
                                                                     Button(
                                                                         onClick = {
                                                                             viewModel.swapUserNumber(usr, target)
@@ -8960,7 +8960,7 @@ fun AdminPanelScreen(
                         }
                         } // end form item
 
-                        items(announcements, key = { it.id }) { ann ->
+                        items(announcements, key = { a: com.example.network.AnnouncementDto -> a.id }) { ann: com.example.network.AnnouncementDto ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
@@ -9066,7 +9066,7 @@ fun AdminPanelScreen(
                         }
                         } // end form item
 
-                        items(featured, key = { it.id }) { ft ->
+                        items(featured, key = { f: com.example.network.FeaturedAnimeDto -> f.id }) { ft: com.example.network.FeaturedAnimeDto ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
@@ -9162,7 +9162,7 @@ fun AdminPanelScreen(
                         }
                         } // end form item
 
-                        items(blacklist, key = { it.id }) { bl ->
+                        items(blacklist, key = { b: com.example.network.BlacklistedAnimeDto -> b.id }) { bl: com.example.network.BlacklistedAnimeDto ->
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                     modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
