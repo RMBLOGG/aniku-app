@@ -8410,6 +8410,21 @@ fun AdminPanelScreen(
     // Search query for user management tab
     var userSearchQuery by remember { mutableStateOf("") }
 
+    // Dihitung di scope @Composable biasa (bukan di dalam item{}) karena dipakai
+    // dua tempat: buat nampilin empty-state di header, DAN buat items() list kartu
+    // user di bawahnya -- keduanya di luar satu sama lain di LazyListScope.
+    val filteredUsers = remember(users, userSearchQuery) {
+        if (userSearchQuery.isBlank()) {
+            users
+        } else {
+            val q = userSearchQuery.trim().removePrefix("#")
+            users.filter { u ->
+                (u.username?.contains(q, ignoreCase = true) == true) ||
+                    (u.user_number?.toString()?.contains(q, ignoreCase = true) == true)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.loadAdminDetails()
     }
@@ -8549,18 +8564,6 @@ fun AdminPanelScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-
-                        val filteredUsers = remember(users, userSearchQuery) {
-                            if (userSearchQuery.isBlank()) {
-                                users
-                            } else {
-                                val q = userSearchQuery.trim().removePrefix("#")
-                                users.filter { u ->
-                                    (u.username?.contains(q, ignoreCase = true) == true) ||
-                                        (u.user_number?.toString()?.contains(q, ignoreCase = true) == true)
-                                }
-                            }
-                        }
 
                         if (filteredUsers.isEmpty()) {
                             Box(
