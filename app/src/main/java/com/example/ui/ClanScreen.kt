@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -142,8 +143,6 @@ fun ClanScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { DiamondBalanceCard(diamondBalance, onTopUpClick) }
-
             item { QuizEntryCard(onClick = onQuizClick) }
 
             clanActionError?.let { err ->
@@ -559,6 +558,69 @@ private fun Modifier.graphicsLayerAlpha(alpha: Float): Modifier = this.then(
     Modifier.graphicsLayer(alpha = alpha.coerceIn(0f, 1f))
 )
 
+// Format angka gede ala kartu clan referensi (1_356_830 -> "1.3M", 24_000 -> "24K")
+private fun formatXpAbbrev(n: Int): String {
+    val abs = kotlin.math.abs(n)
+    return when {
+        abs >= 1_000_000 -> {
+            val v = n / 1_000_000f
+            if (v == v.toInt().toFloat()) "${v.toInt()}M" else "%.1fM".format(v)
+        }
+        abs >= 1_000 -> {
+            val v = n / 1_000f
+            if (v == v.toInt().toFloat()) "${v.toInt()}K" else "%.1fK".format(v)
+        }
+        else -> "$n"
+    }
+}
+
+@Composable
+private fun ClanTagPill(tag: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Brush.horizontalGradient(listOf(Color(0xFFE53950), Color(0xFFFF7A59))))
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(tag, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp, color = Color.White)
+    }
+}
+
+@Composable
+private fun ClanRolePill(isLeader: Boolean, modifier: Modifier = Modifier) {
+    val bg = if (isLeader) Color(0xFFFFC24B) else Color.White.copy(alpha = 0.1f)
+    val fg = if (isLeader) Color(0xFF3A2A00) else Color.White.copy(alpha = 0.6f)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
+    ) {
+        Text(
+            if (isLeader) "LEADER" else "MEMBER",
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 0.3.sp,
+            color = fg
+        )
+    }
+}
+
+@Composable
+private fun ClanStatBox(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Black, color = Color.White, maxLines = 1)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(label, fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.5f))
+    }
+}
+
 @Composable
 private fun MyClanCard(
     clan: ClanDto,
@@ -591,6 +653,9 @@ private fun MyClanCard(
         }
         previousLevel = clan.level
     }
+
+    val leaderMember = remember(members) { members.firstOrNull { it.role == "leader" } }
+    val sortedMembers = remember(members) { members.sortedByDescending { it.contributed_xp ?: 0 } }
 
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }) {
         Box(
@@ -627,144 +692,211 @@ private fun MyClanCard(
                     .padding(18.dp)
                     .animateContentSize()
             ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(AnimeGradient)
-                        .clickable(enabled = isLeader, onClick = onIconClick),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isUploadingIcon) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                    } else if (!clan.icon_url.isNullOrBlank()) {
-                        AsyncImage(
-                            model = clan.icon_url, contentDescription = "Icon Clan",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    } else {
-                        Text("${clan.level}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                    }
-                    if (isLeader) {
-                        Box(
-                            modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape)
-                                .background(Color(0xFF1F1530)).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.CameraAlt, contentDescription = "Ganti icon", tint = Color.White, modifier = Modifier.size(10.dp)) }
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${clan.name} [${clan.tag}]", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                        if (clan.is_private == true) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(Icons.Default.Lock, contentDescription = "Private", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
-                        }
-                    }
-                    Text("${clan.total_xp ?: 0} XP total \u2022 ${members.size} member", fontSize = 12.sp, color = Color.White.copy(alpha = 0.55f))
-                }
-                if (isLeader) {
-                    IconButton(onClick = onManage, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = "Kelola Clan", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Button(
-                    onClick = onContribute, shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2FA8BF))
-                ) { Text("Kontribusi", fontWeight = FontWeight.Bold, color = Color(0xFF1B2A2E)) }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Progress ke Lv.${(clan.level ?: 1) + 1}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
-                Text("$xpIntoLevel / 1000 XP", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            val shimmerTransition = rememberInfiniteTransition(label = "xp_shimmer")
-            val shimmerX by shimmerTransition.animateFloat(
-                initialValue = -80f, targetValue = 260f,
-                animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
-                label = "shimmer_x"
-            )
-            Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f))) {
-                Box(
-                    modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
-                        .clip(RoundedCornerShape(50)).background(AnimeGradient)
-                ) {
+                // ── Header: icon gede + nama/tag/lock + tombol kelola ──
+                Row(verticalAlignment = Alignment.Top) {
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(36.dp)
-                            .graphicsLayer { translationX = shimmerX }
-                            .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent)))
-                    )
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(AnimeGradient)
+                            .clickable(enabled = isLeader, onClick = onIconClick),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isUploadingIcon) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else if (!clan.icon_url.isNullOrBlank()) {
+                            AsyncImage(
+                                model = clan.icon_url, contentDescription = "Icon Clan",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Text("${clan.level}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        }
+                        if (isLeader) {
+                            Box(
+                                modifier = Modifier.align(Alignment.BottomEnd).size(20.dp).clip(CircleShape)
+                                    .background(Color(0xFF1F1530)).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.CameraAlt, contentDescription = "Ganti icon", tint = Color.White, modifier = Modifier.size(11.dp)) }
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                clan.name,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            ClanTagPill(clan.tag)
+                            if (clan.is_private == true) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(Icons.Default.Lock, contentDescription = "Private", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        leaderMember?.let { leader ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (!leader.avatar_url.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = leader.avatar_url, contentDescription = "Leader",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(18.dp).clip(CircleShape)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier.size(18.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.25f)),
+                                        contentAlignment = Alignment.Center
+                                    ) { Text(leader.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 9.sp) }
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(leader.username.orDefault("?"), fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.75f))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                ClanCrownIcon(modifier = Modifier.size(11.dp), tint = Color(0xFFFFD700))
+                            }
+                        }
+                    }
+                    if (isLeader) {
+                        IconButton(onClick = onManage, modifier = Modifier.size(34.dp)) {
+                            Icon(Icons.Default.Settings, contentDescription = "Kelola Clan", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(14.dp))
-            members.forEachIndexed { i, member ->
-                if (i > 0) HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (!member.avatar_url.isNullOrBlank()) {
-                        AsyncImage(
-                            model = member.avatar_url, contentDescription = "Avatar",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.5f), CircleShape)
-                        )
-                    } else {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── Stat row: Level / Total XP / Member ──
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ClanStatBox(value = "${clan.level ?: 1}", label = "Level", modifier = Modifier.weight(1f))
+                    ClanStatBox(value = formatXpAbbrev(clan.total_xp ?: 0), label = "Total XP", modifier = Modifier.weight(1f))
+                    ClanStatBox(value = "${members.size}", label = "Member", modifier = Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = onContribute,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2FA8BF)),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) { Text("Kontribusi", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1B2A2E)) }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Progress ke Lv.${(clan.level ?: 1) + 1}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text("$xpIntoLevel / 1000 XP", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                val shimmerTransition = rememberInfiniteTransition(label = "xp_shimmer")
+                val shimmerX by shimmerTransition.animateFloat(
+                    initialValue = -80f, targetValue = 260f,
+                    animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
+                    label = "shimmer_x"
+                )
+                Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.08f))) {
+                    Box(
+                        modifier = Modifier.fillMaxHeight().fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
+                            .clip(RoundedCornerShape(50)).background(AnimeGradient)
+                    ) {
                         Box(
-                            modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        member.username.orDefault("?"),
-                        fontSize = 13.sp, color = Color.White, modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (member.role == "leader") {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        ClanCrownIcon(modifier = Modifier.size(12.dp), tint = Color(0xFFFFD700))
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text("${member.contributed_xp ?: 0} XP", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
-                    if (isLeader && member.user_id != currentUserId) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = { onKick(member.user_id) }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
-                        }
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(36.dp)
+                                .graphicsLayer { translationX = shimmerX }
+                                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.55f), Color.Transparent)))
+                        )
                     }
                 }
-            }
 
-            if (!isLeader) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                Spacer(modifier = Modifier.height(10.dp))
-                if (!showLeaveConfirm) {
-                    TextButton(onClick = { showLeaveConfirm = true }, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Keluar Clan", color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Text("Yakin mau keluar dari clan ini?", fontSize = 12.sp, color = Color(0xFFE57373))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row {
-                        Button(onClick = onLeave, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
-                            Text("Ya, Keluar")
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "ANGGOTA (${members.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    color = Color.White.copy(alpha = 0.4f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                sortedMembers.forEachIndexed { i, member ->
+                    if (i > 0) HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!member.avatar_url.isNullOrBlank()) {
+                            AsyncImage(
+                                model = member.avatar_url, contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(36.dp).clip(CircleShape)
+                                    .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.5f), CircleShape)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                member.username.orDefault("?"),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                ClanTagPill(clan.tag)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                ClanRolePill(isLeader = member.role == "leader")
+                            }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = { showLeaveConfirm = false }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(formatXpAbbrev(member.contributed_xp ?: 0), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
+                        }
+                        if (isLeader && member.user_id != currentUserId) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(onClick = { onKick(member.user_id) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+                }
+
+                if (!isLeader) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (!showLeaveConfirm) {
+                        TextButton(onClick = { showLeaveConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Keluar Clan", color = Color(0xFFE57373), fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Text("Yakin mau keluar dari clan ini?", fontSize = 12.sp, color = Color(0xFFE57373))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row {
+                            Button(onClick = onLeave, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                                Text("Ya, Keluar")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { showLeaveConfirm = false }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
+                        }
                     }
                 }
             }
-        }
         }
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
@@ -1001,7 +1002,13 @@ private fun ProfileActivityTabs(
     val tabTitles = listOf("Statistik", "Favorit", "Histori")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
     val scope = rememberCoroutineScope()
-    val tabsAreaHeight = 440.dp
+    // Statistik jauh lebih pendek dibanding Favorit/Histori (yang perlu ruang scroll
+    // buat list panjang) -- kalau dipaksa sama-sama 440dp, tab Statistik jadi ada
+    // jarak kosong gede di bawahnya. Jadi tinggi area tab dibikin ngikutin tab aktif.
+    val tabsAreaHeight by animateDpAsState(
+        targetValue = if (pagerState.currentPage == 0) 300.dp else 440.dp,
+        label = "tabsAreaHeight"
+    )
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth()) {
