@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -326,6 +327,18 @@ fun GachaScreen(
     var revealResults by remember { mutableStateOf<List<GachaRollResult>?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // Pencarian & filter rarity di tab Koleksi
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedRarityFilter by remember { mutableStateOf<String?>(null) } // null = semua rarity
+    val filteredCollection = remember(collection, searchQuery, selectedRarityFilter) {
+        collection.filter { entry ->
+            val char = entry.characters ?: return@filter false
+            val matchesQuery = searchQuery.isBlank() || char.name.contains(searchQuery, ignoreCase = true)
+            val matchesRarity = selectedRarityFilter == null || char.rarity == selectedRarityFilter
+            matchesQuery && matchesRarity
+        }
+    }
+
     // Pilihan pajangan yang lagi diedit di layar ini -- dimulai dari nilai
     // tersimpan di server, baru berubah kalau user tap kartu buat pin/unpin.
     var editedShowcaseIds by remember { mutableStateOf<List<Int>?>(null) }
@@ -452,22 +465,106 @@ fun GachaScreen(
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
-                        Box(modifier = Modifier.weight(1f)) {
-                            KoleksiGrid(
-                                collection = collection,
-                                showcaseIds = currentShowcaseIds,
-                                onTogglePin = { malId ->
-                                    val current = currentShowcaseIds
-                                    editedShowcaseIds = when {
-                                        current.contains(malId) -> current - malId
-                                        current.size >= 6 -> {
-                                            showcaseToast = "Maksimal 6 karakter yang bisa dipajang"
-                                            current
-                                        }
-                                        else -> current + malId
+
+                        // ── Kolom pencarian nama karakter ──
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Cari karakter...", color = Color.White.copy(alpha = 0.4f), fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.5f)) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Hapus", tint = Color.White.copy(alpha = 0.5f))
                                     }
                                 }
-                            )
+                            },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Neon.Cyan.copy(alpha = 0.6f),
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                focusedContainerColor = Color.White.copy(alpha = 0.04f),
+                                unfocusedContainerColor = Color.White.copy(alpha = 0.04f),
+                                cursorColor = Neon.Cyan
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // ── Filter chip rarity ──
+                        val rarityFilters = listOf(null, "Common", "Rare", "Epic", "Legendary", "Mythic")
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(rarityFilters) { rarity ->
+                                val isSelected = selectedRarityFilter == rarity
+                                val chipColor = if (rarity == null) Neon.Cyan else rarityColor(rarity)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(if (isSelected) chipColor.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.05f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSelected) chipColor.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(50)
+                                        )
+                                        .clickable { selectedRarityFilter = rarity }
+                                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                                ) {
+                                    if (rarity != null) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(7.dp)
+                                                .clip(CircleShape)
+                                                .background(chipColor)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        rarity ?: "Semua",
+                                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f),
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (filteredCollection.isEmpty() && collection.isNotEmpty()) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.25f), modifier = Modifier.size(32.dp))
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("Gak ketemu karakter yang cocok.", color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp)
+                                    }
+                                }
+                            } else {
+                                KoleksiGrid(
+                                    collection = filteredCollection,
+                                    showcaseIds = currentShowcaseIds,
+                                    onTogglePin = { malId ->
+                                        val current = currentShowcaseIds
+                                        editedShowcaseIds = when {
+                                            current.contains(malId) -> current - malId
+                                            current.size >= 6 -> {
+                                                showcaseToast = "Maksimal 6 karakter yang bisa dipajang"
+                                                current
+                                            }
+                                            else -> current + malId
+                                        }
+                                    }
+                                )
+                            }
                         }
                         if (showcaseDirty) {
                             NeonPrimaryButton(

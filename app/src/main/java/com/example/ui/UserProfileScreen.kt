@@ -615,10 +615,10 @@ fun UserProfileScreen(
                     watchHistory = watchHistory,
                     isLoading = isActivityLoading,
                     accentColor = accentColor,
-                    profileUsername = p.username.orDefault("Pengguna"),
-                    profileAvatarUrl = p.avatar_url,
-                    profileIsAdmin = p.isAdmin(),
-                    profileIsModerator = p.role == "moderator",
+                    goldAccent = goldAccent,
+                    monthsJoined = monthsJoined,
+                    joinedDate = joinedDate,
+                    seasonLevel = seasonLevel,
                     onNavigateToAnime = onNavigateToAnime
                 )
 
@@ -992,13 +992,13 @@ private fun ProfileActivityTabs(
     watchHistory: List<UserWatchHistoryDto>,
     isLoading: Boolean,
     accentColor: Color,
-    profileUsername: String,
-    profileAvatarUrl: String?,
-    profileIsAdmin: Boolean,
-    profileIsModerator: Boolean,
+    goldAccent: Color,
+    monthsJoined: Int,
+    joinedDate: String,
+    seasonLevel: Int,
     onNavigateToAnime: (String) -> Unit
 ) {
-    val tabTitles = listOf("Komentar", "Favorit", "Histori")
+    val tabTitles = listOf("Statistik", "Favorit", "Histori")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
     val scope = rememberCoroutineScope()
     val tabsAreaHeight = 440.dp
@@ -1043,10 +1043,15 @@ private fun ProfileActivityTabs(
                 .height(tabsAreaHeight)
         ) { page ->
             when (page) {
-                0 -> CommentsTabContent(
-                    comments, isLoading, accentColor,
-                    profileUsername, profileAvatarUrl, profileIsAdmin, profileIsModerator,
-                    onNavigateToAnime
+                0 -> StatsTabContent(
+                    commentCount = comments.size,
+                    favoriteCount = bookmarks.size,
+                    historyCount = watchHistory.size,
+                    monthsJoined = monthsJoined,
+                    joinedDate = joinedDate,
+                    seasonLevel = seasonLevel,
+                    accentColor = accentColor,
+                    goldAccent = goldAccent
                 )
                 1 -> FavoritesTabContent(bookmarks, isLoading, onNavigateToAnime)
                 else -> HistoryTabContent(watchHistory, isLoading, accentColor, onNavigateToAnime)
@@ -1070,142 +1075,134 @@ private fun EmptyTabState(icon: androidx.compose.ui.graphics.vector.ImageVector,
     }
 }
 
-// Kartu komentar ala feed asli Aniku - borderless + GlossyGradientText, senada sama
-// gaya komentar episode (EpisodeCommentRow) & chat, bukan kotak flat abu-abu generik.
+// ============================================================================
+//  TAB STATISTIK — ringkasan aktivitas user, ganti feed komentar mentah ala
+//  dashboard "gamer": tile besar per kategori + info bergabung.
+// ============================================================================
 @Composable
-private fun CommentsTabContent(
-    comments: List<EpisodeComment>,
-    isLoading: Boolean,
+private fun StatsTabContent(
+    commentCount: Int,
+    favoriteCount: Int,
+    historyCount: Int,
+    monthsJoined: Int,
+    joinedDate: String,
+    seasonLevel: Int,
     accentColor: Color,
-    profileUsername: String,
-    profileAvatarUrl: String?,
-    profileIsAdmin: Boolean,
-    profileIsModerator: Boolean,
-    onNavigateToAnime: (String) -> Unit
+    goldAccent: Color
 ) {
-    if (isLoading && comments.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = accentColor, modifier = Modifier.size(28.dp))
-        }
-        return
-    }
-    if (comments.isEmpty()) {
-        EmptyTabState(Icons.Default.ChatBubbleOutline, "Belum ada komentar dari user ini.")
-        return
-    }
-    val nameGradient = when {
-        profileIsAdmin -> adminGradientColors
-        profileIsModerator -> moderatorGradientColors
-        else -> defaultNameGradientColors
-    }
-    val ringColor = when {
-        profileIsAdmin -> Color(0xFFFFC107)
-        profileIsModerator -> Color(0xFFB388FF)
-        else -> Color.Transparent
-    }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 14.dp)
     ) {
-        itemsIndexed(comments, key = { _, c -> c.id }) { index, comment ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = comment.anime_slug != null) {
-                        comment.anime_slug?.let { onNavigateToAnime(it) }
-                    }
-            ) {
-                // Baris identitas: avatar + username gradient + timestamp (mirip EpisodeCommentRow)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            StatTile(
+                icon = Icons.Default.ChatBubbleOutline,
+                value = "$commentCount",
+                label = "Komentar",
+                color = accentColor,
+                modifier = Modifier.weight(1f)
+            )
+            StatTile(
+                icon = Icons.Default.Favorite,
+                value = "$favoriteCount",
+                label = "Favorit",
+                color = Color(0xFFFF5C8A),
+                modifier = Modifier.weight(1f)
+            )
+            StatTile(
+                icon = Icons.Default.History,
+                value = "$historyCount",
+                label = "Riwayat",
+                color = Color(0xFF4FC3F7),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Kartu ringkasan keanggotaan - level saat ini + tanggal & lama bergabung
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    )
+                )
+                .border(1.dp, goldAccent.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .clip(CircleShape)
-                            .then(
-                                if (ringColor != Color.Transparent)
-                                    Modifier.border(1.5.dp, ringColor, CircleShape).padding(1.5.dp)
-                                else Modifier
-                            )
-                            .clip(CircleShape)
-                            .background(accentColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (!profileAvatarUrl.isNullOrBlank()) {
-                            AsyncImage(
-                                model = profileAvatarUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize().clip(CircleShape)
-                            )
-                        } else {
-                            Text(profileUsername.take(1).uppercase(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(9.dp))
-                    GlossyGradientText(text = profileUsername, colors = nameGradient, fontSize = 13.sp)
+                    Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = goldAccent, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "\u00b7 ${relativeTimeShort(comment.created_at)} lalu",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f)
+                        "Level $seasonLevel musim ini",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-
-                // Baris anime: poster + judul, mirip kartu "sedang ditonton" di referensi
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 46.dp, height = 64.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        if (!comment.anime_poster.isNullOrBlank()) {
-                            AsyncImage(
-                                model = comment.anime_poster,
-                                contentDescription = comment.anime_title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Icon(
-                                Icons.Default.ChatBubbleOutline,
-                                contentDescription = null,
-                                tint = accentColor.copy(alpha = 0.6f),
-                                modifier = Modifier.align(Alignment.Center).size(18.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            comment.anime_title ?: "Anime",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.5.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(5.dp))
-                        Text(
-                            comment.message,
-                            fontSize = 12.5.sp,
-                            lineHeight = 17.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Bergabung sejak $joinedDate",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
                 }
-
-                if (index != comments.lastIndex) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    if (monthsJoined <= 0) "Baru bergabung bulan ini" else "Sudah $monthsJoined bulan jadi bagian dari Aniku",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
             }
         }
-        item { Spacer(modifier = Modifier.height(4.dp)) }
+    }
+}
+
+@Composable
+private fun StatTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .aspectRatio(0.95f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.verticalGradient(listOf(color.copy(alpha = 0.18f), color.copy(alpha = 0.05f)))
+            )
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+            .padding(vertical = 14.dp, horizontal = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(17.dp))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
     }
 }
 
