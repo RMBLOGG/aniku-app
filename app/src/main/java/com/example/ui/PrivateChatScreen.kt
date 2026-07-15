@@ -317,6 +317,7 @@ private fun ChatInputBar(
                     Row(
                         modifier = Modifier
                             .weight(1f)
+                            .height(IntrinsicSize.Min)
                             .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
