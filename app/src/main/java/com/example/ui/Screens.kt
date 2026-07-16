@@ -10689,25 +10689,41 @@ fun SumberDataScreen(
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+private data class SupporterRow(
+    val name: String,
+    val amount: Int,
+    val matchedProfile: com.example.network.ProfileDto?
+)
+
 @Composable
 fun TopSupporterScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit
 ) {
     val donations by viewModel.donations.collectAsState()
+    val userDirectory by viewModel.userDirectory.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Group by supporter_name dan jumlahkan total_amount
+    // Group by supporter_name dan jumlahkan total_amount, terus dicocokkan ke
+    // akun Aniku (avatar/level/nomor ID) kalau username-nya sama persis --
+    // pola sama kayak widget "Top Supporter" di Home.
     val leaderboard = donations
         .groupBy { it.supporter_name }
-        .map { (name, list) -> name to list.sumOf { it.total_amount ?: 0 } }
-        .sortedByDescending { it.second }
+        .map { (name, list) ->
+            val amount = list.sumOf { it.total_amount ?: 0 }
+            val matched = userDirectory.firstOrNull {
+                it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
+            }
+            SupporterRow(name = name ?: "Anonim", amount = amount, matchedProfile = matched)
+        }
+        .sortedByDescending { it.amount }
 
     var isRefreshing by remember { mutableStateOf(false) }
     var hasLoadedOnce by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadDonations()
+        viewModel.loadUserDirectory()
         hasLoadedOnce = true
     }
 
@@ -10956,8 +10972,10 @@ fun TopSupporterScreen(
                                     PodiumPlaque(
                                         modifier = Modifier.weight(1f),
                                         rank = 2,
-                                        name = top3[1].first ?: "Anonim",
-                                        amountValue = top3[1].second,
+                                        name = top3[1].name,
+                                        amountValue = top3[1].amount,
+                                        avatarUrl = top3[1].matchedProfile?.avatar_url,
+                                        levelValue = top3[1].matchedProfile?.season_level,
                                         rankGradient = silverGradient,
                                         avatarGradient = silverGradient,
                                         borderColor = lineDim,
@@ -10974,8 +10992,10 @@ fun TopSupporterScreen(
                                 PodiumPlaque(
                                     modifier = Modifier.weight(1.15f),
                                     rank = 1,
-                                    name = top3[0].first ?: "Anonim",
-                                    amountValue = top3[0].second,
+                                    name = top3[0].name,
+                                    amountValue = top3[0].amount,
+                                    avatarUrl = top3[0].matchedProfile?.avatar_url,
+                                    levelValue = top3[0].matchedProfile?.season_level,
                                     rankGradient = goldGradient,
                                     avatarGradient = goldGradient,
                                     borderColor = gold.copy(alpha = 0.45f),
@@ -10990,8 +11010,10 @@ fun TopSupporterScreen(
                                     PodiumPlaque(
                                         modifier = Modifier.weight(1f),
                                         rank = 3,
-                                        name = top3[2].first ?: "Anonim",
-                                        amountValue = top3[2].second,
+                                        name = top3[2].name,
+                                        amountValue = top3[2].amount,
+                                        avatarUrl = top3[2].matchedProfile?.avatar_url,
+                                        levelValue = top3[2].matchedProfile?.season_level,
                                         rankGradient = bronzeGradient,
                                         avatarGradient = bronzeGradient,
                                         borderColor = lineDim,
@@ -11022,8 +11044,8 @@ fun TopSupporterScreen(
                     }
 
                     // ===== Sisa daftar (rank 4+), muncul satu-satu (staggered) =====
-                    itemsIndexed(rest, key = { i, item -> item.first ?: "anon-$i" }) { idx, (name, total) ->
-                        var rowVisible by remember(name, idx) { mutableStateOf(false) }
+                    itemsIndexed(rest, key = { i, item -> item.name.ifBlank { "anon-$i" } + "-$i" }) { idx, row ->
+                        var rowVisible by remember(row.name, idx) { mutableStateOf(false) }
                         LaunchedEffect(contentVisible) {
                             if (contentVisible) {
                                 delay(220L + idx * 55L)
@@ -11049,23 +11071,89 @@ fun TopSupporterScreen(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         "${idx + 4}",
                                         fontSize = 12.5.sp,
                                         color = Color(0xFF736A82),
-                                        modifier = Modifier.width(20.dp)
+                                        modifier = Modifier.width(22.dp)
                                     )
-                                    Text(
-                                        name ?: "Anonim",
-                                        fontSize = 12.5.sp,
-                                        color = Color(0xFFCFC7DA),
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    val avatarUrl = row.matchedProfile?.avatar_url
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .background(Color.White.copy(alpha = 0.06f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (avatarUrl != null) {
+                                            AsyncImage(
+                                                model = avatarUrl,
+                                                contentDescription = row.name,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                            )
+                                        } else {
+                                            Text(
+                                                row.name.trim().firstOrNull()?.uppercase() ?: "?",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFCFC7DA)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                row.name,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFFCFC7DA),
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            if (row.matchedProfile != null) {
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Icon(
+                                                    Icons.Default.Verified,
+                                                    contentDescription = "Akun Aniku terverifikasi",
+                                                    tint = Color(0xFF4FC3F7),
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                            }
+                                        }
+                                        row.matchedProfile?.let { p ->
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.MilitaryTech,
+                                                    contentDescription = null,
+                                                    tint = brass,
+                                                    modifier = Modifier.size(10.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text(
+                                                    "Lvl. ${p.season_level ?: 1}",
+                                                    fontSize = 10.sp,
+                                                    color = ivoryDim
+                                                )
+                                                p.user_number?.let { num ->
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        "#$num",
+                                                        fontSize = 10.sp,
+                                                        color = ivoryDim.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     AnimatedRupiahText(
-                                        target = total,
+                                        target = row.amount,
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Normal,
                                         color = Color(0xFF9D93AB),
@@ -11131,6 +11219,8 @@ private fun PodiumPlaque(
     rank: Int,
     name: String,
     amountValue: Int,
+    avatarUrl: String? = null,
+    levelValue: Int? = null,
     rankGradient: Brush,
     avatarGradient: Brush,
     borderColor: Color,
@@ -11139,8 +11229,8 @@ private fun PodiumPlaque(
     isGold: Boolean,
     countDelay: Int = 0
 ) {
-    val avatarSize = if (isGold) 50.dp else 42.dp
-    val rankSize = if (isGold) 26.dp else 22.dp
+    val avatarSize = if (isGold) 58.dp else 48.dp
+    val isVerified = avatarUrl != null
 
     // Glow pulse cuma buat si juara satu
     val glowTransition = rememberInfiniteTransition(label = "podiumGlow")
@@ -11162,6 +11252,17 @@ private fun PodiumPlaque(
         ),
         label = "glowAlpha"
     )
+    // Crown si juara 1 melayang pelan
+    val crownTransition = rememberInfiniteTransition(label = "crownFloat")
+    val crownOffset by crownTransition.animateFloat(
+        initialValue = -3f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1300, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "crownOffset"
+    )
 
     Column(
         modifier = modifier
@@ -11179,29 +11280,16 @@ private fun PodiumPlaque(
             )
             .border(1.dp, borderColor, shape = RoundedCornerShape(18.dp))
             .padding(
-                top = if (isGold) 18.dp else 14.dp,
+                top = if (isGold) 22.dp else 14.dp,
                 bottom = if (isGold) 16.dp else 12.dp,
                 start = 6.dp,
                 end = 6.dp
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-            Box(
-                modifier = Modifier
-                    .size(rankSize)
-                    .background(rankGradient, shape = CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "$rank",
-                    fontSize = if (isGold) 12.sp else 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF120F16)
-                )
-            }
-            Spacer(modifier = Modifier.height(9.dp))
             Box(contentAlignment = Alignment.Center) {
                 if (isGold) {
+                    // Glow napas di belakang avatar juara 1
                     Box(
                         modifier = Modifier
                             .size(avatarSize * glowScale)
@@ -11212,30 +11300,87 @@ private fun PodiumPlaque(
                                 shape = CircleShape
                             )
                     )
+                    // Mahkota di atas avatar juara 1
+                    Icon(
+                        Icons.Default.WorkspacePremium,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-22 + crownOffset).dp)
+                            .size(22.dp)
+                    )
                 }
                 Box(
                     modifier = Modifier
                         .size(avatarSize)
-                        .background(avatarGradient, shape = CircleShape),
+                        .background(avatarGradient, shape = CircleShape)
+                        .border(2.dp, rankGradient, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarUrl != null) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    } else {
+                        Text(
+                            name.trim().firstOrNull()?.uppercase() ?: "?",
+                            fontSize = if (isGold) 20.sp else 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF120F16)
+                        )
+                    }
+                }
+                // Badge nomor rank nempel di pojok kanan bawah avatar
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(if (isGold) 22.dp else 19.dp)
+                        .background(rankGradient, shape = CircleShape)
+                        .border(1.5.dp, Color(0xFF120F16), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        name.trim().firstOrNull()?.uppercase() ?: "?",
-                        fontSize = if (isGold) 18.sp else 15.sp,
+                        "$rank",
+                        fontSize = if (isGold) 11.sp else 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF120F16)
                     )
                 }
             }
             Spacer(modifier = Modifier.height(9.dp))
-            Text(
-                name,
-                fontSize = if (isGold) 13.5.sp else 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = nameColor,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    name,
+                    fontSize = if (isGold) 13.5.sp else 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = nameColor,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isVerified) {
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Icon(
+                        Icons.Default.Verified,
+                        contentDescription = "Akun Aniku terverifikasi",
+                        tint = Color(0xFF4FC3F7),
+                        modifier = Modifier.size(if (isGold) 13.dp else 11.dp)
+                    )
+                }
+            }
+            if (levelValue != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "Lvl. $levelValue",
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = amountColor.copy(alpha = 0.7f)
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             AnimatedRupiahText(
                 target = amountValue,
