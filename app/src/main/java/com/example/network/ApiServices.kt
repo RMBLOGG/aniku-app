@@ -508,6 +508,16 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): DeviceGuardResponse
 
+    // Cek device-ban murni pakai device_id, TANPA butuh user_id -- dipanggil
+    // paling awal SEBELUM akun Supabase Auth dibikin (beda dari check_device_guard
+    // di atas yang butuh user_id, jadi cuma bisa dipanggil abis akun ada).
+    @POST("rest/v1/rpc/is_device_banned")
+    suspend fun isDeviceBanned(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): DeviceGuardResponse
+
     @POST("rest/v1/rpc/set_clan_privacy")
     suspend fun setClanPrivacy(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,

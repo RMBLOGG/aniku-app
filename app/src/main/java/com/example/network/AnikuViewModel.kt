@@ -2179,11 +2179,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Cek murni berdasarkan device_id doang, TANPA butuh user_id -- makanya bisa
+    // dipanggil paling awal SEBELUM akun Supabase Auth-nya dibikin sama sekali.
+    // Ini beda dari checkDeviceGuardAndReturnBanned() yang butuh user_id.
+    private suspend fun isDeviceBannedStandalone(): Boolean {
+        return try {
+            val res = NetworkClient.supabaseDbApi.isDeviceBanned(
+                body = mapOf("p_device_id" to getDeviceId()),
+                authHeader = "Bearer $SUPABASE_ANON_KEY",
+                apiKey = SUPABASE_ANON_KEY
+            )
+            res.banned == true
+        } catch (e: Exception) {
+            Log.e("AnikuVM", "isDeviceBannedStandalone failed, lanjut tanpa cek", e)
+            false
+        }
+    }
+
     fun register(email: String, password: String, username: String, onSuccess: () -> Unit) {
         _authLoading.value = true
         _authError.value = null
         viewModelScope.launch {
             try {
+                // FIX: dicek PALING AWAL, sebelum akun Supabase Auth-nya dibikin
+                // sama sekali. Sebelumnya pengecekan device taruh di bawah (abis
+                // signUp), tapi kalau email confirmation aktif, signUp gak ngasih
+                // access_token dan function langsung return duluan -- jadi device
+                // guard-nya kelewat gak pernah kecek. Ini nutup celah itu.
+                if (isDeviceBannedStandalone()) {
+                    _authError.value = "Pendaftaran ditolak: device ini telah diblokir oleh admin."
+                    _authLoading.value = false
+                    return@launch
+                }
+
                 val res = NetworkClient.supabaseAuthApi.signUp(
                     request = SignUpRequest(email, password, SignUpData(username)),
                     apiKey = SUPABASE_ANON_KEY
@@ -2287,6 +2315,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val uId = json.optString("sub")
                 val email = json.optString("email")
                 if (uId.isBlank()) throw IllegalArgumentException("User ID tidak ditemukan di token")
+
+                // Cek ulang device guard di titik ini juga -- jaga-jaga device-nya
+                // baru keblokir admin di antara waktu daftar & klik link verifikasi email.
+                val deviceBanned = checkDeviceGuardAndReturnBanned(uId, "Bearer $accessToken")
+                if (deviceBanned) {
+                    _authError.value = "Login ditolak: device ini telah diblokir oleh admin."
+                    _authLoading.value = false
+                    return@launch
+                }
 
                 val profiles = NetworkClient.supabaseDbApi.getProfileByUserId(
                     idQuery = "eq.$uId",
