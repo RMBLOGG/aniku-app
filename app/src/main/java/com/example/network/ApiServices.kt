@@ -498,6 +498,16 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Dipanggil abis register/login berhasil -- nyimpen/nge-update device ID
+    // (Android ID) punya user, dan langsung nge-ban akun ini otomatis kalau
+    // device-nya udah masuk daftar banned_devices (dipasang admin lewat tombol Ban).
+    @POST("rest/v1/rpc/check_device_guard")
+    suspend fun checkDeviceGuard(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): DeviceGuardResponse
+
     @POST("rest/v1/rpc/set_clan_privacy")
     suspend fun setClanPrivacy(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,

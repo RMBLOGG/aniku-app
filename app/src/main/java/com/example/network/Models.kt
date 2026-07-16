@@ -175,6 +175,12 @@ data class IpGuardResponse(
 )
 
 @JsonClass(generateAdapter = true)
+data class DeviceGuardResponse(
+    val banned: Boolean? = null,
+    val reason: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class SignInRequest(
     val email: String,
     val password: String
@@ -236,6 +242,9 @@ data class ProfileDto(
     // Warna nama custom - cuma efektif kalau role beta/moderator/admin (dipaksa server-side
     // lewat trigger enforce_custom_name_color). Format hex "#RRGGBB".
     val custom_name_color: String? = null,
+    // Android ID device terakhir yang dipakai user buat login/register --
+    // dipakai admin buat ban device (bukan cuma akun) biar gak gampang bikin akun baru.
+    val device_id: String? = null,
     // Karakter gacha yang dipajang di profil (maks 6). Kepemilikan divalidasi
     // server-side lewat RPC set_profile_showcase -- jangan pernah di-PATCH langsung.
     val showcase_character_ids: List<Int>? = null

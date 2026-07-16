@@ -35,6 +35,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
         remoteConfigManager.fetchAndApply()
     }
 
+    // Android ID -- ID unik per-device yang gak butuh permission apa pun buat
+    // diambil, tetap sama walau app di-uninstall/install ulang. Dipakai admin
+    // buat ban device (bukan cuma akun) biar gak gampang bikin akun baru abis di-ban.
+    private fun getDeviceId(): String {
+        return try {
+            android.provider.Settings.Secure.getString(
+                appContext.contentResolver,
+                android.provider.Settings.Secure.ANDROID_ID
+            ) ?: "unknown"
+        } catch (e: Exception) {
+            "unknown"
+        }
+    }
+
+    // Dipanggil abis register/login sukses. Return true kalau device ini
+    // ternyata udah di-ban admin (akun otomatis ke-ban bareng di server).
+    private suspend fun checkDeviceGuardAndReturnBanned(userId: String, authHeader: String): Boolean {
+        return try {
+            val res = NetworkClient.supabaseDbApi.checkDeviceGuard(
+                body = mapOf("p_user_id" to userId, "p_device_id" to getDeviceId()),
+                authHeader = authHeader,
+                apiKey = SUPABASE_ANON_KEY
+            )
+            res.banned == true
+        } catch (e: Exception) {
+            Log.e("AnikuVM", "checkDeviceGuard failed, lanjut tanpa cek device", e)
+            false
+        }
+    }
+
     // ── Presence: total user online di seluruh aplikasi (bukan cuma di chat room) ──
     private val _onlineCount = MutableStateFlow(0)
     val onlineCount: StateFlow<Int> = _onlineCount.asStateFlow()
@@ -1906,6 +1936,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     return@launch
                 }
 
+                // Cek device guard tiap login juga -- jaga-jaga kalau device ini
+                // baru di-ban admin SETELAH akun ini pernah login sebelumnya.
+                val deviceBanned = checkDeviceGuardAndReturnBanned(uId, "Bearer $token")
+                if (deviceBanned) {
+                    _authError.value = "Login ditolak: device ini telah diblokir oleh admin."
+                    _authLoading.value = false
+                    return@launch
+                }
+
                 val activeSession = UserSession(
                     token = token,
                     refreshToken = res.refresh_token,
@@ -2045,6 +2084,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     }
                 }
 
+                // Cek device guard tiap login (baru atau lama) -- device yang udah
+                // di-ban admin bakal langsung nolak akses walau login pakai Google.
+                val deviceBanned = checkDeviceGuardAndReturnBanned(uId, "Bearer $token")
+                if (deviceBanned) {
+                    _authError.value = "Login ditolak: device ini telah diblokir oleh admin."
+                    _authLoading.value = false
+                    return@launch
+                }
+
                 val activeSession = UserSession(
                     token = token,
                     refreshToken = res.refresh_token,
@@ -2116,6 +2164,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     // Kalau edge function gagal dipanggil (mis. lagi maintenance),
                     // jangan blokir user biasa yang lagi daftar normal.
                     Log.e("AnikuVM", "IP guard check failed, lanjut tanpa cek", e)
+                }
+
+                // Cek device guard: kalau device (Android ID) ini udah di-ban admin
+                // sebelumnya (dari akun lain yang kena ban), akun baru ini langsung
+                // ke-ban juga otomatis di server -- gak perlu bikin akun berkali-kali.
+                val deviceBanned = checkDeviceGuardAndReturnBanned(uId, "Bearer $token")
+                if (deviceBanned) {
+                    _authError.value = "Pendaftaran ditolak: device ini telah diblokir oleh admin."
+                    _authLoading.value = false
+                    return@launch
                 }
 
                 // Sleep briefly to let handle_new_user trigger execute
