@@ -217,6 +217,7 @@ class MainActivity : FragmentActivity() {
             ) {
                 val maintenanceMode by viewModel.remoteConfigManager.maintenanceMode.collectAsState()
                 val maintenanceMessage by viewModel.remoteConfigManager.maintenanceMessage.collectAsState()
+                val forceBannedLogout by viewModel.forceBannedLogout.collectAsState()
                 val appLockEnabled by viewModel.appLockEnabled.collectAsState()
                 val appLockType by viewModel.appLockType.collectAsState()
                 val appPin by viewModel.appPin.collectAsState()
@@ -245,6 +246,11 @@ class MainActivity : FragmentActivity() {
                     // Kill-switch paling atas — begitu nyala di Firebase Console, semua user
                     // langsung ke-block di sini real-time, gak peduli lagi login/lock/dimana.
                     com.example.ui.MaintenanceScreen(message = maintenanceMessage)
+                } else if (forceBannedLogout) {
+                    // Sama kayak maintenance mode, tapi per-user -- begitu admin nge-ban
+                    // akun ini (dipush via Firebase RTDB), device langsung ke-kick di sini
+                    // real-time, gak perlu nunggu logout manual/token expired.
+                    com.example.ui.BannedScreen(onAcknowledge = { viewModel.acknowledgeBannedLogout() })
                 } else if (appLockEnabled && !isUnlocked) {
                     LockScreen(
                         lockType = appLockType,

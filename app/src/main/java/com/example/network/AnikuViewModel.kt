@@ -316,6 +316,34 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
             }
         }
+
+        // Dengerin status ban akun sendiri secara realtime (Firebase RTDB) --
+        // begitu admin nge-ban, device ini langsung ke-kick SAAT ITU JUGA,
+        // gak nunggu logout manual atau token expired. Mirip kill-switch
+        // Maintenance Mode yang udah ada, tapi per-user.
+        viewModelScope.launch {
+            session.map { it.userId }.distinctUntilChanged().collectLatest { userId ->
+                if (!userId.isNullOrBlank()) {
+                    BanStatusManager.listenBanStatus(userId).collect { isBanned ->
+                        if (isBanned) {
+                            _forceBannedLogout.value = true
+                            settingsStore.clearSession()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Dipicu Firebase RTDB begitu admin nge-ban akun ini secara realtime.
+    // Diobservasi di MainActivity buat nampilin layar block, sejajar sama
+    // pengecekan maintenanceMode.
+    private val _forceBannedLogout = MutableStateFlow(false)
+    val forceBannedLogout: StateFlow<Boolean> = _forceBannedLogout.asStateFlow()
+
+    /** Dipanggil UI setelah user nge-tap "OK" di layar block, biar gak nyangkut terus. */
+    fun acknowledgeBannedLogout() {
+        _forceBannedLogout.value = false
     }
 
     /** Upsert FCM token ke Supabase, dipakai buat targeted notif private chat. */
@@ -3099,6 +3127,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 )
                 if (response.isSuccessful || response.code() == 204) {
                     _banStatusMessage.value = if (newBanStatus) "User berhasil dibanned" else "User berhasil diaktifkan"
+                    // Push ke Firebase RTDB biar device korban (kalau lagi online)
+                    // langsung ke-kick real-time, gak perlu nunggu logout/token expired.
+                    BanStatusManager.setBanStatus(userIdToModify, newBanStatus)
                     loadAdminDetails()
                 } else {
                     val errBody = response.errorBody()?.string() ?: "Unknown error"
