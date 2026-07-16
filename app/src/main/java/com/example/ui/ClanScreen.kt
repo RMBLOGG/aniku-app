@@ -326,6 +326,7 @@ fun ClanScreen(
 //  gaya kartu-nya sama kayak MyClanCard biar konsisten: header + tag pill +
 //  stat box + tombol gabung gede + list member dengan role/XP.
 // ============================================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ViewClanScreen(
     clan: ClanDto,
