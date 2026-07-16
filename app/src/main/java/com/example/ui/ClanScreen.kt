@@ -18,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -115,6 +116,20 @@ fun ClanScreen(
             delay(1400)
             showContributeBurst = false
         }
+    }
+
+    if (selectedClan != null) {
+        ViewClanScreen(
+            clan = selectedClan!!,
+            members = selectedClanMembers,
+            alreadyInClan = myClan != null,
+            onBack = { selectedClan = null },
+            onJoin = { clan ->
+                if (clan.is_private == true) viewModel.requestJoinClan(clan.id) else viewModel.joinClan(clan.id)
+                selectedClan = null
+            }
+        )
+        return
     }
 
     Scaffold(
@@ -304,45 +319,212 @@ fun ClanScreen(
         )
     }
 
-    selectedClan?.let { clan ->
-        AnimeDialog(
-            onDismissRequest = { selectedClan = null },
-            title = "${clan.name} [${clan.tag}]",
-            icon = Icons.Default.Groups,
-            content = {
-                Text("Level ${clan.level} \u2022 ${clan.total_xp} XP \u2022 ${selectedClanMembers.size} member", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
-                if (clan.is_private == true) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFB388FF), modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Clan private \u2014 butuh persetujuan leader", fontSize = 12.sp, color = Color(0xFFB388FF))
+}
+
+// ============================================================================
+//  VIEW CLAN — halaman penuh (bukan popup) buat liat detail clan orang lain,
+//  gaya kartu-nya sama kayak MyClanCard biar konsisten: header + tag pill +
+//  stat box + tombol gabung gede + list member dengan role/XP.
+// ============================================================================
+@Composable
+private fun ViewClanScreen(
+    clan: ClanDto,
+    members: List<ClanMemberDto>,
+    alreadyInClan: Boolean,
+    onBack: () -> Unit,
+    onJoin: (ClanDto) -> Unit
+) {
+    val leaderMember = remember(members) { members.firstOrNull { it.role == "leader" } }
+    val sortedMembers = remember(members) { members.sortedByDescending { it.contributed_xp ?: 0 } }
+
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("View Clan", fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
+                )
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF3A1560), Color(0xFF241530))))
+                        .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.35f), RoundedCornerShape(22.dp))
+                        .padding(18.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.size(64.dp).clip(CircleShape).background(AnimeGradient),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!clan.icon_url.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = clan.icon_url, contentDescription = "Icon Clan",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    )
+                                } else {
+                                    Text("${clan.level ?: 1}", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        clan.name,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 19.sp,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    ClanTagPill(clan.tag)
+                                    if (clan.is_private == true) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Icon(Icons.Default.Lock, contentDescription = "Private", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                leaderMember?.let { leader ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (!leader.avatar_url.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = leader.avatar_url, contentDescription = "Leader",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.size(18.dp).clip(CircleShape)
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier.size(18.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.25f)),
+                                                contentAlignment = Alignment.Center
+                                            ) { Text(leader.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 9.sp) }
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(leader.username.orDefault("?"), fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.75f))
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            ClanStatBox(value = "${clan.level ?: 1}", label = "Level", modifier = Modifier.weight(1f))
+                            ClanStatBox(value = formatXpAbbrev(clan.total_xp ?: 0), label = "Total XP", modifier = Modifier.weight(1f))
+                            ClanStatBox(value = "${members.size}", label = "Member", modifier = Modifier.weight(1f))
+                        }
+
+                        if (!alreadyInClan) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Button(
+                                onClick = { onJoin(clan) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFC24B)),
+                                modifier = Modifier.fillMaxWidth().height(50.dp)
+                            ) {
+                                Text(
+                                    if (clan.is_private == true) "Minta Gabung" else "Gabung Clan Ini",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF3A2A00)
+                                )
+                            }
+                            if (clan.is_private == true) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFB388FF), modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Clan private \u2014 butuh persetujuan leader", fontSize = 11.5.sp, color = Color(0xFFB388FF))
+                                }
+                            }
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
-                selectedClanMembers.forEach { member ->
-                    Text(
-                        "\u2022 " + (member.username.orDefault("?")) + if (member.role == "leader") " (Leader)" else "",
-                        fontSize = 13.sp, color = Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-                }
-            },
-            buttons = {
-                TextButton(onClick = { selectedClan = null }) { Text("Tutup", color = Color.White.copy(alpha = 0.6f)) }
-                if (myClan == null) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Button(
-                        onClick = {
-                            if (clan.is_private == true) viewModel.requestJoinClan(clan.id) else viewModel.joinClan(clan.id)
-                            selectedClan = null
-                        },
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
-                    ) { Text(if (clan.is_private == true) "Minta Gabung" else "Gabung Clan Ini", fontWeight = FontWeight.Bold) }
+            }
+
+            item {
+                Text(
+                    "MEMBER (${members.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.6.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                )
+            }
+
+            items(sortedMembers, key = { it.id }) { member ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (!member.avatar_url.isNullOrBlank()) {
+                            AsyncImage(
+                                model = member.avatar_url, contentDescription = "Avatar",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(40.dp).clip(CircleShape)
+                                    .border(1.dp, Color(0xFF7B2FBF).copy(alpha = 0.5f), CircleShape)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFBA68C8).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) { Text(member.username?.take(1)?.uppercase() ?: "?", color = Color(0xFFBA68C8), fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                member.username.orDefault("?"),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                ClanTagPill(clan.tag)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                ClanRolePill(isLeader = member.role == "leader")
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                formatXpAbbrev(member.contributed_xp ?: 0),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD700)
+                            )
+                        }
+                    }
                 }
             }
-        )
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+        }
     }
 }
 
