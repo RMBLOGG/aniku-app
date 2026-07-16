@@ -317,6 +317,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
             }
         }
 
+        // FIX: checkDeviceGuardAndReturnBanned() sebelumnya CUMA kepanggil pas
+        // login()/register()/loginWithGoogle() -- padahal session yang di-RESTORE
+        // otomatis dari penyimpanan (user yang udah login terus buka lagi app-nya)
+        // gak pernah lewat 3 fungsi itu sama sekali! Akibatnya profiles.device_id
+        // banyak yang gak pernah kesimpen, jadi pas akun itu di-ban, device-nya
+        // ikut gak ke-ban (soalnya device_id-nya kosong). Ini nutup celah itu:
+        // device_id di-refresh/di-cek ulang tiap kali ada session aktif, gak
+        // peduli itu dari login baru atau restore session lama.
+        viewModelScope.launch {
+            session.map { it.userId }.distinctUntilChanged().collect { userId ->
+                if (!userId.isNullOrBlank()) {
+                    val currentToken = session.value.token
+                    if (!currentToken.isNullOrBlank()) {
+                        val deviceBanned = checkDeviceGuardAndReturnBanned(userId, "Bearer $currentToken")
+                        if (deviceBanned) {
+                            _forceBannedLogout.value = true
+                            settingsStore.clearSession()
+                        }
+                    }
+                }
+            }
+        }
+
         // Dengerin status ban akun sendiri secara realtime (Firebase RTDB) --
         // begitu admin nge-ban, device ini langsung ke-kick SAAT ITU JUGA,
         // gak nunggu logout manual atau token expired. Mirip kill-switch
