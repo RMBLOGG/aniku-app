@@ -10688,13 +10688,13 @@ fun SumberDataScreen(
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 private data class SupporterRow(
     val name: String,
     val amount: Int,
     val matchedProfile: com.example.network.ProfileDto?
 )
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun TopSupporterScreen(
     viewModel: AnikuViewModel,
