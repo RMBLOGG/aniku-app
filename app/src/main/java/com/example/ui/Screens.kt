@@ -16,6 +16,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11450,15 +11451,19 @@ fun MiniPlayerOverlay(
     val config = LocalConfiguration.current
     val density = androidx.compose.ui.platform.LocalDensity.current
 
-    val widthDp = 168.dp
-    val heightDp = 94.dp
+    // Ukuran resizable, jaga rasio 16:9. Batas biar gak kekecilan/kegedean sampe
+    // gak muat di layar atau nutupin kontennya sendiri.
+    val minWidthPx = with(density) { 110.dp.toPx() }
+    val maxWidthPx = with(density) { (config.screenWidthDp.dp * 0.85f).toPx() }
+    var widthPx by remember { mutableStateOf(with(density) { 168.dp.toPx() }) }
+    val heightPx = widthPx * 9f / 16f
 
     // Posisi awal: pojok kanan bawah, di atas bottom nav.
     var offsetX by remember {
-        mutableStateOf(with(density) { (config.screenWidthDp.dp - widthDp - 12.dp).toPx() })
+        mutableStateOf(with(density) { (config.screenWidthDp.dp.toPx() - widthPx - 12.dp.toPx()) })
     }
     var offsetY by remember {
-        mutableStateOf(with(density) { (config.screenHeightDp.dp - heightDp - 90.dp).toPx() })
+        mutableStateOf(with(density) { (config.screenHeightDp.dp.toPx() - heightPx - 90.dp.toPx()) })
     }
 
     val exoPlayer = remember(data.streamUrl) {
@@ -11490,7 +11495,10 @@ fun MiniPlayerOverlay(
     Box(
         modifier = Modifier
             .offset { androidx.compose.ui.unit.IntOffset(offsetX.toInt(), offsetY.toInt()) }
-            .size(width = widthDp, height = heightDp)
+            .size(
+                width = with(density) { widthPx.toDp() },
+                height = with(density) { heightPx.toDp() }
+            )
             .shadow(10.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black)
@@ -11499,6 +11507,17 @@ fun MiniPlayerOverlay(
                     change.consume()
                     offsetX += dragAmount.x
                     offsetY += dragAmount.y
+                }
+            }
+            .pointerInput(Unit) {
+                // Pinch buat resize — dua jari cubit di mana pun di dalam mini player.
+                detectTransformGestures { _, _, zoom, _ ->
+                    if (zoom != 1f) {
+                        val newWidth = (widthPx * zoom).coerceIn(minWidthPx, maxWidthPx)
+                        offsetX -= (newWidth - widthPx) / 2f
+                        offsetY -= (newWidth * 9f / 16f - heightPx) / 2f
+                        widthPx = newWidth
+                    }
                 }
             }
             .pointerInput(Unit) {
@@ -11554,6 +11573,32 @@ fun MiniPlayerOverlay(
                 contentDescription = "Tutup mini player",
                 tint = Color.White,
                 modifier = Modifier.size(14.dp)
+            )
+        }
+
+        // Handle resize pojok kanan-bawah — drag buat gedein/kecilin tanpa perlu pinch dua jari.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(22.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            val newWidth = (widthPx + dragAmount.x).coerceIn(minWidthPx, maxWidthPx)
+                            widthPx = newWidth
+                        }
+                    )
+                }
+        ) {
+            Icon(
+                Icons.Default.OpenInFull,
+                contentDescription = "Ubah ukuran mini player",
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .size(12.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 3.dp, end = 3.dp)
             )
         }
     }
