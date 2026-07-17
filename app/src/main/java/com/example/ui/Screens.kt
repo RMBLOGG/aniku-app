@@ -11546,12 +11546,12 @@ fun MiniPlayerOverlay(
                             if (prevPinchDistance > 0f && distance > 0f) {
                                 val zoom = distance / prevPinchDistance
                                 if (zoom != 1f) {
-                                    val newWidth = (widthPx * zoom).coerceIn(minWidthPx, maxWidthPx)
-                                    val deltaW = newWidth - widthPx
-                                    val deltaH = (newWidth * 9f / 16f) - heightPx
-                                    offsetX -= deltaW / 2f
-                                    offsetY -= deltaH / 2f
-                                    widthPx = newWidth
+                                    // Nempel di pojok kiri-atas — cuma widthPx/heightPx yang
+                                    // berubah, offsetX/Y TIDAK disentuh. Sebelumnya resize
+                                    // "centered" (ngegeser pojok kiri-atas juga biar box
+                                    // tetap di tengah), itu penyebab box kelihatan jalan
+                                    // sendiri ke atas tiap kali di-resize berkali-kali.
+                                    widthPx = (widthPx * zoom).coerceIn(minWidthPx, maxWidthPx)
                                 }
                             }
                             prevPinchDistance = distance
