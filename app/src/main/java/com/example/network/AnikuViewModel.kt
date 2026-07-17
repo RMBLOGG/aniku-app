@@ -3905,134 +3905,26 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     fun clearChatError() { _chatError.value = null }
 
-    // ── Typing indicator ("sedang mengetik...") ─────────────────
+    // ── Typing indicator & read receipt: DIMATIKAN (2026-07) ─────
+    // Dulu polling tiap 2 detik (typing) & 4 detik (chat reads) ke Supabase,
+    // ini yang jadi penyumbang gede egress PostgREST (over quota Free Plan).
+    // Sekarang jadi no-op permanen: state selalu kosong, gak ada request
+    // yang jalan lagi. Kalau nanti mau diaktifin lagi, ganti ke Supabase
+    // Realtime (websocket) alih-alih REST polling biar egress-nya jauh lebih murah.
     private val _typingUsers = MutableStateFlow<List<TypingStatus>>(emptyList())
     val typingUsers: StateFlow<List<TypingStatus>> = _typingUsers.asStateFlow()
 
-    private var typingPollingJob: kotlinx.coroutines.Job? = null
-    private var lastTypingSentAt = 0L
+    fun notifyTyping() { /* dimatikan, lihat komentar di atas */ }
+    fun clearTyping() { /* dimatikan, lihat komentar di atas */ }
+    fun startTypingPolling() { /* dimatikan, lihat komentar di atas */ }
+    fun stopTypingPolling() { /* dimatikan, lihat komentar di atas */ }
 
-    // Dipanggil tiap kali teks input chat berubah. Di-throttle 2 detik
-    // biar ga spam request ke Supabase pas user ngetik cepat.
-    fun notifyTyping() {
-        val userId = session.value.userId ?: return
-        val token = session.value.token ?: return
-        val now = System.currentTimeMillis()
-        if (now - lastTypingSentAt < 2000L) return
-        lastTypingSentAt = now
-        val username = session.value.username.nullIfBlank()
-            ?: session.value.email?.substringBefore("@") ?: "Anonymous"
-        viewModelScope.launch {
-            try {
-                NetworkClient.supabaseDbApi.upsertTyping(
-                    data = mapOf(
-                        "user_id" to userId,
-                        "username" to username,
-                        "updated_at" to java.time.Instant.now().toString()
-                    ),
-                    authHeader = "Bearer $token",
-                    apiKey = SUPABASE_ANON_KEY
-                )
-            } catch (_: Exception) {}
-        }
-    }
-
-    // Hapus status typing sendiri, dipanggil pas kirim pesan atau keluar dari chat
-    fun clearTyping() {
-        val userId = session.value.userId ?: return
-        val token = session.value.token ?: return
-        lastTypingSentAt = 0L
-        viewModelScope.launch {
-            try {
-                NetworkClient.supabaseDbApi.removeTyping(
-                    userId = "eq.$userId",
-                    authHeader = "Bearer $token",
-                    apiKey = SUPABASE_ANON_KEY
-                )
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun startTypingPolling() {
-        typingPollingJob?.cancel()
-        typingPollingJob = viewModelScope.launch {
-            while (true) {
-                try {
-                    // Cuma ambil status typing yang di-update 5 detik terakhir,
-                    // jadi otomatis "ilang" begitu user berhenti ngetik tanpa perlu delete manual.
-                    val cutoff = java.time.Instant.now().minusSeconds(5).toString()
-                    val result = NetworkClient.supabaseDbApi.getTypingUsers(
-                        updatedAtFilter = "gte.$cutoff",
-                        authHeader = "Bearer $SUPABASE_ANON_KEY",
-                        apiKey = SUPABASE_ANON_KEY
-                    )
-                    _typingUsers.value = result.filter { it.user_id != session.value.userId }
-                } catch (_: Exception) {}
-                kotlinx.coroutines.delay(2000L)
-            }
-        }
-    }
-
-    fun stopTypingPolling() {
-        typingPollingJob?.cancel()
-        typingPollingJob = null
-        _typingUsers.value = emptyList()
-    }
-
-    // ── Read receipt ("dilihat oleh" + avatar) ───────────────────
     private val _chatReads = MutableStateFlow<List<ChatReadStatus>>(emptyList())
     val chatReads: StateFlow<List<ChatReadStatus>> = _chatReads.asStateFlow()
 
-    private var chatReadsPollingJob: kotlinx.coroutines.Job? = null
-    private var lastMarkedReadMessageId: String? = null
-
-    // Dipanggil pas chat pertama dibuka & tiap kali ada pesan baru ke-load,
-    // upsert baris chat_reads milik user ini nunjuk ke pesan terakhir yang keliatan.
-    fun markChatReadReceipt(lastMessageId: String) {
-        if (lastMessageId == lastMarkedReadMessageId) return
-        val userId = session.value.userId ?: return
-        val token = session.value.token ?: return
-        lastMarkedReadMessageId = lastMessageId
-        val username = session.value.username.nullIfBlank()
-            ?: session.value.email?.substringBefore("@") ?: "Anonymous"
-        val avatar = session.value.avatarUrl
-        viewModelScope.launch {
-            try {
-                NetworkClient.supabaseDbApi.upsertChatRead(
-                    data = mapOf(
-                        "user_id" to userId,
-                        "username" to username,
-                        "avatar_url" to avatar,
-                        "last_read_message_id" to lastMessageId,
-                        "updated_at" to java.time.Instant.now().toString()
-                    ),
-                    authHeader = "Bearer $token",
-                    apiKey = SUPABASE_ANON_KEY
-                )
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun startChatReadsPolling() {
-        chatReadsPollingJob?.cancel()
-        chatReadsPollingJob = viewModelScope.launch {
-            while (true) {
-                try {
-                    _chatReads.value = NetworkClient.supabaseDbApi.getChatReads(
-                        authHeader = "Bearer $SUPABASE_ANON_KEY",
-                        apiKey = SUPABASE_ANON_KEY
-                    )
-                } catch (_: Exception) {}
-                kotlinx.coroutines.delay(4000L)
-            }
-        }
-    }
-
-    fun stopChatReadsPolling() {
-        chatReadsPollingJob?.cancel()
-        chatReadsPollingJob = null
-        lastMarkedReadMessageId = null
-    }
+    fun markChatReadReceipt(lastMessageId: String) { /* dimatikan, lihat komentar di atas */ }
+    fun startChatReadsPolling() { /* dimatikan, lihat komentar di atas */ }
+    fun stopChatReadsPolling() { /* dimatikan, lihat komentar di atas */ }
 
     // ── Watch Live Chat ──────────────────────────────────────────
     private val _watchChatMessages = MutableStateFlow<List<WatchChatMessage>>(emptyList())
