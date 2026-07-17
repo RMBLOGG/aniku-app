@@ -15,6 +15,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11494,7 +11495,7 @@ fun MiniPlayerOverlay(
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black)
             .pointerInput(Unit) {
-                androidx.compose.foundation.gestures.detectDragGestures { change, dragAmount ->
+                detectDragGestures { change, dragAmount ->
                     change.consume()
                     offsetX += dragAmount.x
                     offsetY += dragAmount.y
