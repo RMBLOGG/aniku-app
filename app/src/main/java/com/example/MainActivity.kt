@@ -755,6 +755,9 @@ class MainActivity : FragmentActivity() {
                     }
                 }
 
+                val miniPlayerData by viewModel.miniPlayer.collectAsState()
+
+                Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
@@ -1159,6 +1162,21 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 }
+
+                // Mini player in-app — overlay di ATAS NavHost, jadi tetap kelihatan &
+                // tetap muter walaupun user pindah tab/halaman lain di dalam Aniku.
+                miniPlayerData?.let { data ->
+                    com.example.ui.MiniPlayerOverlay(
+                        data = data,
+                        onExpand = { resumeMs ->
+                            viewModel.expandMiniPlayer(resumeMs)
+                            val encodedTitle = java.net.URLEncoder.encode(data.animeTitle, "UTF-8")
+                            navController.navigate("watch/${data.episodeSlug}/$encodedTitle")
+                        },
+                        onClose = { viewModel.closeMiniPlayer() }
+                    )
+                }
+                } // end Box wrapper
             }
             } // end else (unlocked)
         }

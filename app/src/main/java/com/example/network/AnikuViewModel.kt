@@ -584,6 +584,48 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _resolvedHeaders = MutableStateFlow<Map<String, String>>(emptyMap())
     val resolvedHeaders: StateFlow<Map<String, String>> = _resolvedHeaders.asStateFlow()
 
+    // ── Mini player (in-app floating PIP) ──
+    // Beda dengan PIP sistem Android (MainActivity.pipExoPlayer) yang bikin app keluar
+    // ke floating window level OS. Ini murni overlay Compose di atas NavHost: video kecil
+    // tetap muter (pakai ExoPlayer instance-nya SENDIRI, terpisah dari WatchScreen) sambil
+    // user bebas pindah halaman lain di dalam app. Saat di-tap, overlay ini ditutup dan
+    // WatchScreen dibuka lagi lalu di-seek ke posisi terakhir (lihat pendingResumeMs).
+    data class MiniPlayerData(
+        val animeSlug: String,
+        val animeTitle: String,
+        val episodeSlug: String,
+        val episodeTitle: String,
+        val streamUrl: String,
+        val headers: Map<String, String>,
+        val startPositionMs: Long
+    )
+
+    private val _miniPlayer = MutableStateFlow<MiniPlayerData?>(null)
+    val miniPlayer: StateFlow<MiniPlayerData?> = _miniPlayer.asStateFlow()
+
+    private val _pendingResumeMs = MutableStateFlow<Long?>(null)
+
+    fun openMiniPlayer(data: MiniPlayerData) {
+        _miniPlayer.value = data
+    }
+
+    fun closeMiniPlayer() {
+        _miniPlayer.value = null
+    }
+
+    /** Dipanggil WatchScreen sekali saat ExoPlayer baru dibuat, buat lanjut dari posisi mini player. */
+    fun consumePendingResumeMs(): Long? {
+        val v = _pendingResumeMs.value
+        _pendingResumeMs.value = null
+        return v
+    }
+
+    /** Dipanggil overlay mini player saat user tap buat expand balik ke WatchScreen. */
+    fun expandMiniPlayer(currentPositionMs: Long) {
+        _pendingResumeMs.value = currentPositionMs
+        _miniPlayer.value = null
+    }
+
     // Debug info dari percobaan ekstraksi video terakhir yang GAGAL (jatuh ke WebView
     // fallback) - isinya VideoExtractor.lastDebugSnippet. Tujuannya buat yang build via
     // GitHub Actions/CI (gak ada akses Logcat/adb sama sekali) - tinggal buka dialog-nya

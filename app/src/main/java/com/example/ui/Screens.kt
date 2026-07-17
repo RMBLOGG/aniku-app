@@ -5547,6 +5547,10 @@ fun WatchScreen(
                                 val room = nobarRoom
                                 if (room != null && room.hostUid != session.userId) {
                                     seekTo(NobarManager.estimateCurrentPositionMs(room))
+                                } else {
+                                    // Balik dari mini player (in-app floating PIP) -> lanjut
+                                    // dari posisi terakhir, bukan mulai dari 00:00 lagi.
+                                    viewModel.consumePendingResumeMs()?.let { resumeMs -> seekTo(resumeMs) }
                                 }
                             }
                     }
@@ -5883,7 +5887,7 @@ fun WatchScreen(
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
-                                                // PiP button
+                                                // PiP button (sistem Android — app keluar ke floating window OS)
                                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                                     FilledIconButton(
                                                         onClick = { enterPiP() },
@@ -5895,6 +5899,40 @@ fun WatchScreen(
                                                     ) {
                                                         Icon(Icons.Default.PictureInPicture, contentDescription = "PiP", modifier = Modifier.size(16.dp))
                                                     }
+                                                }
+                                                // Mini player in-app — video tetap muter di kotak kecil,
+                                                // tapi TETAP di dalam Aniku (beda sama PiP sistem di atas),
+                                                // jadi user masih bisa buka halaman lain (home, search, dll).
+                                                FilledIconButton(
+                                                    onClick = {
+                                                        if (isFullscreen) {
+                                                            isFullscreen = false
+                                                            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                                            activity?.window?.decorView?.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+                                                        }
+                                                        val urlNow = activeStreamUrl
+                                                        if (!urlNow.isNullOrEmpty()) {
+                                                            viewModel.openMiniPlayer(
+                                                                AnikuViewModel.MiniPlayerData(
+                                                                    animeSlug = currentAnimeSlug,
+                                                                    animeTitle = animeTitle,
+                                                                    episodeSlug = currentEpisodeSlug,
+                                                                    episodeTitle = episodeTitle ?: "",
+                                                                    streamUrl = urlNow,
+                                                                    headers = resolvedHeaders,
+                                                                    startPositionMs = exoPlayer.currentPosition
+                                                                )
+                                                            )
+                                                        }
+                                                        onBack()
+                                                    },
+                                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                                        containerColor = Color.Black.copy(alpha = 0.4f),
+                                                        contentColor = Color.White
+                                                    ),
+                                                    modifier = Modifier.size(34.dp)
+                                                ) {
+                                                    Icon(Icons.Default.PictureInPictureAlt, contentDescription = "Mini player", modifier = Modifier.size(16.dp))
                                                 }
                                             }
                                         }
@@ -11389,5 +11427,133 @@ private fun PodiumPlaque(
                 color = amountColor,
                 delayMillis = countDelay
             )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mini Player (in-app floating PIP)
+// ─────────────────────────────────────────────────────────────────────────
+// Overlay Compose yang ditaruh di ROOT, di atas NavHost (lihat MainActivity).
+// Beda sama PIP sistem Android: video kecil ini nempel DI DALAM Aniku, jadi
+// NavHost di baliknya tetap jalan normal — user bisa buka home/search/dll
+// sementara video tetap muter di kotak kecil draggable ini. ExoPlayer yang
+// dipakai di sini instance BARU & terpisah dari yang di WatchScreen (yang
+// sudah di-release begitu WatchScreen ditutup lewat tombol minimize).
+@Composable
+fun MiniPlayerOverlay(
+    data: AnikuViewModel.MiniPlayerData,
+    onExpand: (Long) -> Unit,
+    onClose: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val config = LocalConfiguration.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    val widthDp = 168.dp
+    val heightDp = 94.dp
+
+    // Posisi awal: pojok kanan bawah, di atas bottom nav.
+    var offsetX by remember {
+        mutableStateOf(with(density) { (config.screenWidthDp.dp - widthDp - 12.dp).toPx() })
+    }
+    var offsetY by remember {
+        mutableStateOf(with(density) { (config.screenHeightDp.dp - heightDp - 90.dp).toPx() })
+    }
+
+    val exoPlayer = remember(data.streamUrl) {
+        val httpDataSourceFactory = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+            com.example.network.VideoExtractor.streamingHttpClient
+        ).apply {
+            if (data.headers.isNotEmpty()) setDefaultRequestProperties(data.headers)
+        }
+        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(ctx, httpDataSourceFactory)
+        ExoPlayer.Builder(ctx)
+            .setMediaSourceFactory(
+                if (data.streamUrl.contains(".m3u8"))
+                    androidx.media3.exoplayer.hls.HlsMediaSource.Factory(dataSourceFactory)
+                else
+                    androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(dataSourceFactory)
+            )
+            .build().apply {
+                setMediaItem(MediaItem.fromUri(data.streamUrl))
+                prepare()
+                playWhenReady = true
+                seekTo(data.startPositionMs)
+            }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose { exoPlayer.release() }
+    }
+
+    Box(
+        modifier = Modifier
+            .offset { androidx.compose.ui.unit.IntOffset(offsetX.toInt(), offsetY.toInt()) }
+            .size(width = widthDp, height = heightDp)
+            .shadow(10.dp, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black)
+            .pointerInput(Unit) {
+                androidx.compose.foundation.gestures.detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    offsetX += dragAmount.x
+                    offsetY += dragAmount.y
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onExpand(exoPlayer.currentPosition) })
+            }
+    ) {
+        AndroidView(
+            factory = { c ->
+                PlayerView(c).apply {
+                    player = exoPlayer
+                    useController = false
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Judul kecil biar user tau lagi nonton apa
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))
+                    )
+                )
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = data.animeTitle,
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        // Tombol close
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(24.dp)
+                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Tutup mini player",
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }
