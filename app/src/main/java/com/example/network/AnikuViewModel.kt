@@ -33,6 +33,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     init {
         remoteConfigManager.fetchAndApply()
+
+        // Cek device-ban SEKALI di paling awal app dibuka, gak peduli ada sesi
+        // login atau enggak. Tanpa ini, device yang udah di-ban masih bisa masuk
+        // lewat "Mode Tamu" (browsing tanpa akun sama sekali) -- soalnya semua
+        // pengecekan ban lain nempel di alur login/register/session, sedangkan
+        // Mode Tamu gak lewat jalur itu sama sekali.
+        viewModelScope.launch {
+            if (isDeviceBannedStandalone()) {
+                _forceBannedLogout.value = true
+            }
+        }
     }
 
     // Android ID -- ID unik per-device yang gak butuh permission apa pun buat
