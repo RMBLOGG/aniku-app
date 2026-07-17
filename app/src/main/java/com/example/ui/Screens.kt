@@ -16,8 +16,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11492,6 +11494,10 @@ fun MiniPlayerOverlay(
         onDispose { exoPlayer.release() }
     }
 
+    // Ambang gerak buat bedain "tap" (buka full player) dari "drag" (geser posisi) —
+    // gerak di bawah ini dianggap tap, di atasnya dianggap mulai geser.
+    val tapSlopPx = with(density) { 12.dp.toPx() }
+
     Box(
         modifier = Modifier
             .offset { androidx.compose.ui.unit.IntOffset(offsetX.toInt(), offsetY.toInt()) }
@@ -11503,25 +11509,68 @@ fun MiniPlayerOverlay(
             .clip(RoundedCornerShape(12.dp))
             .background(Color.Black)
             .pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    offsetX += dragAmount.x
-                    offsetY += dragAmount.y
-                }
-            }
-            .pointerInput(Unit) {
-                // Pinch buat resize — dua jari cubit di mana pun di dalam mini player.
-                detectTransformGestures { _, _, zoom, _ ->
-                    if (zoom != 1f) {
-                        val newWidth = (widthPx * zoom).coerceIn(minWidthPx, maxWidthPx)
-                        offsetX -= (newWidth - widthPx) / 2f
-                        offsetY -= (newWidth * 9f / 16f - heightPx) / 2f
-                        widthPx = newWidth
+                // SATU handler tunggal buat geser (1 jari), pinch-resize (2 jari), dan
+                // tap (buka full player). Sebelumnya ini 3 pointerInput terpisah yang
+                // masing-masing baca event mentah yang SAMA tanpa koordinasi — pas pinch
+                // 2 jari, detektor "geser" ikut nganggep gerakan itu sebagai drag JUGA,
+                // jadi offset ke-update dobel (dari drag + dari resize pinch) sampai
+                // videonya kelontang ke luar layar. Sekarang cuma satu loop yang jalan,
+                // jadi gak mungkin dobel proses buat gesture yang sama.
+                awaitEachGesture {
+                    val firstDown = awaitFirstDown(requireUnconsumed = false)
+                    // Sengaja gak konsumsi down di sini kalau area ini bakal ditangani
+                    // handle resize (pojok kanan-bawah) — biar pointerInput handle-nya
+                    // (composable terpisah) yang megang gesture ini, gak direbut di sini.
+                    val handleZonePx = with(density) { 30.dp.toPx() }
+                    val inHandleZone = firstDown.position.x >= size.width - handleZonePx &&
+                        firstDown.position.y >= size.height - handleZonePx
+                    if (inHandleZone) return@awaitEachGesture
+
+                    firstDown.consume()
+                    var totalMovement = 0f
+                    var wasPinch = false
+                    var prevPinchDistance = 0f
+
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.isEmpty()) break
+
+                        if (pressed.size >= 2) {
+                            wasPinch = true
+                            val p1 = pressed[0].position
+                            val p2 = pressed[1].position
+                            val dx = p1.x - p2.x
+                            val dy = p1.y - p2.y
+                            val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+                            if (prevPinchDistance > 0f && distance > 0f) {
+                                val zoom = distance / prevPinchDistance
+                                if (zoom != 1f) {
+                                    val newWidth = (widthPx * zoom).coerceIn(minWidthPx, maxWidthPx)
+                                    val deltaW = newWidth - widthPx
+                                    val deltaH = (newWidth * 9f / 16f) - heightPx
+                                    offsetX -= deltaW / 2f
+                                    offsetY -= deltaH / 2f
+                                    widthPx = newWidth
+                                }
+                            }
+                            prevPinchDistance = distance
+                            pressed.forEach { it.consume() }
+                        } else {
+                            val change = pressed[0]
+                            val drag = change.positionChange()
+                            offsetX += drag.x
+                            offsetY += drag.y
+                            totalMovement += kotlin.math.abs(drag.x) + kotlin.math.abs(drag.y)
+                            change.consume()
+                            prevPinchDistance = 0f
+                        }
+                    }
+
+                    if (!wasPinch && totalMovement < tapSlopPx) {
+                        onExpand(exoPlayer.currentPosition)
                     }
                 }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onExpand(exoPlayer.currentPosition) })
             }
     ) {
         AndroidView(
