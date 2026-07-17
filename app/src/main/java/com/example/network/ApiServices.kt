@@ -475,6 +475,23 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Leader jadiin salah satu member biasa jadi co-leader (bisa approve
+    // join request & kick member biasa, tapi gak bisa kick leader/co-leader lain)
+    @POST("rest/v1/rpc/promote_co_leader")
+    suspend fun promoteCoLeader(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
+    // Leader copot co-leader balik jadi member biasa
+    @POST("rest/v1/rpc/demote_co_leader")
+    suspend fun demoteCoLeader(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/rpc/delete_clan")
     suspend fun deleteClan(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,

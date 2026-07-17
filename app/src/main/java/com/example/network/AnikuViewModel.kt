@@ -3025,6 +3025,28 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    fun promoteCoLeader(clanId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.promoteCoLeader(mapOf("p_clan_id" to clanId, "p_target_user_id" to userId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) loadMyClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal jadiin co-leader"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal jadiin co-leader"
+            }
+        }
+    }
+
+    fun demoteCoLeader(clanId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.demoteCoLeader(mapOf("p_clan_id" to clanId, "p_target_user_id" to userId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) loadMyClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal copot co-leader"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal copot co-leader"
+            }
+        }
+    }
+
     fun deleteClan(clanId: String, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             try {

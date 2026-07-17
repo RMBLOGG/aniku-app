@@ -90,9 +90,11 @@ fun ClanScreen(
     var clanTabIndex by remember { mutableStateOf(0) }
 
     val isLeader = myMembership?.role == "leader" && myMembership?.user_id == session.userId
+    val isCoLeader = myMembership?.role == "co_leader" && myMembership?.user_id == session.userId
+    val canManageMembers = isLeader || isCoLeader
 
-    LaunchedEffect(myClan, isLeader) {
-        if (isLeader) myClan?.let { viewModel.loadPendingJoinRequests(it.id) }
+    LaunchedEffect(myClan, canManageMembers) {
+        if (canManageMembers) myClan?.let { viewModel.loadPendingJoinRequests(it.id) }
     }
 
     val iconPickerLauncher = rememberLauncherForActivityResult(
@@ -179,11 +181,14 @@ fun ClanScreen(
                                 clan = myClan!!,
                                 members = myClanMembers,
                                 isLeader = isLeader,
+                                isCoLeader = isCoLeader,
                                 isUploadingIcon = isUploadingIcon,
                                 currentUserId = session.userId,
                                 onContribute = { showContributeDialog = true },
                                 onManage = { showManageDialog = true },
                                 onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
+                                onPromote = { userId -> viewModel.promoteCoLeader(myClan!!.id, userId) },
+                                onDemote = { userId -> viewModel.demoteCoLeader(myClan!!.id, userId) },
                                 onLeave = { viewModel.leaveClan() },
                                 onIconClick = {
                                     if (isLeader) iconPickerLauncher.launch("image/*")
@@ -305,6 +310,7 @@ fun ClanScreen(
     if (showManageDialog && myClan != null) {
         ManageClanDialog(
             clan = myClan!!,
+            isLeader = isLeader,
             pendingRequests = pendingRequests,
             diamondBalance = diamondBalance,
             onDismiss = { showManageDialog = false },
@@ -506,7 +512,7 @@ private fun ViewClanScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 ClanTagPill(clan.tag)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                ClanRolePill(isLeader = member.role == "leader")
+                                ClanRolePill(role = member.role)
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -771,9 +777,22 @@ private fun ClanTagPill(tag: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ClanRolePill(isLeader: Boolean, modifier: Modifier = Modifier) {
-    val bg = if (isLeader) Color(0xFFFFC24B) else Color.White.copy(alpha = 0.1f)
-    val fg = if (isLeader) Color(0xFF3A2A00) else Color.White.copy(alpha = 0.6f)
+private fun ClanRolePill(role: String?, modifier: Modifier = Modifier) {
+    val bg = when (role) {
+        "leader" -> Color(0xFFFFC24B)
+        "co_leader" -> Color(0xFF64D9E5)
+        else -> Color.White.copy(alpha = 0.1f)
+    }
+    val fg = when (role) {
+        "leader" -> Color(0xFF3A2A00)
+        "co_leader" -> Color(0xFF073136)
+        else -> Color.White.copy(alpha = 0.6f)
+    }
+    val label = when (role) {
+        "leader" -> "LEADER"
+        "co_leader" -> "CO-LEADER"
+        else -> "MEMBER"
+    }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
@@ -781,7 +800,7 @@ private fun ClanRolePill(isLeader: Boolean, modifier: Modifier = Modifier) {
             .padding(horizontal = 8.dp, vertical = 3.dp)
     ) {
         Text(
-            if (isLeader) "LEADER" else "MEMBER",
+            label,
             fontSize = 9.5.sp,
             fontWeight = FontWeight.Black,
             letterSpacing = 0.3.sp,
@@ -810,14 +829,18 @@ private fun MyClanCard(
     clan: ClanDto,
     members: List<ClanMemberDto>,
     isLeader: Boolean,
+    isCoLeader: Boolean,
     isUploadingIcon: Boolean,
     currentUserId: String?,
     onContribute: () -> Unit,
     onManage: () -> Unit,
     onKick: (String) -> Unit,
+    onPromote: (String) -> Unit,
+    onDemote: (String) -> Unit,
     onLeave: () -> Unit,
     onIconClick: () -> Unit
 ) {
+    val canManageMembers = isLeader || isCoLeader
     var showLeaveConfirm by remember { mutableStateOf(false) }
     val xpIntoLevel = (clan.total_xp ?: 0) % 1000
     val progress = xpIntoLevel / 1000f
@@ -946,7 +969,7 @@ private fun MyClanCard(
                             }
                         }
                     }
-                    if (isLeader) {
+                    if (canManageMembers) {
                         IconButton(onClick = onManage, modifier = Modifier.size(34.dp)) {
                             Icon(Icons.Default.Settings, contentDescription = "Kelola Clan", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                         }
@@ -1040,7 +1063,7 @@ private fun MyClanCard(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 ClanTagPill(clan.tag)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                ClanRolePill(isLeader = member.role == "leader")
+                                ClanRolePill(role = member.role)
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1049,7 +1072,21 @@ private fun MyClanCard(
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(formatXpAbbrev(member.contributed_xp ?: 0), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
                         }
-                        if (isLeader && member.user_id != currentUserId) {
+                        if (isLeader && member.user_id != currentUserId && member.role == "member") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(onClick = { onPromote(member.user_id) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.MilitaryTech, contentDescription = "Jadikan Co-Leader", tint = Color(0xFF64D9E5), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        if (isLeader && member.user_id != currentUserId && member.role == "co_leader") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(onClick = { onDemote(member.user_id) }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.RemoveModerator, contentDescription = "Copot Co-Leader", tint = Color(0xFF64D9E5), modifier = Modifier.size(14.dp))
+                            }
+                        }
+                        if (canManageMembers && member.user_id != currentUserId && member.role != "leader" &&
+                            !(isCoLeader && member.role == "co_leader")
+                        ) {
                             Spacer(modifier = Modifier.width(6.dp))
                             IconButton(onClick = { onKick(member.user_id) }, modifier = Modifier.size(24.dp)) {
                                 Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
@@ -1284,6 +1321,7 @@ private fun ClanLeaderboardRow(clan: ClanDto, rank: Int, index: Int, showRank: B
 @Composable
 private fun ManageClanDialog(
     clan: ClanDto,
+    isLeader: Boolean,
     pendingRequests: List<com.example.network.ClanJoinRequestDto>,
     diamondBalance: Int,
     onDismiss: () -> Unit,
@@ -1304,67 +1342,74 @@ private fun ManageClanDialog(
         icon = Icons.Default.Settings,
         content = {
             Column(modifier = Modifier.animateContentSize()) {
-                Text("Ganti Nama Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                Text("Biaya 1.000 DM \u2014 saldo kamu: $diamondBalance DM", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newName, onValueChange = { newName = it }, singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF2FA8BF), unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { if (newName.isNotBlank() && newName != clan.name) onRename(newName) },
-                        enabled = newName.isNotBlank() && newName != clan.name
-                    ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text("Ganti Singkatan Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                Text("Maks 6 karakter, otomatis jadi huruf kapital", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = newTag,
-                        onValueChange = { if (it.length <= 6) newTag = it.uppercase() },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                            focusedBorderColor = Color(0xFF2FA8BF), unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { if (newTag.isNotBlank() && newTag != clan.tag) onRenameTag(newTag) },
-                        enabled = newTag.isNotBlank() && newTag != clan.tag
-                    ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Clan Private", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                        Text("Anggota baru butuh persetujuan kamu", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                if (isLeader) {
+                    Text("Ganti Nama Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                    Text("Biaya 1.000 DM \u2014 saldo kamu: $diamondBalance DM", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newName, onValueChange = { newName = it }, singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF2FA8BF), unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(
+                            onClick = { if (newName.isNotBlank() && newName != clan.name) onRename(newName) },
+                            enabled = newName.isNotBlank() && newName != clan.name
+                        ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
                     }
-                    Switch(
-                        checked = clan.is_private == true, onCheckedChange = onTogglePrivacy,
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF7B2FBF))
-                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text("Ganti Singkatan Clan", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                    Text("Maks 6 karakter, otomatis jadi huruf kapital", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = newTag,
+                            onValueChange = { if (it.length <= 6) newTag = it.uppercase() },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF2FA8BF), unfocusedBorderColor = Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(
+                            onClick = { if (newTag.isNotBlank() && newTag != clan.tag) onRenameTag(newTag) },
+                            enabled = newTag.isNotBlank() && newTag != clan.tag
+                        ) { Text("Simpan", color = Color(0xFF2FA8BF)) }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Clan Private", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                            Text("Anggota baru butuh persetujuan kamu", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
+                        }
+                        Switch(
+                            checked = clan.is_private == true, onCheckedChange = onTogglePrivacy,
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF7B2FBF))
+                        )
+                    }
+                } else {
+                    // Co-leader: cuma bisa liat & kelola permintaan gabung, gak ada
+                    // akses rename/ganti tag/privacy/hapus clan (tetap leader-only).
+                    Text("Kelola Permintaan Gabung", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                    Text("Sebagai co-leader kamu bisa terima/tolak member baru", fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f))
                 }
 
                 if (clan.is_private == true) {
@@ -1387,25 +1432,27 @@ private fun ManageClanDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(12.dp))
+                if (isLeader) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                if (!showDeleteConfirm) {
-                    TextButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Hapus Clan", color = Color(0xFFE57373))
-                    }
-                } else {
-                    Text("Yakin mau hapus clan? Semua member bakal ikut keluar. Aksi ini gak bisa dibatalkan.", fontSize = 12.sp, color = Color(0xFFE57373))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row {
-                        Button(onClick = onDeleteClan, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
-                            Text("Ya, Hapus")
+                    if (!showDeleteConfirm) {
+                        TextButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.DeleteForever, contentDescription = null, tint = Color(0xFFE57373), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Hapus Clan", color = Color(0xFFE57373))
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
+                    } else {
+                        Text("Yakin mau hapus clan? Semua member bakal ikut keluar. Aksi ini gak bisa dibatalkan.", fontSize = 12.sp, color = Color(0xFFE57373))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row {
+                            Button(onClick = onDeleteClan, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))) {
+                                Text("Ya, Hapus")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = { showDeleteConfirm = false }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
+                        }
                     }
                 }
             }
