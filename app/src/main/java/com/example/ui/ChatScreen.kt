@@ -434,18 +434,12 @@ fun ChatScreen(
         uri?.let { pendingImageUri = it }
     }
 
-    // Auto-poll setiap 5 detik -- berhenti total kalau chat_room_enabled
-    // dimatiin dari Firebase Remote Config (kill-switch darurat kalau egress boros).
-    // loadClanTagMap tetap jalan sekali di awal karena dipakai fitur lain (tag clan),
-    // bukan bagian dari polling chat.
+    // Auto-poll setiap 5 detik
     LaunchedEffect(Unit) {
-        viewModel.loadClanTagMap()
-    }
-    LaunchedEffect(chatRoomEnabled) {
-        if (!chatRoomEnabled) return@LaunchedEffect
         viewModel.loadChatMessages()
         viewModel.markChatRead()
-        while (chatRoomEnabled) {
+        viewModel.loadClanTagMap()
+        while (true) {
             delay(5000)
             viewModel.loadChatMessages()
             viewModel.markChatRead()

@@ -4295,22 +4295,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = "Bearer $SUPABASE_ANON_KEY",
                     apiKey = SUPABASE_ANON_KEY
                 )
-                // Dulu fetch SEMUA profiles (ratusan user) tiap poll 5 detik cuma buat
-                // manual-join user_number/season_level -- ini yang bikin egress bengkak.
-                // Sekarang cuma fetch profil user yang pesannya lagi ditampilin di batch
-                // ini (biasanya puluhan, bukan ratusan), jauh lebih hemat tapi hasil
-                // tampilan (level real-time) tetap sama persis kayak sebelumnya.
+                // Fetch semua profiles sekali untuk manual-join user_number
+                // (Supabase auto-join via PostgREST schema cache tidak reliable)
                 val profilesMap = try {
-                    val userIds = messagesDeferred.map { it.user_id }.distinct()
-                    if (userIds.isEmpty()) {
-                        emptyMap()
-                    } else {
-                        NetworkClient.supabaseDbApi.getProfileByUserId(
-                            idQuery = "in.(${userIds.joinToString(",")})",
-                            authHeader = getAuthHeader(),
-                            apiKey = SUPABASE_ANON_KEY
-                        ).associateBy { it.id }
-                    }
+                    NetworkClient.supabaseDbApi.getProfiles(
+                        authHeader = getAuthHeader(),
+                        apiKey = SUPABASE_ANON_KEY
+                    ).associateBy { it.id }
                 } catch (e: Exception) {
                     Log.e("AnikuVM", "Failed fetching profiles for chat join", e)
                     emptyMap()
