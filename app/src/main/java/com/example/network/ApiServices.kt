@@ -1310,7 +1310,7 @@ object NetworkClient {
 
     val supabaseAuthApi: SupabaseAuthApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
+            .baseUrl("http://203-175-11-166.nip.io:8000/")
             .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
@@ -1319,7 +1319,7 @@ object NetworkClient {
 
     val supabaseFunctionsApi: SupabaseFunctionsApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
+            .baseUrl("http://203-175-11-166.nip.io:8000/")
             .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
@@ -1328,7 +1328,7 @@ object NetworkClient {
 
     val supabaseDbApi: SupabaseDbApi by lazy {
         Retrofit.Builder()
-            .baseUrl("https://uczxaiyibnwgycodtcvm.supabase.co/")
+            .baseUrl("http://203-175-11-166.nip.io:8000/")
             .client(defaultOkHttpClient)
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()

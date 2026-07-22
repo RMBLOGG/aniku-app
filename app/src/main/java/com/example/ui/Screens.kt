@@ -7377,7 +7377,7 @@ fun AuthScreen(
     var googleLoading by remember { mutableStateOf(false) }
 
     // GANTI dengan Web Client ID (bukan Android Client ID) dari Google Cloud Console
-    val googleWebClientId = "1050856790349-re2egjtpjg28b6aiojt2lab56vs1u3ei.apps.googleusercontent.com"
+    val googleWebClientId = "592000451797-8tq0be87569l9m2pll8b3jtv2k7ci4m5.apps.googleusercontent.com"
 
     fun launchGoogleSignIn() {
         coroutineScope.launch {
