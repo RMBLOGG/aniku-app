@@ -374,6 +374,36 @@ fun UserProfileScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         GlossyGradientText(text = "Lv.$seasonLevel", colors = levelGradientColors, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
+                    var userRanks by remember(p.id) { mutableStateOf<UserRanksDto?>(null) }
+                    LaunchedEffect(p.id) {
+                        viewModel.loadUserRanks(p.id) { ranks -> userRanks = ranks }
+                    }
+                    userRanks?.support_rank?.let { rank ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFFFFD54F).copy(alpha = 0.18f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("🏆", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Top Support #$rank", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFA000))
+                        }
+                    }
+                    userRanks?.xp_rank?.let { rank ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF64B5F6).copy(alpha = 0.18f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("⭐", fontSize = 11.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Top XP #$rank", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1976D2))
+                        }
+                    }
                     viewedClanForPill?.let { clan ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -420,14 +450,16 @@ fun UserProfileScreen(
                     }
                 } else {
                     val showBanButton = canModerate
-                    val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin
+                    val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin || session.isPremiumActive()
+                    var showGiftPremiumSheet by remember { mutableStateOf(false) }
 
                     var showGiveDialog by remember { mutableStateOf(false) }
                     var giveAmountText by remember { mutableStateOf("") }
                     var giveResultMsg by remember { mutableStateOf<String?>(null) }
                     var giveInProgress by remember { mutableStateOf(false) }
 
-                    if (showBanButton || showDiamondButton) {
+                    val showGiftPremiumButton = session.userId != null
+                    if (showBanButton || showDiamondButton || showGiftPremiumButton) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -494,7 +526,35 @@ fun UserProfileScreen(
                                     Text("Diamond", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
                                 }
                             }
+
+                            if (showGiftPremiumButton) {
+                                OutlinedButton(
+                                    onClick = { showGiftPremiumSheet = true },
+                                    shape = RoundedCornerShape(16.dp),
+                                    border = BorderStroke(1.dp, Color(0xFFFFA000).copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color(0xFFFFA000).copy(alpha = 0.08f),
+                                        contentColor = Color(0xFFFFA000)
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp)
+                                ) {
+                                    Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Gift Premium", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
+                                }
+                            }
                         }
+                    }
+                    if (showGiftPremiumSheet) {
+                        GiftPremiumSheet(
+                            targetUserId = p.id,
+                            targetUsername = p.username ?: "Pengguna",
+                            viewModel = viewModel,
+                            onDismiss = { showGiftPremiumSheet = false }
+                        )
                     }
                     if (showGiveDialog) {
                         AlertDialog(
@@ -1504,6 +1564,152 @@ private fun ShowcaseCard(char: com.example.network.CharacterInfoDto, index: Int 
                     }
                 }
             }
+        }
+    }
+}
+
+// Bottom sheet buat kirim Gift Premium ke user lain, dengan 2 mode:
+// - "direct": langsung ke target_user_id (dari profil orang lain)
+// - "giveaway": "War di Chat Global" - siapa cepat dia dapat
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun GiftPremiumSheet(
+    targetUserId: String,
+    targetUsername: String,
+    viewModel: AnikuViewModel,
+    onDismiss: () -> Unit
+) {
+    val packages by viewModel.premiumPackages.collectAsState()
+    var selectedPackageId by remember { mutableStateOf<String?>(null) }
+    var mode by remember { mutableStateOf("direct") } // "direct" atau "giveaway"
+    var isLoading by remember { mutableStateOf(false) }
+    var resultClaim by remember { mutableStateOf<PremiumClaimDto?>(null) }
+    var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (packages.isEmpty()) viewModel.loadPremiumPackages()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            if (resultClaim != null) {
+                Text("Gift Premium Berhasil Dibuat!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(16.dp)
+                ) {
+                    Column {
+                        Text("Kode Klaim:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            resultClaim!!.code,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Buka Sociabuzz, isi nominal sesuai paket, lalu tulis kode di atas di kolom pesan dukungan. Premium otomatis aktif setelah pembayaran terverifikasi.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                    Text("Tutup")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                return@Column
+            }
+
+            Text("Gift Premium", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Kirim Premium ke $targetUsername",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Pilih Paket", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            packages.forEach { pkg ->
+                val isSelected = selectedPackageId == pkg.id
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .clickable { selectedPackageId = pkg.id }
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(pkg.label, fontWeight = FontWeight.SemiBold)
+                    Text("Rp${pkg.price}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Mode Pengiriman", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = mode == "direct",
+                    onClick = { mode = "direct" },
+                    label = { Text("Langsung ke $targetUsername") }
+                )
+                FilterChip(
+                    selected = mode == "giveaway",
+                    onClick = { mode = "giveaway" },
+                    label = { Text("War di Chat Global") }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            errorMsg?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Button(
+                onClick = {
+                    val pkgId = selectedPackageId ?: return@Button
+                    isLoading = true
+                    errorMsg = null
+                    if (mode == "direct") {
+                        viewModel.createPremiumClaim(targetUserId, pkgId) { claim, error ->
+                            isLoading = false
+                            if (claim != null) resultClaim = claim else errorMsg = error
+                        }
+                    } else {
+                        viewModel.createGiveawayClaim(pkgId) { claim, error ->
+                            isLoading = false
+                            if (claim != null) resultClaim = claim else errorMsg = error
+                        }
+                    }
+                },
+                enabled = selectedPackageId != null && !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Buat Gift Premium")
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

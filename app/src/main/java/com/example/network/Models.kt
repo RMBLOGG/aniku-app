@@ -247,7 +247,11 @@ data class ProfileDto(
     val device_id: String? = null,
     // Karakter gacha yang dipajang di profil (maks 6). Kepemilikan divalidasi
     // server-side lewat RPC set_profile_showcase -- jangan pernah di-PATCH langsung.
-    val showcase_character_ids: List<Int>? = null
+    val showcase_character_ids: List<Int>? = null,
+    // Status Premium (diisi lewat fitur Gift Premium) & total dukungan yang pernah
+    // diterima (dipakai buat badge "Top Support" di profil).
+    val premium_until: String? = null,
+    val support_points: Int? = 0
 ) {
     fun isAdmin() = role == "admin" || is_admin == true
     fun isModerator() = role == "moderator"
@@ -255,6 +259,17 @@ data class ProfileDto(
     // akses admin/moderator apapun. Semua pengecekan permission tetap cuma cek isAdmin()/
     // isModerator(), role "beta" gak pernah dicek di jalur permission manapun.
     fun isBeta() = role == "beta"
+    // Premium - dicek dari premium_until (bukan kolom role), karena role tetap
+    // "user"/"beta"/dst, status premium cuma nempel sebagai masa berlaku terpisah.
+    fun isPremiumActive(): Boolean {
+        val until = premium_until ?: return false
+        return try {
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val untilDate = parser.parse(until.take(19)) ?: return false
+            untilDate.after(java.util.Date())
+        } catch (e: Exception) { false }
+    }
     fun roleLabel() = when (role) {
         "admin" -> "Admin"
         "moderator" -> "Moderator"
@@ -424,7 +439,12 @@ data class ChatMessage(
     val reply_to_id: String? = null,
     val reply_to_username: String? = null,
     val reply_to_message: String? = null,
-    val image_url: String? = null
+    val image_url: String? = null,
+    // Penanda pesan giveaway "War Premium" - message_type "giveaway" dirender
+    // beda (bubble khusus dengan tombol Klaim) daripada bubble teks biasa.
+    val message_type: String? = "text",
+    val giveaway_claim_id: String? = null,
+    val giveaway_status: String? = null
 )
 
 // Chat khusus clan - struktur sama kayak ChatMessage tapi ada clan_id
@@ -484,7 +504,10 @@ data class ChatMessageWithProfile(
     val reply_to_username: String? = null,
     val reply_to_message: String? = null,
     val image_url: String? = null,
-    val profiles: ProfileNumberDto? = null
+    val profiles: ProfileNumberDto? = null,
+    val message_type: String? = "text",
+    val giveaway_claim_id: String? = null,
+    val giveaway_status: String? = null
 ) {
     fun toChatMessage() = ChatMessage(
         id = id,
@@ -499,7 +522,10 @@ data class ChatMessageWithProfile(
         reply_to_id = reply_to_id,
         reply_to_username = reply_to_username,
         reply_to_message = reply_to_message,
-        image_url = image_url
+        image_url = image_url,
+        message_type = message_type,
+        giveaway_claim_id = giveaway_claim_id,
+        giveaway_status = giveaway_status
     )
 }
 
@@ -1653,4 +1679,69 @@ data class FriendshipStatusUpdate(
 @JsonClass(generateAdapter = true)
 data class JikanRandomAnimeResponse(
     val data: JikanAnimeData?
+)
+
+// --- Model buat fitur Gift Premium & Giveaway (War di Chat) ---
+
+@JsonClass(generateAdapter = true)
+data class PremiumPackageDto(
+    val id: String,
+    val label: String,
+    val duration_days: Int,
+    val price: Int,
+    val is_active: Boolean? = true
+)
+
+@JsonClass(generateAdapter = true)
+data class PremiumClaimDto(
+    val id: String,
+    val code: String,
+    val sender_id: String,
+    val target_user_id: String? = null,
+    val package_id: String,
+    val amount_expected: Int,
+    val status: String,
+    val claim_type: String,
+    val created_at: String? = null,
+    val expires_at: String? = null
+)
+
+// Body buat manggil RPC create_premium_claim (gift langsung ke user tertentu)
+@JsonClass(generateAdapter = true)
+data class CreatePremiumClaimRequest(
+    val p_target_user_id: String,
+    val p_package_id: String
+)
+
+// Body buat manggil RPC create_giveaway_claim (mode "War di Chat Global")
+@JsonClass(generateAdapter = true)
+data class CreateGiveawayClaimRequest(
+    val p_package_id: String
+)
+
+// Body buat manggil RPC claim_giveaway (user tap tombol "Klaim" di chat)
+@JsonClass(generateAdapter = true)
+data class ClaimGiveawayRequest(
+    val p_claim_id: String
+)
+
+// Response dari RPC claim_giveaway - balikin array 1 baris (success, message, package_label)
+@JsonClass(generateAdapter = true)
+data class ClaimGiveawayResult(
+    val success: Boolean,
+    val message: String,
+    val package_label: String? = null
+)
+
+// Response dari RPC get_user_ranks - dipakai buat badge Top Support / Top XP di profil
+@JsonClass(generateAdapter = true)
+data class UserRanksDto(
+    val support_rank: Int? = null,
+    val xp_rank: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class GetUserRanksRequest(
+    val p_user_id: String,
+    val p_top_n: Int = 50
 )

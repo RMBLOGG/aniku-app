@@ -719,6 +719,54 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
+    // --- Premium Gift & Giveaway ---
+
+    @GET("rest/v1/premium_packages")
+    suspend fun getPremiumPackages(
+        @Query("is_active") isActive: String = "eq.true",
+        @Header("apikey") apiKey: String
+    ): List<PremiumPackageDto>
+
+    // Gift langsung ke 1 user tertentu (dari profil orang lain)
+    @POST("rest/v1/rpc/create_premium_claim")
+    suspend fun createPremiumClaim(
+        @Body body: CreatePremiumClaimRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PremiumClaimDto>
+
+    // Bikin giveaway "War di Chat Global" (belum ada target user)
+    @POST("rest/v1/rpc/create_giveaway_claim")
+    suspend fun createGiveawayClaim(
+        @Body body: CreateGiveawayClaimRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PremiumClaimDto>
+
+    // User tap tombol "Klaim" di bubble giveaway chat
+    @POST("rest/v1/rpc/claim_giveaway")
+    suspend fun claimGiveaway(
+        @Body body: ClaimGiveawayRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ClaimGiveawayResult>
+
+    // Cek status klaim tertentu (buat polling status "udah dibayar belum" di UI)
+    @GET("rest/v1/premium_claims")
+    suspend fun getPremiumClaimById(
+        @Query("id") idQuery: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PremiumClaimDto>
+
+    // Badge Top Support & Top XP di profil
+    @POST("rest/v1/rpc/get_user_ranks")
+    suspend fun getUserRanks(
+        @Body body: GetUserRanksRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<UserRanksDto>
+
     // Versi baru — 1 checkpoint = 1 baris XP sendiri (tabel & RPC terpisah dari watch_events/
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung

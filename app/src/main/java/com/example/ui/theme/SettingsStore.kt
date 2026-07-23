@@ -236,7 +236,20 @@ data class UserSession(
     // Warna nama chat custom (hex "#RRGGBB") - null berarti pakai warna default sesuai role
     val customNameColor: String? = null,
     val isBanned: Boolean,
-    val userNumber: Int? = null
+    val userNumber: Int? = null,
+    // Status Premium (dari fitur Gift Premium) & total dukungan yang pernah
+    // diterima (dipakai buat badge "Top Support" di profil).
+    val premiumUntil: String? = null,
+    val supportPoints: Int? = 0
 ) {
     fun canModerate() = isAdmin || isModerator
+
+    fun isPremiumActive(): Boolean {
+        val until = premiumUntil ?: return false
+        return try {
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            parser.parse(until.take(19))?.after(java.util.Date()) ?: false
+        } catch (e: Exception) { false }
+    }
 }

@@ -1033,6 +1033,7 @@ fun ChatScreen(
                                 isOwnMessage = isOwn,
                                 navController = navController,
                                 clanTagMap = clanTagMap,
+                                viewModel = viewModel,
                                 onReply = if (isLoggedIn) { { replyTarget = message } } else null,
                                 onDelete = if (isOwn || session.canModerate()) {
                                     { viewModel.deleteChatMessage(message.id) }
@@ -1104,6 +1105,7 @@ fun ChatScreen(
                                         isOwnMessage = isOwn,
                                         navController = navController,
                                         clanTagMap = clanTagMap,
+                                        viewModel = viewModel,
                                         onReply = if (isLoggedIn) { { clanReplyTarget = message } } else null,
                                         onDelete = if (isOwn || session.canModerate()) {
                                             { viewModel.deleteClanChatMessage(message.id) }
@@ -1218,9 +1220,17 @@ private fun ChatBubble(
     isOwnMessage: Boolean,
     navController: NavController,
     clanTagMap: Map<String, Pair<String, String?>>,
+    viewModel: com.example.network.AnikuViewModel,
     onReply: (() -> Unit)?,
     onDelete: (() -> Unit)?
 ) {
+    // Pesan giveaway "War Premium" dirender pakai bubble khusus (ada tombol
+    // Klaim), bukan bubble teks biasa.
+    if (message.message_type == "giveaway") {
+        GiveawayBubble(message = message, viewModel = viewModel)
+        return
+    }
+
     val timeStr = remember(message.created_at) {
         try {
             val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
@@ -1573,6 +1583,100 @@ private fun ChatBubble(
                 }
             }
         )
+    }
+}
+
+// Bubble khusus buat pesan giveaway "War Premium" - beda dari bubble teks
+// biasa, ada tombol "Klaim Sekarang" yang manggil RPC claim_giveaway (atomic
+// di server, jadi cuma 1 orang yang bisa menang walau banyak yang tap bareng).
+@Composable
+private fun GiveawayBubble(
+    message: ChatMessage,
+    viewModel: com.example.network.AnikuViewModel
+) {
+    var isClaimed by remember(message.giveaway_status) {
+        mutableStateOf(message.giveaway_status == "claimed")
+    }
+    var isLoading by remember { mutableStateOf(false) }
+    var resultText by remember { mutableStateOf<String?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFFFFD54F), Color(0xFFFF8A65))
+                    )
+                )
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = "🎁", fontSize = 32.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message.message,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (isClaimed) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.3f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = resultText ?: "Sudah diklaim",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
+            } else {
+                Button(
+                    onClick = {
+                        if (isLoading) return@Button
+                        val claimId = message.giveaway_claim_id ?: return@Button
+                        isLoading = true
+                        viewModel.claimGiveaway(claimId) { result, error ->
+                            isLoading = false
+                            isClaimed = true
+                            resultText = if (result != null && result.success) {
+                                "Kamu dapat Premium ${result.package_label ?: ""}!"
+                            } else {
+                                result?.message ?: error ?: "Giveaway sudah diklaim orang lain"
+                            }
+                        }
+                    },
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color(0xFFFF6F00)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFFF6F00)
+                        )
+                    } else {
+                        Text("Klaim Sekarang", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 

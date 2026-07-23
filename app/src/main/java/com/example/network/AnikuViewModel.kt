@@ -2061,7 +2061,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isBeta = profile?.isBeta() ?: false,
                     customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
-                    userNumber = profile?.user_number
+                    userNumber = profile?.user_number,
+                    premiumUntil = profile?.premium_until,
+                    supportPoints = profile?.support_points
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -2213,7 +2215,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isBeta = profile?.isBeta() ?: false,
                     customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
-                    userNumber = profile?.user_number
+                    userNumber = profile?.user_number,
+                    premiumUntil = profile?.premium_until,
+                    supportPoints = profile?.support_points
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -2332,7 +2336,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isBeta = profile?.isBeta() ?: false,
                     customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
-                    userNumber = profile?.user_number
+                    userNumber = profile?.user_number,
+                    premiumUntil = profile?.premium_until,
+                    supportPoints = profile?.support_points
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -2397,7 +2403,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     isBeta = profile?.isBeta() ?: false,
                     customNameColor = profile?.custom_name_color,
                     isBanned = profile?.is_banned ?: false,
-                    userNumber = profile?.user_number
+                    userNumber = profile?.user_number,
+                    premiumUntil = profile?.premium_until,
+                    supportPoints = profile?.support_points
                 )
 
                 settingsStore.saveSession(activeSession)
@@ -3350,8 +3358,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // give_diamond), jadi walau pengecekan client-side ini di-bypass, server tetap nolak.
     fun giveDiamond(receiverUsername: String, amount: Int, onResult: (Boolean, String?) -> Unit) {
         val sess = session.value
-        if (!sess.isBeta && !sess.isModerator && !sess.isAdmin) {
-            onResult(false, "Fitur ini cuma buat role Beta/Moderator/Admin")
+        // Cek client-side ini cuma buat UX (nampilin pesan cepat tanpa nunggu round-trip
+        // server) -- validasi ASLI tetap di server lewat function give_diamond, jadi
+        // walau ini di-bypass, server tetap nolak kalau ga eligible.
+        if (!sess.isBeta && !sess.isModerator && !sess.isAdmin && !sess.isPremiumActive()) {
+            onResult(false, "Fitur ini cuma buat role Beta/Moderator/Admin, atau user Premium")
             return
         }
         val authHeader = getAuthHeader()
@@ -3381,6 +3392,141 @@ class AnikuViewModel(context: Context) : ViewModel() {
             } catch (e: Exception) {
                 Log.e("AnikuVM", "giveDiamond error", e)
                 onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // --- Premium Gift & Giveaway ---
+
+    private val _premiumPackages = MutableStateFlow<List<PremiumPackageDto>>(emptyList())
+    val premiumPackages: StateFlow<List<PremiumPackageDto>> = _premiumPackages.asStateFlow()
+
+    fun loadPremiumPackages() {
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getPremiumPackages(
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _premiumPackages.value = result
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadPremiumPackages error", e)
+            }
+        }
+    }
+
+    // Gift premium langsung ke 1 user (dipanggil dari profil orang lain).
+    // Hasil sukses ngasih balik kode klaim (mis. "ANK-7F3K2X") buat ditampilin
+    // ke user beserta instruksi bayar ke Sociabuzz.
+    fun createPremiumClaim(
+        targetUserId: String,
+        packageId: String,
+        onResult: (PremiumClaimDto?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createPremiumClaim(
+                    body = CreatePremiumClaimRequest(
+                        p_target_user_id = targetUserId,
+                        p_package_id = packageId
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull(), null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat gift premium (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createPremiumClaim error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Bikin giveaway "War di Chat Global" - target_user_id kosong dulu,
+    // nanti diisi otomatis pas ada yang menang klaim.
+    fun createGiveawayClaim(
+        packageId: String,
+        onResult: (PremiumClaimDto?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createGiveawayClaim(
+                    body = CreateGiveawayClaimRequest(p_package_id = packageId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull(), null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat giveaway (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createGiveawayClaim error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // User tap tombol "🎁 Klaim" di bubble giveaway chat. Atomic di server --
+    // kalau kalah cepat, dapet pesan "Giveaway sudah diklaim orang lain",
+    // bukan error/crash.
+    fun claimGiveaway(
+        claimId: String,
+        onResult: (ClaimGiveawayResult?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.claimGiveaway(
+                    body = ClaimGiveawayRequest(p_claim_id = claimId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val res = result.firstOrNull()
+                if (res != null) {
+                    onResult(res, null)
+                } else {
+                    onResult(null, "Tidak ada respons dari server")
+                }
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal klaim giveaway (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "claimGiveaway error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Ambil rank Top Support & Top XP user tertentu, buat badge di profil.
+    // null berarti user itu ga masuk top 50 (jadi badge ga usah ditampilin).
+    fun loadUserRanks(userId: String, onResult: (UserRanksDto?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getUserRanks(
+                    body = GetUserRanksRequest(p_user_id = userId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull())
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadUserRanks error", e)
+                onResult(null)
             }
         }
     }
