@@ -70,6 +70,9 @@ import com.example.network.AnikuViewModel
 import com.example.network.EpisodeComment
 import com.example.network.UserBookmarkDto
 import com.example.network.UserWatchHistoryDto
+import com.example.network.UserRanksDto
+import com.example.network.PremiumClaimDto
+import com.example.network.PremiumPackageDto
 import com.example.util.orDefault
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -541,7 +544,7 @@ fun UserProfileScreen(
                                         .weight(1f)
                                         .height(52.dp)
                                 ) {
-                                    Icon(Icons.Default.CardGiftcard, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Gift Premium", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, maxLines = 1)
                                 }
@@ -1596,7 +1599,8 @@ private fun GiftPremiumSheet(
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
-            if (resultClaim != null) {
+            val claim = resultClaim
+            if (claim != null) {
                 Text("Gift Premium Berhasil Dibuat!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(12.dp))
                 Box(
@@ -1609,7 +1613,7 @@ private fun GiftPremiumSheet(
                     Column {
                         Text("Kode Klaim:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            resultClaim!!.code,
+                            claim.code,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 1.sp
