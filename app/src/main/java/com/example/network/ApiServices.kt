@@ -727,6 +727,14 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<PremiumPackageDto>
 
+    // Beli premium buat diri sendiri
+    @POST("rest/v1/rpc/create_self_premium_claim")
+    suspend fun createSelfPremiumClaim(
+        @Body body: CreateSelfPremiumClaimRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<PremiumClaimDto>
+
     // Gift langsung ke 1 user tertentu (dari profil orang lain)
     @POST("rest/v1/rpc/create_premium_claim")
     suspend fun createPremiumClaim(

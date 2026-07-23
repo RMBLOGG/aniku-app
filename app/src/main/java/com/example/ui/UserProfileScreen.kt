@@ -451,6 +451,31 @@ fun UserProfileScreen(
                     ) {
                         Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
                     }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    var showBuyPremiumSheet by remember { mutableStateOf(false) }
+                    OutlinedButton(
+                        onClick = { showBuyPremiumSheet = true },
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFFA000).copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFFFFA000).copy(alpha = 0.08f),
+                            contentColor = Color(0xFFFFA000)
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Beli Premium", fontWeight = FontWeight.Bold)
+                    }
+                    if (showBuyPremiumSheet) {
+                        GiftPremiumSheet(
+                            targetUserId = p.id,
+                            targetUsername = p.username ?: "Kamu",
+                            viewModel = viewModel,
+                            selfMode = true,
+                            onDismiss = { showBuyPremiumSheet = false }
+                        )
+                    }
                 } else {
                     val showBanButton = canModerate
                     val showDiamondButton = session.isBeta || session.isModerator || session.isAdmin || session.isPremiumActive()
@@ -1580,11 +1605,14 @@ private fun GiftPremiumSheet(
     targetUserId: String,
     targetUsername: String,
     viewModel: AnikuViewModel,
+    selfMode: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val packages by viewModel.premiumPackages.collectAsState()
     var selectedPackageId by remember { mutableStateOf<String?>(null) }
-    var mode by remember { mutableStateOf("direct") } // "direct" atau "giveaway"
+    // "direct" atau "giveaway" - kalau selfMode, mode ini ga ditampilin (selalu "direct")
+    var mode by remember { mutableStateOf("direct") }
+    var slotCount by remember { mutableStateOf(1) }
     var isLoading by remember { mutableStateOf(false) }
     var resultClaim by remember { mutableStateOf<PremiumClaimDto?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -1601,7 +1629,10 @@ private fun GiftPremiumSheet(
         ) {
             val claim = resultClaim
             if (claim != null) {
-                Text("Gift Premium Berhasil Dibuat!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (selfMode) "Pembelian Premium Dibuat!" else "Gift Premium Berhasil Dibuat!",
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 Box(
                     modifier = Modifier
@@ -1634,10 +1665,10 @@ private fun GiftPremiumSheet(
                 return@Column
             }
 
-            Text("Gift Premium", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(if (selfMode) "Beli Premium" else "Gift Premium", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Kirim Premium ke $targetUsername",
+                if (selfMode) "Aktifkan Premium buat akun kamu sendiri" else "Kirim Premium ke $targetUsername",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1660,25 +1691,68 @@ private fun GiftPremiumSheet(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(pkg.label, fontWeight = FontWeight.SemiBold)
-                    Text("Rp${pkg.price}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    val priceText = if (mode == "giveaway" && !selfMode) "Rp${pkg.price * slotCount}" else "Rp${pkg.price}"
+                    Text(priceText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Mode Pengiriman", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = mode == "direct",
-                    onClick = { mode = "direct" },
-                    label = { Text("Langsung ke $targetUsername") }
-                )
-                FilterChip(
-                    selected = mode == "giveaway",
-                    onClick = { mode = "giveaway" },
-                    label = { Text("War di Chat Global") }
-                )
+            if (!selfMode) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Mode Pengiriman", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = mode == "direct",
+                        onClick = { mode = "direct" },
+                        label = { Text("Langsung ke $targetUsername") }
+                    )
+                    FilterChip(
+                        selected = mode == "giveaway",
+                        onClick = { mode = "giveaway" },
+                        label = { Text("War di Chat Global") }
+                    )
+                }
+
+                if (mode == "giveaway") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Jumlah Pemenang", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { if (slotCount > 1) slotCount-- },
+                            enabled = slotCount > 1,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "$slotCount orang",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.widthIn(min = 64.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        OutlinedButton(
+                            onClick = { if (slotCount < 50) slotCount++ },
+                            enabled = slotCount < 50,
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Giveaway berlaku buat $slotCount orang tercepat yang klaim di chat",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -1692,15 +1766,24 @@ private fun GiftPremiumSheet(
                     val pkgId = selectedPackageId ?: return@Button
                     isLoading = true
                     errorMsg = null
-                    if (mode == "direct") {
-                        viewModel.createPremiumClaim(targetUserId, pkgId) { claim, error ->
-                            isLoading = false
-                            if (claim != null) resultClaim = claim else errorMsg = error
+                    when {
+                        selfMode -> {
+                            viewModel.createSelfPremiumClaim(pkgId) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
                         }
-                    } else {
-                        viewModel.createGiveawayClaim(pkgId) { claim, error ->
-                            isLoading = false
-                            if (claim != null) resultClaim = claim else errorMsg = error
+                        mode == "direct" -> {
+                            viewModel.createPremiumClaim(targetUserId, pkgId) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
+                        }
+                        else -> {
+                            viewModel.createGiveawayClaim(pkgId, slotCount) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
                         }
                     }
                 },
@@ -1710,7 +1793,7 @@ private fun GiftPremiumSheet(
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
-                    Text("Buat Gift Premium")
+                    Text(if (selfMode) "Beli Sekarang" else "Buat Gift Premium")
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))

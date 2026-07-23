@@ -1652,7 +1652,12 @@ private fun GiveawayBubble(
                             isLoading = false
                             isClaimed = true
                             resultText = if (result != null && result.success) {
-                                "Kamu dapat Premium ${result.package_label ?: ""}!"
+                                val left = result.slots_left
+                                if (left != null && left > 0) {
+                                    "Kamu dapat Premium ${result.package_label ?: ""}! (Sisa $left slot)"
+                                } else {
+                                    "Kamu dapat Premium ${result.package_label ?: ""}!"
+                                }
                             } else {
                                 result?.message ?: error ?: "Giveaway sudah diklaim orang lain"
                             }

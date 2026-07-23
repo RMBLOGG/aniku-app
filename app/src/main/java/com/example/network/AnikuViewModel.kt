@@ -3414,6 +3414,34 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Beli premium buat diri sendiri (dipanggil dari profil sendiri / settings).
+    fun createSelfPremiumClaim(
+        packageId: String,
+        onResult: (PremiumClaimDto?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createSelfPremiumClaim(
+                    body = CreateSelfPremiumClaimRequest(p_package_id = packageId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull(), null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membeli premium (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createSelfPremiumClaim error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Gift premium langsung ke 1 user (dipanggil dari profil orang lain).
     // Hasil sukses ngasih balik kode klaim (mis. "ANK-7F3K2X") buat ditampilin
     // ke user beserta instruksi bayar ke Sociabuzz.
@@ -3449,16 +3477,18 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Bikin giveaway "War di Chat Global" - target_user_id kosong dulu,
-    // nanti diisi otomatis pas ada yang menang klaim.
+    // nanti diisi otomatis pas ada yang menang klaim. maxClaims = jumlah
+    // orang yang bisa menang (default 1 = siapa cepat dia dapat).
     fun createGiveawayClaim(
         packageId: String,
+        maxClaims: Int = 1,
         onResult: (PremiumClaimDto?, String?) -> Unit
     ) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val result = NetworkClient.supabaseDbApi.createGiveawayClaim(
-                    body = CreateGiveawayClaimRequest(p_package_id = packageId),
+                    body = CreateGiveawayClaimRequest(p_package_id = packageId, p_max_claims = maxClaims),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )

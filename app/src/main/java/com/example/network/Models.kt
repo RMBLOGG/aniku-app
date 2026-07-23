@@ -1702,8 +1702,16 @@ data class PremiumClaimDto(
     val amount_expected: Int,
     val status: String,
     val claim_type: String,
+    val max_claims: Int? = 1,
+    val claims_filled: Int? = 0,
     val created_at: String? = null,
     val expires_at: String? = null
+)
+
+// Body buat manggil RPC create_self_premium_claim (beli premium buat diri sendiri)
+@JsonClass(generateAdapter = true)
+data class CreateSelfPremiumClaimRequest(
+    val p_package_id: String
 )
 
 // Body buat manggil RPC create_premium_claim (gift langsung ke user tertentu)
@@ -1713,10 +1721,12 @@ data class CreatePremiumClaimRequest(
     val p_package_id: String
 )
 
-// Body buat manggil RPC create_giveaway_claim (mode "War di Chat Global")
+// Body buat manggil RPC create_giveaway_claim (mode "War di Chat Global").
+// p_max_claims = jumlah orang yang bisa menang (default 1).
 @JsonClass(generateAdapter = true)
 data class CreateGiveawayClaimRequest(
-    val p_package_id: String
+    val p_package_id: String,
+    val p_max_claims: Int = 1
 )
 
 // Body buat manggil RPC claim_giveaway (user tap tombol "Klaim" di chat)
@@ -1725,12 +1735,13 @@ data class ClaimGiveawayRequest(
     val p_claim_id: String
 )
 
-// Response dari RPC claim_giveaway - balikin array 1 baris (success, message, package_label)
+// Response dari RPC claim_giveaway
 @JsonClass(generateAdapter = true)
 data class ClaimGiveawayResult(
     val success: Boolean,
     val message: String,
-    val package_label: String? = null
+    val package_label: String? = null,
+    val slots_left: Int? = null
 )
 
 // Response dari RPC get_user_ranks - dipakai buat badge Top Support / Top XP di profil
