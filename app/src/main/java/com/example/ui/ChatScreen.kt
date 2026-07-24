@@ -181,6 +181,8 @@ internal val adminGradientColors = listOf(Color(0xFFFFD200), Color(0xFFFF6B6B), 
 internal val moderatorGradientColors = listOf(Color(0xFFB388FF), Color(0xFF7C4DFF))
 // Beta - badge kosmetik doang, gak ada hak akses moderasi apapun di chat
 internal val betaGradientColors = listOf(Color(0xFF22D3EE), Color(0xFF3B82F6))
+// Premium - status dari fitur Gift Premium (premium_until), terpisah dari role
+internal val premiumGradientColors = listOf(Color(0xFFFFD54F), Color(0xFFFF8A65))
 internal val defaultNameGradientColors = listOf(Color(0xFF64B5F6), Color(0xFFBA68C8))
 internal val idGradientColors = listOf(Color(0xFFCFD8DC), Color(0xFF90A4AE))
 internal val levelGradientColors = listOf(Color(0xFF4FD1C5), Color(0xFF38B2AC))
@@ -216,6 +218,7 @@ private fun ClanChatMessage.toChatMessage() = ChatMessage(
     avatar_url = avatar_url,
     role = role,
     is_admin = is_admin,
+    is_premium = is_premium,
     custom_name_color = custom_name_color,
     user_number = user_number,
     season_level = season_level,
@@ -1456,6 +1459,13 @@ private fun ChatBubble(
                         fontSize = 10.sp,
                         letterSpacing = 0.4.sp
                     )
+                } else if (message.is_premium == true) {
+                    GlossyGradientText(
+                        text = "PREMIUM",
+                        colors = premiumGradientColors,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.4.sp
+                    )
                 }
             }
 
@@ -1787,6 +1797,13 @@ private fun OwnChatBubble(
                     GlossyGradientText(
                         text = "BETA",
                         colors = betaGradientColors,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.4.sp
+                    )
+                } else if (message.is_premium == true) {
+                    GlossyGradientText(
+                        text = "PREMIUM",
+                        colors = premiumGradientColors,
                         fontSize = 10.sp,
                         letterSpacing = 0.4.sp
                     )

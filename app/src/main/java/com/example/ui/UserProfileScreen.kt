@@ -208,9 +208,10 @@ fun UserProfileScreen(
             p.isAdmin() -> RoleBadgeStyle("ADMINISTRATOR", goldAccent, premium = true)
             p.role == "moderator" -> RoleBadgeStyle("MODERATOR", Color(0xFFB388FF), premium = true)
             p.isBeta() -> RoleBadgeStyle("BETA", Color(0xFF22D3EE), premium = true)
+            p.isPremiumActive() -> RoleBadgeStyle("PREMIUM", Color(0xFFFFA000), premium = true)
             else -> RoleBadgeStyle("USER", MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f), premium = false)
         }
-        val isVerifiedRole = p.isAdmin() || p.role == "moderator" || p.isBeta()
+        val isVerifiedRole = p.isAdmin() || p.role == "moderator" || p.isBeta() || p.isPremiumActive()
 
         Column(
             modifier = Modifier
@@ -1636,6 +1637,8 @@ fun GiftPremiumSheet(
                     fontSize = 18.sp, fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+                var justCopied by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1643,15 +1646,37 @@ fun GiftPremiumSheet(
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(16.dp)
                 ) {
-                    Column {
-                        Text("Kode Klaim:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            claim.code,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column {
+                            Text("Kode Klaim:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                claim.code,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(claim.code))
+                                justCopied = true
+                            }
+                        ) {
+                            Icon(
+                                if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = "Salin kode",
+                                tint = if (justCopied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
+                }
+                if (justCopied) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Kode disalin!", fontSize = 11.sp, color = Color(0xFF4CAF50))
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
