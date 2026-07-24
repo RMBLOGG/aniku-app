@@ -3427,7 +3427,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
-                onResult(result.firstOrNull(), null)
+                onResult(result, null)
             } catch (e: retrofit2.HttpException) {
                 val errorMsg = try {
                     val errorBody = e.response()?.errorBody()?.string()
@@ -3461,7 +3461,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
-                onResult(result.firstOrNull(), null)
+                onResult(result, null)
             } catch (e: retrofit2.HttpException) {
                 val errorMsg = try {
                     val errorBody = e.response()?.errorBody()?.string()
@@ -3492,7 +3492,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
-                onResult(result.firstOrNull(), null)
+                onResult(result, null)
             } catch (e: retrofit2.HttpException) {
                 val errorMsg = try {
                     val errorBody = e.response()?.errorBody()?.string()

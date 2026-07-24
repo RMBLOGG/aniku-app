@@ -733,7 +733,7 @@ interface SupabaseDbApi {
         @Body body: CreateSelfPremiumClaimRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): List<PremiumClaimDto>
+    ): PremiumClaimDto
 
     // Gift langsung ke 1 user tertentu (dari profil orang lain)
     @POST("rest/v1/rpc/create_premium_claim")
@@ -741,7 +741,7 @@ interface SupabaseDbApi {
         @Body body: CreatePremiumClaimRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): List<PremiumClaimDto>
+    ): PremiumClaimDto
 
     // Bikin giveaway "War di Chat Global" (belum ada target user)
     @POST("rest/v1/rpc/create_giveaway_claim")
@@ -749,7 +749,7 @@ interface SupabaseDbApi {
         @Body body: CreateGiveawayClaimRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): List<PremiumClaimDto>
+    ): PremiumClaimDto
 
     // User tap tombol "Klaim" di bubble giveaway chat
     @POST("rest/v1/rpc/claim_giveaway")

@@ -393,6 +393,7 @@ fun ChatScreen(
 
     var inputText by remember { mutableStateOf("") }
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var showQuickGiveawaySheet by remember { mutableStateOf(false) }
     var pendingImageUri by remember { mutableStateOf<Uri?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -754,6 +755,14 @@ fun ChatScreen(
                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                             )
                         }
+                        // Tombol Gift Premium (bikin giveaway "war" langsung dari chat)
+                        IconButton(onClick = { showQuickGiveawaySheet = true }) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = "Gift Premium",
+                                tint = Color(0xFFFFA000)
+                            )
+                        }
                         OutlinedTextField(
                             value = inputText,
                             onValueChange = {
@@ -855,6 +864,15 @@ fun ChatScreen(
                             Text("Login", fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+                if (showQuickGiveawaySheet) {
+                    GiftPremiumSheet(
+                        targetUserId = "",
+                        targetUsername = "",
+                        viewModel = viewModel,
+                        giveawayOnly = true,
+                        onDismiss = { showQuickGiveawaySheet = false }
+                    )
                 }
             }
             }

@@ -1606,12 +1606,14 @@ fun GiftPremiumSheet(
     targetUsername: String,
     viewModel: AnikuViewModel,
     selfMode: Boolean = false,
+    giveawayOnly: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val packages by viewModel.premiumPackages.collectAsState()
     var selectedPackageId by remember { mutableStateOf<String?>(null) }
-    // "direct" atau "giveaway" - kalau selfMode, mode ini ga ditampilin (selalu "direct")
-    var mode by remember { mutableStateOf("direct") }
+    // "direct" atau "giveaway" - kalau selfMode, mode ini ga ditampilin (selalu "direct").
+    // Kalau giveawayOnly (dipanggil dari chat, tanpa target spesifik), dipaksa "giveaway".
+    var mode by remember { mutableStateOf(if (giveawayOnly) "giveaway" else "direct") }
     var slotCount by remember { mutableStateOf(1) }
     var isLoading by remember { mutableStateOf(false) }
     var resultClaim by remember { mutableStateOf<PremiumClaimDto?>(null) }
@@ -1665,10 +1667,21 @@ fun GiftPremiumSheet(
                 return@Column
             }
 
-            Text(if (selfMode) "Beli Premium" else "Gift Premium", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(
+                when {
+                    selfMode -> "Beli Premium"
+                    giveawayOnly -> "Gift Premium - War di Chat"
+                    else -> "Gift Premium"
+                },
+                fontSize = 18.sp, fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                if (selfMode) "Aktifkan Premium buat akun kamu sendiri" else "Kirim Premium ke $targetUsername",
+                when {
+                    selfMode -> "Aktifkan Premium buat akun kamu sendiri"
+                    giveawayOnly -> "Bagikan Premium ke chat global, siapa cepat dia dapat"
+                    else -> "Kirim Premium ke $targetUsername"
+                },
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1698,20 +1711,22 @@ fun GiftPremiumSheet(
             }
 
             if (!selfMode) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Mode Pengiriman", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = mode == "direct",
-                        onClick = { mode = "direct" },
-                        label = { Text("Langsung ke $targetUsername") }
-                    )
-                    FilterChip(
-                        selected = mode == "giveaway",
-                        onClick = { mode = "giveaway" },
-                        label = { Text("War di Chat Global") }
-                    )
+                if (!giveawayOnly) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Mode Pengiriman", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = mode == "direct",
+                            onClick = { mode = "direct" },
+                            label = { Text("Langsung ke $targetUsername") }
+                        )
+                        FilterChip(
+                            selected = mode == "giveaway",
+                            onClick = { mode = "giveaway" },
+                            label = { Text("War di Chat Global") }
+                        )
+                    }
                 }
 
                 if (mode == "giveaway") {
