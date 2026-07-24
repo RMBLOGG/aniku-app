@@ -1601,7 +1601,7 @@ private fun ShowcaseCard(char: com.example.network.CharacterInfoDto, index: Int 
 // - "giveaway": "War di Chat Global" - siapa cepat dia dapat
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun GiftPremiumSheet(
+fun GiftPremiumSheet(
     targetUserId: String,
     targetUsername: String,
     viewModel: AnikuViewModel,

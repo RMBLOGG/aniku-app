@@ -2064,7 +2064,8 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // ── Premium / Top-Up banner ──
+                        // ── Premium banner ──
+                        var showBuyPremiumSheet by remember { mutableStateOf(false) }
                         Row(
                             modifier = Modifier
                                 .padding(horizontal = 20.dp)
@@ -2072,7 +2073,7 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color.White.copy(alpha = 0.06f))
                                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                                .clickable { navController.navigate("diamond_topup") }
+                                .clickable { if (isLoggedIn) showBuyPremiumSheet = true else onShowLoginDialog() }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -2089,9 +2090,9 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Top-Up Diamond", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Beli Premium", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 Text(
-                                    text = if (isLoggedIn) "Saldo kamu: $diamondBalance Diamond" else "Isi Diamond, dukung Aniku & naik level",
+                                    text = if (session.isPremiumActive()) "Premium aktif kamu" else "Aktifkan Premium, dukung Aniku & dapat badge",
                                     color = Color.White.copy(alpha = 0.55f),
                                     fontSize = 11.sp,
                                     maxLines = 1,
@@ -2099,6 +2100,15 @@ fun HomeScreen(
                                 )
                             }
                             Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
+                        }
+                        if (showBuyPremiumSheet) {
+                            GiftPremiumSheet(
+                                targetUserId = session.userId ?: "",
+                                targetUsername = session.username ?: "Kamu",
+                                viewModel = viewModel,
+                                selfMode = true,
+                                onDismiss = { showBuyPremiumSheet = false }
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))
