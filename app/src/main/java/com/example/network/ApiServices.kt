@@ -710,7 +710,7 @@ interface SupabaseDbApi {
 
     // Kasih Diamond ke user lain - cuma role beta/moderator/admin (divalidasi ulang
     // server-side di dalam function give_diamond, gak bisa dibypass), dengan limit
-    // harian 200 DM yang juga dicek di server.
+    // harian 1000 DM yang juga dicek di server.
     @POST("rest/v1/rpc/give_diamond")
     suspend fun giveDiamond(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,

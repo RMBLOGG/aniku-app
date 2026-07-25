@@ -3354,7 +3354,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Kasih Diamond ke user lain (username tujuan) - fitur eksklusif role beta/moderator/
-    // admin. Validasi asli (role, saldo, limit harian 200 DM) ada di server (function
+    // admin. Validasi asli (role, saldo, limit harian 1000 DM) ada di server (function
     // give_diamond), jadi walau pengecekan client-side ini di-bypass, server tetap nolak.
     fun giveDiamond(receiverUsername: String, amount: Int, onResult: (Boolean, String?) -> Unit) {
         val sess = session.value

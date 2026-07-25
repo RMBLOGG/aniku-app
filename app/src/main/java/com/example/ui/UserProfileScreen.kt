@@ -605,7 +605,7 @@ fun UserProfileScreen(
                             text = {
                                 Column {
                                     Text(
-                                        "Maksimal 200 DM per hari (gabungan semua penerima).",
+                                        "Maksimal 1000 DM per hari (gabungan semua penerima).",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
