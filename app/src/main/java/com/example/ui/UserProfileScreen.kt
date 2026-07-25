@@ -383,7 +383,19 @@ fun UserProfileScreen(
                     LaunchedEffect(p.id) {
                         viewModel.loadUserRanks(p.id) { ranks -> userRanks = ranks }
                     }
-                    userRanks?.support_rank?.let { rank ->
+                    // Badge "Top Support" ini sengaja dihitung dari donasi Trakteer
+                    // (donations, sama persis sumbernya kayak widget "TOP SUPPORTER"
+                    // di Home), BUKAN dari support_points fitur Gift Premium.
+                    val donationsForRank by viewModel.donations.collectAsState()
+                    val directoryForRank by viewModel.userDirectory.collectAsState()
+                    LaunchedEffect(Unit) {
+                        if (donationsForRank.isEmpty()) viewModel.loadDonations()
+                        if (directoryForRank.isEmpty()) viewModel.loadUserDirectory()
+                    }
+                    val supportRank = remember(donationsForRank, directoryForRank, p.username) {
+                        viewModel.getSupporterRank(p.username)
+                    }
+                    supportRank?.let { rank ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier

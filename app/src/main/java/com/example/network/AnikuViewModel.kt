@@ -3401,6 +3401,33 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _premiumPackages = MutableStateFlow<List<PremiumPackageDto>>(emptyList())
     val premiumPackages: StateFlow<List<PremiumPackageDto>> = _premiumPackages.asStateFlow()
 
+    // Hitung rank "Top Support" berdasarkan donasi Trakteer (donations), BUKAN
+    // support_points dari fitur Gift Premium -- disamakan persis sama logic
+    // yang dipakai widget "TOP SUPPORTER" di Home / TopSupporterScreen, biar
+    // badge di profil dan leaderboard di Home selalu konsisten satu sumber.
+    fun getSupporterRank(username: String?, topN: Int = 50): Int? {
+        if (username.isNullOrBlank()) return null
+        val donationsList = _donations.value
+        val directory = _userDirectory.value
+        if (donationsList.isEmpty()) return null
+
+        val leaderboard = donationsList
+            .groupBy { it.supporter_name }
+            .map { (name, list) ->
+                val amount = list.sumOf { it.total_amount ?: 0 }
+                val matchedUsername = directory.firstOrNull {
+                    it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
+                }?.username
+                (matchedUsername ?: name) to amount
+            }
+            .sortedByDescending { it.second }
+
+        val rank = leaderboard.indexOfFirst { it.first.equals(username.trim(), ignoreCase = true) }
+        if (rank < 0) return null
+        val rank1Based = rank + 1
+        return if (rank1Based <= topN) rank1Based else null
+    }
+
     fun loadPremiumPackages() {
         viewModelScope.launch {
             try {
