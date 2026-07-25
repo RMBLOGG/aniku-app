@@ -24,6 +24,11 @@ import kotlinx.coroutines.flow.asStateFlow
  * - download_enabled
  * - maintenance_mode
  * - maintenance_message
+ * - app_shutdown_enabled: kill-switch PERMANEN, beda sama maintenance_mode yang kesannya
+ *   sementara. Dipakai buat nutup total aplikasi (misal: admin udah gak sanggup bayar
+ *   biaya database bulanan). Prioritas paling tinggi, di atas maintenance & ban.
+ * - app_shutdown_message: pesan utama yang tampil di layar shutdown
+ * - app_shutdown_support_info: teks opsional (link donasi/kontak admin), boleh dikosongin
  * - default_data_source: source yang dipake user baru / kalau source aktifnya kena disable
  *   (contoh: "Dayynime-v1")
  * - disabled_sources: daftar source yang dimatiin, dipisah koma
@@ -50,6 +55,9 @@ class RemoteConfigManager {
                     KEY_DOWNLOAD to true,
                     KEY_MAINTENANCE_MODE to false,
                     KEY_MAINTENANCE_MESSAGE to "Aniku lagi maintenance sebentar, balik lagi nanti ya!",
+                    KEY_SHUTDOWN_ENABLED to false,
+                    KEY_SHUTDOWN_MESSAGE to "Aniku terpaksa tutup karena biaya server & database bulanan udah gak bisa ditanggung lagi oleh admin.",
+                    KEY_SHUTDOWN_SUPPORT_INFO to "",
                     KEY_DEFAULT_SOURCE to "Dayynime-v1",
                     KEY_DISABLED_SOURCES to ""
                 )
@@ -80,6 +88,17 @@ class RemoteConfigManager {
 
     private val _maintenanceMessage = MutableStateFlow("")
     val maintenanceMessage: StateFlow<String> = _maintenanceMessage.asStateFlow()
+
+    // Kill-switch permanen: aplikasi ditutup total (misal admin gak sanggup lagi
+    // bayar database bulanan). Beda dari maintenance yang kesannya sementara.
+    private val _shutdownEnabled = MutableStateFlow(false)
+    val shutdownEnabled: StateFlow<Boolean> = _shutdownEnabled.asStateFlow()
+
+    private val _shutdownMessage = MutableStateFlow("")
+    val shutdownMessage: StateFlow<String> = _shutdownMessage.asStateFlow()
+
+    private val _shutdownSupportInfo = MutableStateFlow("")
+    val shutdownSupportInfo: StateFlow<String> = _shutdownSupportInfo.asStateFlow()
 
     // Sumber Data: default buat user baru + daftar source yang dimatiin dari console
     private val _defaultDataSource = MutableStateFlow("Dayynime-v1")
@@ -126,6 +145,9 @@ class RemoteConfigManager {
         _downloadEnabled.value = remoteConfig.getBoolean(KEY_DOWNLOAD)
         _maintenanceMode.value = remoteConfig.getBoolean(KEY_MAINTENANCE_MODE)
         _maintenanceMessage.value = remoteConfig.getString(KEY_MAINTENANCE_MESSAGE)
+        _shutdownEnabled.value = remoteConfig.getBoolean(KEY_SHUTDOWN_ENABLED)
+        _shutdownMessage.value = remoteConfig.getString(KEY_SHUTDOWN_MESSAGE)
+        _shutdownSupportInfo.value = remoteConfig.getString(KEY_SHUTDOWN_SUPPORT_INFO)
         _defaultDataSource.value = remoteConfig.getString(KEY_DEFAULT_SOURCE).ifBlank { "Dayynime-v1" }
         _disabledSources.value = remoteConfig.getString(KEY_DISABLED_SOURCES)
             .split(",")
@@ -143,6 +165,9 @@ class RemoteConfigManager {
         private const val KEY_DOWNLOAD = "download_enabled"
         private const val KEY_MAINTENANCE_MODE = "maintenance_mode"
         private const val KEY_MAINTENANCE_MESSAGE = "maintenance_message"
+        private const val KEY_SHUTDOWN_ENABLED = "app_shutdown_enabled"
+        private const val KEY_SHUTDOWN_MESSAGE = "app_shutdown_message"
+        private const val KEY_SHUTDOWN_SUPPORT_INFO = "app_shutdown_support_info"
         private const val KEY_DEFAULT_SOURCE = "default_data_source"
         private const val KEY_DISABLED_SOURCES = "disabled_sources"
     }
