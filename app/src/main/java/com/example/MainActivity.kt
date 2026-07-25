@@ -215,6 +215,9 @@ class MainActivity : FragmentActivity() {
                 textScale = textSizeScale,
                 themePreset = themePreset
             ) {
+                val shutdownEnabled by viewModel.remoteConfigManager.shutdownEnabled.collectAsState()
+                val shutdownMessage by viewModel.remoteConfigManager.shutdownMessage.collectAsState()
+                val shutdownSupportInfo by viewModel.remoteConfigManager.shutdownSupportInfo.collectAsState()
                 val maintenanceMode by viewModel.remoteConfigManager.maintenanceMode.collectAsState()
                 val maintenanceMessage by viewModel.remoteConfigManager.maintenanceMessage.collectAsState()
                 val forceBannedLogout by viewModel.forceBannedLogout.collectAsState()
@@ -242,6 +245,14 @@ class MainActivity : FragmentActivity() {
 
                 if (showSplash) {
                     com.example.ui.SplashScreen()
+                } else if (shutdownEnabled) {
+                    // Kill-switch PERMANEN, prioritas paling atas -- di atas maintenance
+                    // & ban. Dipakai kalau aplikasi resmi ditutup total (misal biaya
+                    // server/database bulanan udah gak sanggup ditanggung admin lagi).
+                    com.example.ui.ShutdownScreen(
+                        message = shutdownMessage,
+                        supportInfo = shutdownSupportInfo
+                    )
                 } else if (maintenanceMode) {
                     // Kill-switch paling atas — begitu nyala di Firebase Console, semua user
                     // langsung ke-block di sini real-time, gak peduli lagi login/lock/dimana.
