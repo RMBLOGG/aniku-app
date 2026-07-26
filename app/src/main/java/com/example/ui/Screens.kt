@@ -11684,7 +11684,7 @@ fun MiniPlayerOverlay(
 @Composable
 private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
     val packages by viewModel.premiumPackages.collectAsState()
-    var username by remember { mutableStateOf("") }
+    var userNumberInput by remember { mutableStateOf("") }
     var selectedPackageId by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
@@ -11709,10 +11709,14 @@ private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = username,
-            onValueChange = { username = it; resultMessage = null },
-            label = { Text("Username Penerima") },
+            value = userNumberInput,
+            onValueChange = { input ->
+                userNumberInput = input.filter { it.isDigit() }
+                resultMessage = null
+            },
+            label = { Text("ID Penerima (contoh: 543)") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -11752,29 +11756,29 @@ private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
         Button(
             onClick = {
                 val pkgId = selectedPackageId ?: return@Button
-                val uname = username.trim()
-                if (uname.isEmpty()) {
-                    resultMessage = "Isi username dulu"
+                val userNumber = userNumberInput.trim().toIntOrNull()
+                if (userNumber == null) {
+                    resultMessage = "Isi ID penerima dulu"
                     isSuccess = false
                     return@Button
                 }
                 isLoading = true
                 resultMessage = null
-                viewModel.adminGrantPremiumManual(uname, pkgId) { success, error ->
+                viewModel.adminGrantPremiumManual(userNumber, pkgId) { success, error ->
                     isLoading = false
                     isSuccess = success
                     resultMessage = if (success) {
-                        "Premium berhasil diberikan ke $uname"
+                        "Premium berhasil diberikan ke #$userNumber"
                     } else {
                         error ?: "Gagal memberikan premium"
                     }
                     if (success) {
-                        username = ""
+                        userNumberInput = ""
                         selectedPackageId = null
                     }
                 }
             },
-            enabled = selectedPackageId != null && username.isNotBlank() && !isLoading,
+            enabled = selectedPackageId != null && userNumberInput.isNotBlank() && !isLoading,
             modifier = Modifier.fillMaxWidth()
         ) {
             if (isLoading) {

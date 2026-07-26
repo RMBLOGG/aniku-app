@@ -3594,7 +3594,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // ASLI (harus admin) dicek di server lewat function admin_grant_premium_manual,
     // jadi ini aman walau ada yang coba panggil API-nya langsung.
     fun adminGrantPremiumManual(
-        username: String,
+        userNumber: Int,
         packageId: String,
         onResult: (Boolean, String?) -> Unit
     ) {
@@ -3602,7 +3602,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = NetworkClient.supabaseDbApi.adminGrantPremiumManual(
-                    body = AdminGrantPremiumManualRequest(p_username = username, p_package_id = packageId),
+                    body = AdminGrantPremiumManualRequest(p_user_number = userNumber, p_package_id = packageId),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
