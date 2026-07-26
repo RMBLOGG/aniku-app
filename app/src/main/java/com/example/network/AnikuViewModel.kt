@@ -3588,6 +3588,41 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Grant premium manual oleh admin, dipanggil dari Admin Panel. Buat kasus
+    // pembayaran yang ga otomatis ke-proses lewat webhook Sociabuzz (misal
+    // transaksi nyangkut, delay dari transaksi luar negeri, dll). Validasi
+    // ASLI (harus admin) dicek di server lewat function admin_grant_premium_manual,
+    // jadi ini aman walau ada yang coba panggil API-nya langsung.
+    fun adminGrantPremiumManual(
+        username: String,
+        packageId: String,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.adminGrantPremiumManual(
+                    body = AdminGrantPremiumManualRequest(p_username = username, p_package_id = packageId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (response.isSuccessful) {
+                    onResult(true, null)
+                } else {
+                    val errorMsg = try {
+                        val errorBody = response.errorBody()?.string()
+                        val json = errorBody?.let { org.json.JSONObject(it) }
+                        json?.optString("message")?.takeIf { it.isNotBlank() }
+                    } catch (parseErr: Exception) { null }
+                    onResult(false, errorMsg ?: "Gagal grant premium (HTTP ${response.code()})")
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "adminGrantPremiumManual error", e)
+                onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
     // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
     // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.

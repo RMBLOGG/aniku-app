@@ -1762,3 +1762,11 @@ data class GetUserRanksRequest(
     val p_user_id: String,
     val p_top_n: Int = 50
 )
+
+// Body buat RPC admin_grant_premium_manual - khusus admin, buat kasus
+// pembayaran yang ga otomatis ke-proses (gagal webhook, transaksi nyangkut, dll)
+@JsonClass(generateAdapter = true)
+data class AdminGrantPremiumManualRequest(
+    val p_username: String,
+    val p_package_id: String
+)

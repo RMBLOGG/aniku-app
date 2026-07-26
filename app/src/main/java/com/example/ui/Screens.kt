@@ -8526,15 +8526,19 @@ fun AdminPanelScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val sections = listOf(
-                "Manajemen User" to Icons.Default.Group,
-                "Pengumuman" to Icons.Default.Campaign,
-                "Hero Slider" to Icons.Default.ViewCarousel,
-                "Blacklist Anime" to Icons.Default.Block,
-                "Blacklist Genre" to Icons.Default.FilterAltOff,
-                "Anime Request" to Icons.Default.VideoLibrary,
-                "Feature Flags" to Icons.Default.Science
-            )
+            val sections = buildList {
+                add("Manajemen User" to Icons.Default.Group)
+                add("Pengumuman" to Icons.Default.Campaign)
+                add("Hero Slider" to Icons.Default.ViewCarousel)
+                add("Blacklist Anime" to Icons.Default.Block)
+                add("Blacklist Genre" to Icons.Default.FilterAltOff)
+                add("Anime Request" to Icons.Default.VideoLibrary)
+                add("Feature Flags" to Icons.Default.Science)
+                // Tab ini SENGAJA cuma admin (bukan canModerate()) -- moderator
+                // ga boleh grant premium manual tanpa approval admin.
+                if (sess.isAdmin) add("Gift Premium" to Icons.Default.WorkspacePremium)
+            }
+            val giftPremiumTabIndex = sections.indexOfFirst { it.first == "Gift Premium" }
             sections.forEachIndexed { index, (label, icon) ->
                 val isSelected = selectedTab == index
                 Row(
@@ -9312,6 +9316,11 @@ fun AdminPanelScreen(
                     }
                     6 -> {
                         item { FeatureFlagsAdminSection(viewModel = viewModel) }
+                    }
+                    giftPremiumTabIndex -> {
+                        if (sess.isAdmin) {
+                            item { AdminGiftPremiumSection(viewModel = viewModel) }
+                        }
                     }
                 }
             }
@@ -11659,6 +11668,115 @@ fun MiniPlayerOverlay(
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 3.dp, end = 3.dp)
             )
+        }
+    }
+}
+
+// Bagian Admin Panel - Grant Premium manual, khusus admin. Dipakai buat
+// nolongin kasus pembayaran yang ga otomatis ke-proses lewat webhook Sociabuzz
+// (misal transaksi nyangkut, delay dari luar negeri, dll) tanpa perlu masuk
+// ke SQL Editor manual satu-satu.
+@Composable
+private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
+    val packages by viewModel.premiumPackages.collectAsState()
+    var username by remember { mutableStateOf("") }
+    var selectedPackageId by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var resultMessage by remember { mutableStateOf<String?>(null) }
+    var isSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (packages.isEmpty()) viewModel.loadPremiumPackages()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text("Gift Premium Manual", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Grant Premium langsung ke user, buat kasus pembayaran yang gagal otomatis ke-proses (transaksi nyangkut, delay, dll). Nominal tetap tercatat sebagai dukungan (support points) buat user tersebut.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it; resultMessage = null },
+            label = { Text("Username Penerima") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text("Pilih Paket", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(8.dp))
+        packages.forEach { pkg ->
+            val isSelected = selectedPackageId == pkg.id
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                    .clickable { selectedPackageId = pkg.id; resultMessage = null }
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(pkg.label, fontWeight = FontWeight.SemiBold)
+                Text("Rp${pkg.price}", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        resultMessage?.let {
+            Text(
+                it,
+                color = if (isSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        Button(
+            onClick = {
+                val pkgId = selectedPackageId ?: return@Button
+                val uname = username.trim()
+                if (uname.isEmpty()) {
+                    resultMessage = "Isi username dulu"
+                    isSuccess = false
+                    return@Button
+                }
+                isLoading = true
+                resultMessage = null
+                viewModel.adminGrantPremiumManual(uname, pkgId) { success, error ->
+                    isLoading = false
+                    isSuccess = success
+                    resultMessage = if (success) {
+                        "Premium berhasil diberikan ke $uname"
+                    } else {
+                        error ?: "Gagal memberikan premium"
+                    }
+                    if (success) {
+                        username = ""
+                        selectedPackageId = null
+                    }
+                }
+            },
+            enabled = selectedPackageId != null && username.isNotBlank() && !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Berikan Premium")
+            }
         }
     }
 }
