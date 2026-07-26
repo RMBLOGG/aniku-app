@@ -8443,6 +8443,12 @@ fun AdminPanelScreen(
 
     var selectedTab by remember { mutableStateOf(0) } // 0: Users, 1: Announcements, 2: Slider, 3: Blacklist Anime, 4: Blacklist Genre, 5: Anime Request
 
+    // Index tab "Gift Premium" -- muncul cuma buat admin, jadi index-nya dihitung
+    // dinamis dari urutan section yang sama kayak di header tab. Dipindah ke sini
+    // (scope Composable utama) biar bisa diakses dari Row tab DAN dari when(selectedTab)
+    // di LazyColumn bawah, yang sebelumnya beda scope sama val lokal di dalam Row.
+    val giftPremiumTabIndex = if (sess.isAdmin) 7 else -1
+
     // Announcements adding inputs state
     var annTitle by remember { mutableStateOf("") }
     var annMessage by remember { mutableStateOf("") }
@@ -8538,7 +8544,6 @@ fun AdminPanelScreen(
                 // ga boleh grant premium manual tanpa approval admin.
                 if (sess.isAdmin) add("Gift Premium" to Icons.Default.WorkspacePremium)
             }
-            val giftPremiumTabIndex = sections.indexOfFirst { it.first == "Gift Premium" }
             sections.forEachIndexed { index, (label, icon) ->
                 val isSelected = selectedTab == index
                 Row(
