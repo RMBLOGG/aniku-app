@@ -234,6 +234,9 @@ data class ProfileDto(
     val role: String? = "user",
     val is_admin: Boolean? = false,
     val is_banned: Boolean? = false,
+    // Alasan ban yang diketik manual sama admin/moderator pas nge-ban user ini.
+    // Null/kosong kalau lagi gak dibanned atau adminnya gak isi alasan.
+    val ban_reason: String? = null,
     val user_number: Int? = null,
     val created_at: String? = null,
     val season_xp: Int? = 0,

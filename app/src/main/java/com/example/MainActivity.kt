@@ -221,6 +221,7 @@ class MainActivity : FragmentActivity() {
                 val maintenanceMode by viewModel.remoteConfigManager.maintenanceMode.collectAsState()
                 val maintenanceMessage by viewModel.remoteConfigManager.maintenanceMessage.collectAsState()
                 val forceBannedLogout by viewModel.forceBannedLogout.collectAsState()
+                val forceBannedReason by viewModel.bannedReason.collectAsState()
                 val appLockEnabled by viewModel.appLockEnabled.collectAsState()
                 val appLockType by viewModel.appLockType.collectAsState()
                 val appPin by viewModel.appPin.collectAsState()
@@ -261,7 +262,10 @@ class MainActivity : FragmentActivity() {
                     // Sama kayak maintenance mode, tapi per-user -- begitu admin nge-ban
                     // akun ini (dipush via Firebase RTDB), device langsung ke-kick di sini
                     // real-time, gak perlu nunggu logout manual/token expired.
-                    com.example.ui.BannedScreen(onAcknowledge = { viewModel.acknowledgeBannedLogout() })
+                    com.example.ui.BannedScreen(
+                        reason = forceBannedReason,
+                        onAcknowledge = { viewModel.acknowledgeBannedLogout() }
+                    )
                 } else if (appLockEnabled && !isUnlocked) {
                     LockScreen(
                         lockType = appLockType,
@@ -310,11 +314,19 @@ class MainActivity : FragmentActivity() {
                 // Popup ban real-time — muncul begitu ban kedeteksi (polling tiap 15s),
                 // session udah otomatis di-clear di ViewModel, di sini cuma redirect + tampilkan info
                 val showBannedDialog by viewModel.showBannedDialog.collectAsState()
+                val bannedDialogReason by viewModel.bannedReason.collectAsState()
                 if (showBannedDialog) {
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { /* tidak bisa di-dismiss tanpa konfirmasi */ },
                         title = { Text("Akun Dibanned") },
-                        text = { Text("Akunmu telah ditangguhkan (banned) oleh Admin. Kamu akan keluar dari sesi ini.") },
+                        text = {
+                            Text(
+                                if (!bannedDialogReason.isNullOrBlank())
+                                    "Akunmu telah ditangguhkan (banned) oleh Admin.\n\nAlasan: $bannedDialogReason\n\nKamu akan keluar dari sesi ini."
+                                else
+                                    "Akunmu telah ditangguhkan (banned) oleh Admin. Kamu akan keluar dari sesi ini."
+                            )
+                        },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
                                 viewModel.dismissBannedDialog()

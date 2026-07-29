@@ -358,8 +358,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             session.map { it.userId }.distinctUntilChanged().collectLatest { userId ->
                 if (!userId.isNullOrBlank()) {
-                    BanStatusManager.listenBanStatus(userId).collect { isBanned ->
-                        if (isBanned) {
+                    BanStatusManager.listenBanStatus(userId).collect { status ->
+                        if (status.banned) {
+                            _bannedReason.value = status.reason
                             _forceBannedLogout.value = true
                             settingsStore.clearSession()
                         }
@@ -375,9 +376,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _forceBannedLogout = MutableStateFlow(false)
     val forceBannedLogout: StateFlow<Boolean> = _forceBannedLogout.asStateFlow()
 
+    // Alasan ban yang diketik manual sama admin -- ditampilin di BannedScreen.
+    // Null berarti gak ada alasan spesifik (dibiarin kosong sama admin).
+    private val _bannedReason = MutableStateFlow<String?>(null)
+    val bannedReason: StateFlow<String?> = _bannedReason.asStateFlow()
+
     /** Dipanggil UI setelah user nge-tap "OK" di layar block, biar gak nyangkut terus. */
     fun acknowledgeBannedLogout() {
         _forceBannedLogout.value = false
+        _bannedReason.value = null
     }
 
     /** Upsert FCM token ke Supabase, dipakai buat targeted notif private chat. */
@@ -801,6 +808,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     )
                     val profile = profileList.firstOrNull()
                     if (profile?.is_banned == true) {
+                        _bannedReason.value = profile.ban_reason
                         _showBannedDialog.value = true
                         settingsStore.clearSession()
                         stopBanWatcher()
@@ -3251,10 +3259,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    fun toggleUserBanStatus(profile: ProfileDto) {
+    fun toggleUserBanStatus(profile: ProfileDto, reason: String? = null) {
         val authHeader = getAuthHeader()
         val userIdToModify = profile.id
         val newBanStatus = !(profile.is_banned ?: false)
+        // Alasan cuma relevan pas lagi nge-ban (bukan pas unban), dan otomatis
+        // dikosongin pas unban (lihat juga RPC toggle_user_ban di sisi Supabase).
+        val reasonToSend = if (newBanStatus) reason?.nullIfBlank() else null
         Log.d("AnikuVM", "Trying ban - token: ${session.value.token?.take(20)} userId: $userIdToModify")
         viewModelScope.launch {
             try {
@@ -3263,7 +3274,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val response = NetworkClient.supabaseDbApi.toggleUserBan(
                     body = mapOf(
                         "target_user_id" to userIdToModify,
-                        "new_ban_status" to newBanStatus
+                        "new_ban_status" to newBanStatus,
+                        "ban_reason_text" to reasonToSend
                     ),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
@@ -3272,7 +3284,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     _banStatusMessage.value = if (newBanStatus) "User berhasil dibanned" else "User berhasil diaktifkan"
                     // Push ke Firebase RTDB biar device korban (kalau lagi online)
                     // langsung ke-kick real-time, gak perlu nunggu logout/token expired.
-                    BanStatusManager.setBanStatus(userIdToModify, newBanStatus)
+                    BanStatusManager.setBanStatus(userIdToModify, newBanStatus, reasonToSend)
                     loadAdminDetails()
                 } else {
                     val errBody = response.errorBody()?.string() ?: "Unknown error"

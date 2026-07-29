@@ -42,7 +42,7 @@ import kotlin.random.Random
  * Mode Tamu atau layar login.
  */
 @Composable
-fun BannedScreen(onAcknowledge: () -> Unit = {}) {
+fun BannedScreen(reason: String? = null, onAcknowledge: () -> Unit = {}) {
     val ink = Color(0xFF0A0808)
     val signal = Color(0xFFE8483A)
     val bone = Color(0xFFEDE7E1)
@@ -107,6 +107,33 @@ fun BannedScreen(onAcknowledge: () -> Unit = {}) {
                 color = slate,
                 modifier = Modifier.fillMaxWidth(0.9f)
             )
+
+            if (!reason.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(18.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(signal.copy(alpha = 0.08f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        "ALASAN",
+                        fontFamily = SignalMonoFont,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.5.sp,
+                        letterSpacing = 2.sp,
+                        color = signal
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        reason,
+                        fontSize = 13.5.sp,
+                        lineHeight = 19.sp,
+                        color = bone.copy(alpha = 0.92f)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(22.dp))
 

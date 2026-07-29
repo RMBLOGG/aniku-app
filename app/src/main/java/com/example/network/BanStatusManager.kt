@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
+/** Hasil dengerin status ban: apa lagi dibanned, dan alasan (kalau admin isi manual). */
+data class BanStatusInfo(val banned: Boolean, val reason: String? = null)
+
 /**
  * Status ban per-user, realtime via Firebase Realtime Database. Pola sama
  * kayak PrivateChatManager/NobarManager -- dipakai biar begitu admin nge-ban
@@ -17,18 +20,25 @@ import kotlinx.coroutines.tasks.await
  * manual atau token expired), mirip kill-switch Maintenance Mode yang udah ada.
  *
  * Struktur data di Firebase:
- * banned_status/{userId}  -> Boolean (true = lagi di-ban)
+ * banned_status/{userId} -> { "banned": Boolean, "reason": String? }
  */
 object BanStatusManager {
     private const val TAG = "BanStatusManager"
     private val database: FirebaseDatabase by lazy { FirebaseDatabase.getInstance() }
 
-    /** Dengerin status ban user tertentu secara realtime. */
-    fun listenBanStatus(userId: String): Flow<Boolean> = callbackFlow {
+    /** Dengerin status ban user tertentu secara realtime (termasuk alasannya). */
+    fun listenBanStatus(userId: String): Flow<BanStatusInfo> = callbackFlow {
         val ref = database.getReference("banned_status/$userId")
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                trySend(snapshot.getValue(Boolean::class.java) ?: false)
+                // Kompatibel juga sama data lama yang cuma Boolean polos (sebelum
+                // ada fitur alasan), biar gak crash pas baca entry lama di Firebase.
+                val banned = when (val raw = snapshot.child("banned").value) {
+                    is Boolean -> raw
+                    else -> snapshot.getValue(Boolean::class.java) ?: false
+                }
+                val reason = snapshot.child("reason").getValue(String::class.java)
+                trySend(BanStatusInfo(banned = banned, reason = reason))
             }
             override fun onCancelled(error: DatabaseError) {
                 Log.e(TAG, "listenBanStatus cancelled: ${error.message}")
@@ -38,11 +48,13 @@ object BanStatusManager {
         awaitClose { ref.removeEventListener(listener) }
     }
 
-    /** Dipanggil admin pas toggle ban/unban -- push status baru ke Firebase
-     * biar device korban (kalau lagi online) langsung kena efeknya. */
-    suspend fun setBanStatus(userId: String, banned: Boolean) {
+    /** Dipanggil admin pas toggle ban/unban -- push status baru (+ alasan manual)
+     * ke Firebase biar device korban (kalau lagi online) langsung ke-kick real-time. */
+    suspend fun setBanStatus(userId: String, banned: Boolean, reason: String? = null) {
         try {
-            database.getReference("banned_status/$userId").setValue(banned).await()
+            database.getReference("banned_status/$userId").setValue(
+                mapOf("banned" to banned, "reason" to if (banned) reason else null)
+            ).await()
         } catch (e: Exception) {
             // Kalau Firebase gagal ditulis (mis. offline), gak masalah -- status
             // ban asli tetap valid di Postgres, cuma efek instannya yang gak jalan

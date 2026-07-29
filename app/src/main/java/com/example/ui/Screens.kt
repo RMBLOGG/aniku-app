@@ -8739,8 +8739,58 @@ fun AdminPanelScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
+                                        var showBanReasonDialog by remember(usr.id) { mutableStateOf(false) }
+                                        var banReasonInput by remember(usr.id) { mutableStateOf("") }
+
+                                        if (showBanReasonDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showBanReasonDialog = false },
+                                                title = { Text("Ban ${usr.username.orDefault("user ini")}") },
+                                                text = {
+                                                    Column {
+                                                        Text(
+                                                            "Ketik alasan ban-nya (opsional, bakal ditampilin ke user):",
+                                                            fontSize = 13.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                        Spacer(modifier = Modifier.height(10.dp))
+                                                        OutlinedTextField(
+                                                            value = banReasonInput,
+                                                            onValueChange = { banReasonInput = it },
+                                                            placeholder = { Text("Contoh: spam link judi di chat", fontSize = 13.sp) },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            minLines = 2,
+                                                            maxLines = 4,
+                                                            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                                                        )
+                                                    }
+                                                },
+                                                confirmButton = {
+                                                    TextButton(onClick = {
+                                                        viewModel.toggleUserBanStatus(usr, banReasonInput)
+                                                        showBanReasonDialog = false
+                                                        banReasonInput = ""
+                                                    }) {
+                                                        Text("Ban", color = Color(0xFFFF5252), fontWeight = FontWeight.Bold)
+                                                    }
+                                                },
+                                                dismissButton = {
+                                                    TextButton(onClick = { showBanReasonDialog = false }) {
+                                                        Text("Batal")
+                                                    }
+                                                }
+                                            )
+                                        }
+
                                         Button(
-                                            onClick = { viewModel.toggleUserBanStatus(usr) },
+                                            onClick = {
+                                                if (isBanned) {
+                                                    // Unban langsung, gak perlu alasan
+                                                    viewModel.toggleUserBanStatus(usr)
+                                                } else {
+                                                    showBanReasonDialog = true
+                                                }
+                                            },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = if (isBanned) Color(0xFF4CAF50).copy(alpha = 0.15f) else Color(0xFFFF5252).copy(alpha = 0.15f)
                                             ),
