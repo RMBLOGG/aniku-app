@@ -4635,6 +4635,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     )
                 }
                 loadChatMessages()
+            } catch (e: retrofit2.HttpException) {
+                val errBody = e.response()?.errorBody()?.string() ?: ""
+                if (errBody.contains("COOLDOWN")) {
+                    _chatError.value = "Tunggu beberapa detik sebelum kirim pesan lagi"
+                } else {
+                    _chatError.value = "Gagal kirim pesan: HTTP ${e.code()}"
+                }
+                Log.e("AnikuVM", "sendChatMessage failed: HTTP ${e.code()} - $errBody")
             } catch (e: Exception) {
                 _chatError.value = "Gagal kirim pesan: ${e.message}"
             }

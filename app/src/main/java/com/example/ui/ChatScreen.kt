@@ -396,6 +396,13 @@ fun ChatScreen(
 
     var inputText by remember { mutableStateOf("") }
     var replyTarget by remember { mutableStateOf<ChatMessage?>(null) }
+    var cooldownSecondsLeft by remember { mutableStateOf(0) }
+    LaunchedEffect(cooldownSecondsLeft) {
+        if (cooldownSecondsLeft > 0) {
+            delay(1000)
+            cooldownSecondsLeft -= 1
+        }
+    }
     var showQuickGiveawaySheet by remember { mutableStateOf(false) }
     var pendingImageUri by remember { mutableStateOf<Uri?>(null) }
     val listState = rememberLazyListState()
@@ -739,6 +746,18 @@ fun ChatScreen(
                 }
 
                 if (isLoggedIn) {
+                    AnimatedVisibility(
+                        visible = cooldownSecondsLeft > 0,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Text(
+                            text = "Tunggu $cooldownSecondsLeft detik untuk kirim lagi",
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -812,6 +831,7 @@ fun ChatScreen(
                                     inputText = ""
                                     replyTarget = null
                                     viewModel.clearTyping()
+                                    cooldownSecondsLeft = 5
                                     coroutineScope.launch {
                                         delay(300)
                                         if (messages.isNotEmpty()) {
@@ -820,7 +840,7 @@ fun ChatScreen(
                                     }
                                 }
                             },
-                            enabled = (inputText.trim().isNotEmpty() || pendingImageUri != null) && !isSendingImage,
+                            enabled = (inputText.trim().isNotEmpty() || pendingImageUri != null) && !isSendingImage && cooldownSecondsLeft <= 0,
                             modifier = Modifier.size(48.dp)
                         ) {
                             if (isSendingImage) {
