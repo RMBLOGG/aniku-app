@@ -795,6 +795,16 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): SakurupiahInvoiceResponse
+
+    // Bikin invoice pembayaran QRIS Sakurupiah buat top-up Diamond (DM),
+    // nominal bebas input user, rasio Rp4 = 1 DM. Beda dari premium, gak
+    // ada claim yang dibikin duluan.
+    @POST("functions/v1/sakurupiah-create-diamond-invoice")
+    suspend fun sakurupiahCreateDiamondInvoice(
+        @Body body: SakurupiahDiamondInvoiceRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): SakurupiahDiamondInvoiceResponse
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
     // (bukan cuma "retry sampai berhasil 1x" kayak mekanisme lama).

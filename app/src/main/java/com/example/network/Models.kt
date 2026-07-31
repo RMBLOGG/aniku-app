@@ -1792,3 +1792,22 @@ data class SakurupiahInvoiceResponse(
     val merchant_ref: String? = null,
     val error: String? = null
 )
+
+// Body & response buat Edge Function sakurupiah-create-diamond-invoice.
+// Beda dari premium: gak ada "claim" yang dibikin duluan, langsung kirim
+// nominal rupiah, server yang hitung diamond_amount (rasio Rp4 = 1 DM).
+@JsonClass(generateAdapter = true)
+data class SakurupiahDiamondInvoiceRequest(
+    val amount: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class SakurupiahDiamondInvoiceResponse(
+    val checkout_url: String? = null,
+    val qr: String? = null,
+    val trx_id: String? = null,
+    val merchant_ref: String? = null,
+    val diamond_amount: Int? = null,
+    val error: String? = null
+)
+

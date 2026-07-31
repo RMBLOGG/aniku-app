@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,9 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.network.AnikuViewModel
+import com.example.network.SakurupiahDiamondInvoiceResponse
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +39,14 @@ fun DiamondTopUpScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    var amountInput by remember { mutableStateOf("") }
+    var isCreatingInvoice by remember { mutableStateOf(false) }
+    var invoiceError by remember { mutableStateOf<String?>(null) }
+    var invoiceResult by remember { mutableStateOf<SakurupiahDiamondInvoiceResponse?>(null) }
+    var showInvoiceSheet by remember { mutableStateOf(false) }
+
+    val amountValue = amountInput.toIntOrNull() ?: 0
+    val estimatedDiamond = amountValue / 4
 
     Scaffold(
         topBar = {
@@ -98,38 +110,159 @@ fun DiamondTopUpScreen(
             }
 
             Spacer(modifier = Modifier.height(22.dp))
-            Text("Cara Top-up", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text("Masukin Nominal", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
-            listOf(
-                "Donasi lewat Trakteer dengan nominal berapa pun (rasio Rp4 = 1 DM)",
-                "Wajib cantumkan Username kamu di kolom pesan dukungan, biar bisa dicocokkan",
-                "Saldo DM otomatis masuk ke akun kamu dalam beberapa menit setelah donasi terverifikasi"
-            ).forEachIndexed { i, step ->
-                StepRow(index = i, text = step)
+            OutlinedTextField(
+                value = amountInput,
+                onValueChange = { new ->
+                    if (new.length <= 8 && new.all { it.isDigit() }) amountInput = new
+                },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Contoh: 10000") },
+                prefix = { Text("Rp") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                shape = RoundedCornerShape(14.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(5000, 20000, 50000).forEach { preset ->
+                    OutlinedButton(
+                        onClick = { amountInput = preset.toString() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Rp${preset / 1000}rb", fontSize = 12.sp)
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            if (amountValue > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF2FA8BF).copy(alpha = 0.1f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Kamu akan dapat", fontSize = 13.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF2FA8BF), modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("$estimatedDiamond DM", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    }
+                }
+            }
+
+            invoiceError?.let { err ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(err, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
             Button(
                 onClick = {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://trakteer.id/Dayynimee")))
+                    invoiceError = null
+                    if (amountValue < 5000) {
+                        invoiceError = "Nominal minimal Rp5.000"
+                        return@Button
+                    }
+                    isCreatingInvoice = true
+                    viewModel.createSakurupiahDiamondInvoice(amountValue) { result, error ->
+                        isCreatingInvoice = false
+                        if (result != null) {
+                            invoiceResult = result
+                            showInvoiceSheet = true
+                        } else {
+                            invoiceError = error ?: "Gagal membuat invoice pembayaran"
+                        }
+                    }
                 },
+                enabled = amountValue >= 5000 && !isCreatingInvoice,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
             ) {
-                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Buka Trakteer buat Top-up", fontWeight = FontWeight.Bold)
+                if (isCreatingInvoice) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Bayar dengan QRIS", fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                "Kalau saldo belum masuk lebih dari 15 menit, hubungi admin di Chat Room.",
+                "Diamond otomatis masuk ke akun kamu setelah pembayaran terverifikasi. Kalau belum masuk lebih dari 15 menit, hubungi admin di Chat Room.",
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
             Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+
+    if (showInvoiceSheet && invoiceResult != null) {
+        DiamondInvoiceSheet(
+            invoice = invoiceResult!!,
+            onDismiss = {
+                showInvoiceSheet = false
+                invoiceResult = null
+                amountInput = ""
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DiamondInvoiceSheet(
+    invoice: SakurupiahDiamondInvoiceResponse,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Text("Invoice Top-up Diamond Dibuat!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Selesaikan pembayaran QRIS buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val url = invoice.checkout_url
+                    if (!url.isNullOrBlank()) {
+                        try {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        } catch (e: Exception) {
+                            Log.e("DiamondTopUpScreen", "Failed to open checkout url", e)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Bayar Sekarang")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            ) {
+                Text("Tutup", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            }
         }
     }
 }
@@ -206,18 +339,3 @@ private fun BenefitCard(icon: ImageVector, title: String, subtitle: String, modi
     }
 }
 
-@Composable
-private fun StepRow(index: Int, text: String) {
-    Row(modifier = Modifier.padding(vertical = 6.dp)) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .background(Color(0xFF7B2FBF), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("${index + 1}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(text, fontSize = 13.sp, modifier = Modifier.weight(1f))
-    }
-}

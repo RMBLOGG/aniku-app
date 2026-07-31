@@ -3669,6 +3669,41 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Bikin invoice QRIS Sakurupiah buat top-up Diamond (DM). Beda dari
+    // premium: gak ada claim yang dibikin duluan, langsung kirim nominal
+    // rupiah yang diinput user, server yang hitung diamond_amount-nya
+    // (rasio Rp4 = 1 DM) dan bikin baris di tabel diamond_topups.
+    fun createSakurupiahDiamondInvoice(
+        amount: Int,
+        onResult: (SakurupiahDiamondInvoiceResponse?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.sakurupiahCreateDiamondInvoice(
+                    body = SakurupiahDiamondInvoiceRequest(amount = amount),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (result.error != null) {
+                    onResult(null, result.error)
+                } else {
+                    onResult(result, null)
+                }
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("error")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat invoice pembayaran (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createSakurupiahDiamondInvoice error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
     // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
     // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.
