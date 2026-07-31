@@ -1775,3 +1775,20 @@ data class AdminGrantPremiumManualRequest(
     val p_user_number: Int,
     val p_package_id: String
 )
+
+// Body & response buat Edge Function sakurupiah-create-invoice (ganti total
+// dari alur Sociabuzz -- ga ada lagi kode klaim manual, langsung dapet
+// link/QR pembayaran QRIS).
+@JsonClass(generateAdapter = true)
+data class SakurupiahCreateInvoiceRequest(
+    val claim_id: String
+)
+
+@JsonClass(generateAdapter = true)
+data class SakurupiahInvoiceResponse(
+    val checkout_url: String? = null,
+    val qr: String? = null,
+    val trx_id: String? = null,
+    val merchant_ref: String? = null,
+    val error: String? = null
+)

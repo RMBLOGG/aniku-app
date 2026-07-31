@@ -3635,6 +3635,40 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Bikin invoice QRIS Sakurupiah buat klaim premium yang udah dibikin.
+    // Dipanggil abis createPremiumClaim/createSelfPremiumClaim/createGiveawayClaim
+    // sukses, ganti total alur "kode klaim manual + buka Sociabuzz sendiri".
+    fun createSakurupiahInvoice(
+        claimId: String,
+        onResult: (SakurupiahInvoiceResponse?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.sakurupiahCreateInvoice(
+                    body = SakurupiahCreateInvoiceRequest(claim_id = claimId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (result.error != null) {
+                    onResult(null, result.error)
+                } else {
+                    onResult(result, null)
+                }
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("error")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat invoice pembayaran (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createSakurupiahInvoice error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
     // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
     // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.

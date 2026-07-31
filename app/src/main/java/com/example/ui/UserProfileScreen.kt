@@ -1,5 +1,7 @@
 package com.example.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,6 +76,7 @@ import com.example.network.UserWatchHistoryDto
 import com.example.network.UserRanksDto
 import com.example.network.PremiumClaimDto
 import com.example.network.PremiumPackageDto
+import com.example.network.SakurupiahInvoiceResponse
 import com.example.util.orDefault
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -1645,61 +1648,74 @@ fun GiftPremiumSheet(
         ) {
             val claim = resultClaim
             if (claim != null) {
+                var invoice by remember(claim.id) { mutableStateOf<SakurupiahInvoiceResponse?>(null) }
+                var invoiceError by remember(claim.id) { mutableStateOf<String?>(null) }
+                var isCreatingInvoice by remember(claim.id) { mutableStateOf(true) }
+                val context = LocalContext.current
+
+                LaunchedEffect(claim.id) {
+                    isCreatingInvoice = true
+                    invoiceError = null
+                    viewModel.createSakurupiahInvoice(claim.id) { result, error ->
+                        isCreatingInvoice = false
+                        if (result != null) invoice = result else invoiceError = error
+                    }
+                }
+
                 Text(
                     if (selfMode) "Pembelian Premium Dibuat!" else "Gift Premium Berhasil Dibuat!",
                     fontSize = 18.sp, fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-                var justCopied by remember { mutableStateOf(false) }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column {
-                            Text("Kode Klaim:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                claim.code,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(claim.code))
-                                justCopied = true
-                            }
+
+                when {
+                    isCreatingInvoice -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
-                                contentDescription = "Salin kode",
-                                tint = if (justCopied) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
-                            )
+                            CircularProgressIndicator()
+                        }
+                    }
+                    invoiceError != null -> {
+                        Text(
+                            invoiceError ?: "Gagal membuat invoice pembayaran",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 13.sp
+                        )
+                    }
+                    invoice != null -> {
+                        Text(
+                            "Selesaikan pembayaran QRIS buat aktifin Premium-nya. Otomatis aktif setelah pembayaran terverifikasi.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                val url = invoice?.checkout_url
+                                if (!url.isNullOrBlank()) {
+                                    try {
+                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                    } catch (e: Exception) {
+                                        Log.e("GiftPremiumSheet", "Failed to open checkout url", e)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Bayar Sekarang")
                         }
                     }
                 }
-                if (justCopied) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Kode disalin!", fontSize = 11.sp, color = Color(0xFF4CAF50))
-                }
+
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    "Buka Sociabuzz, isi nominal sesuai paket, lalu tulis kode di atas di kolom pesan dukungan. Premium otomatis aktif setelah pembayaran terverifikasi.",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Tutup")
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Tutup", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 return@Column

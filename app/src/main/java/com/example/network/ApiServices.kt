@@ -785,7 +785,16 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=minimal"
     ): retrofit2.Response<Unit>
 
-    // Versi baru — 1 checkpoint = 1 baris XP sendiri (tabel & RPC terpisah dari watch_events/
+    // Bikin invoice pembayaran QRIS Sakurupiah buat klaim premium yang udah
+    // dibikin (create_premium_claim / create_self_premium_claim / create_giveaway_claim).
+    // Ini Edge Function biasa (bukan RPC PostgREST), routing-nya beda tapi host
+    // sama, jadi tetep dipanggil dari Retrofit instance yang sama.
+    @POST("functions/v1/sakurupiah-create-invoice")
+    suspend fun sakurupiahCreateInvoice(
+        @Body body: SakurupiahCreateInvoiceRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): SakurupiahInvoiceResponse
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
     // (bukan cuma "retry sampai berhasil 1x" kayak mekanisme lama).
