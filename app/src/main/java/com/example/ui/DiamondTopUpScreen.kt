@@ -4,7 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -34,14 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.ImageBitmap
-import android.graphics.Bitmap
-import android.graphics.Color as AndroidColor
 import com.example.network.AnikuViewModel
 import com.example.network.SakurupiahDiamondInvoiceResponse
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -292,7 +286,13 @@ private fun DiamondInvoiceSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val qrString = invoice.qr
+    // PENTING: field "qr" dari Sakurupiah itu URL ke GAMBAR PNG QR code yang
+    // udah jadi (https://sakurupiah.id/qr-codeIMG/....png), BUKAN raw string
+    // EMVCo QRIS. Sempat salah kirain raw string dan di-generate ulang jadi
+    // QR baru pakai ZXing -- hasilnya QR yang isinya cuma URL itu doang,
+    // bukan data pembayaran asli, makanya invalid pas discan e-wallet.
+    // Fix: langsung load & tampilin gambar itu apa adanya.
+    val qrImageUrl = invoice.qr
 
     var latestStatus by remember(invoice.merchant_ref) { mutableStateOf<DiamondTopupStatusDto?>(null) }
     var keepPolling by remember(invoice.merchant_ref) { mutableStateOf(true) }
@@ -314,15 +314,7 @@ private fun DiamondInvoiceSheet(
         }
     }
 
-    val qrBitmap: ImageBitmap? = remember(qrString) {
-        if (qrString.isNullOrBlank()) return@remember null
-        try {
-            generateQrBitmap(qrString, 512).asImageBitmap()
-        } catch (e: Exception) {
-            Log.e("DiamondTopUpScreen", "Failed to generate QR bitmap", e)
-            null
-        }
-    }
+    val hasQrImage = !qrImageUrl.isNullOrBlank()
 
     // "payment_no" isinya beda-beda tergantung channel: buat Virtual Account
     // itu nomor VA asli (angka), tapi buat e-wallet REDIRECT (GoPay/DANA/
@@ -344,7 +336,7 @@ private fun DiamondInvoiceSheet(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 when {
-                    qrBitmap != null -> "Scan QRIS di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                    hasQrImage -> "Scan QRIS di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
                     vaNumber != null -> "Transfer ke nomor Virtual Account di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
                     isRedirectLink -> "Buka aplikasi ${invoice.method ?: "pembayaran"} buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
                     else -> "Selesaikan pembayaran buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
@@ -354,7 +346,7 @@ private fun DiamondInvoiceSheet(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (qrBitmap != null) {
+            if (hasQrImage) {
                 Box(
                     modifier = Modifier
                         .size(240.dp)
@@ -363,8 +355,8 @@ private fun DiamondInvoiceSheet(
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        bitmap = qrBitmap,
+                    AsyncImage(
+                        model = qrImageUrl,
                         contentDescription = "QRIS Top-up Diamond",
                         modifier = Modifier.fillMaxSize()
                     )
@@ -414,7 +406,7 @@ private fun DiamondInvoiceSheet(
                 Text(
                     when {
                         isRedirectLink -> "Buka ${invoice.method ?: "Aplikasi"}"
-                        qrBitmap != null || vaNumber != null -> "Buka Halaman Pembayaran"
+                        hasQrImage || vaNumber != null -> "Buka Halaman Pembayaran"
                         else -> "Bayar Sekarang"
                     }
                 )
@@ -527,21 +519,6 @@ private fun BenefitCard(icon: ImageVector, title: String, subtitle: String, modi
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Text(subtitle, fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
-}
-
-// Generate bitmap QR code dari raw string QRIS yang dibalikin Sakurupiah
-// (mereka ngasih string EMVCo QRIS mentah, bukan gambar - jadi kita yang
-// render sendiri di device biar gak perlu buka browser buat lihat QR-nya).
-private fun generateQrBitmap(content: String, size: Int): Bitmap {
-    val writer = QRCodeWriter()
-    val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
-    for (x in 0 until size) {
-        for (y in 0 until size) {
-            bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) AndroidColor.BLACK else AndroidColor.WHITE)
-        }
-    }
-    return bitmap
 }
 
 data class PaymentChannelOption(
