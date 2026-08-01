@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -316,7 +317,8 @@ private fun NeonBackdrop(modifier: Modifier = Modifier) {
 fun GachaScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit,
-    onTopUpClick: () -> Unit
+    onTopUpClick: () -> Unit,
+    onTradeClick: () -> Unit = {}
 ) {
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val collection by viewModel.gachaCollection.collectAsState()
@@ -399,6 +401,11 @@ fun GachaScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onTradeClick) {
+                        Icon(Icons.Default.Storefront, contentDescription = "Pasar", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White)

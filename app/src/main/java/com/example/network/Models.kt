@@ -584,6 +584,79 @@ data class GachaRollResult(
     val remaining_balance: Int
 )
 
+// ─────────────── Trade kartu gacha antar user ───────────────
+
+// Request buat RPC create_trade_listing
+@JsonClass(generateAdapter = true)
+data class CreateTradeListingRequest(
+    val p_character_mal_id: Int,
+    val p_price_dm: Int
+)
+
+// Hasil create_trade_listing
+@JsonClass(generateAdapter = true)
+data class CreateTradeListingResult(
+    val listing_id: Long,
+    val character_mal_id: Int,
+    val price_dm: Int,
+    val status: String
+)
+
+// Request buat RPC cancel_trade_listing / buy_trade_listing (sama-sama cuma butuh id)
+@JsonClass(generateAdapter = true)
+data class TradeListingIdRequest(
+    val p_listing_id: Long
+)
+
+// Hasil cancel_trade_listing
+@JsonClass(generateAdapter = true)
+data class CancelTradeListingResult(
+    val listing_id: Long,
+    val status: String
+)
+
+// Hasil buy_trade_listing - persis kayak jsonb_build_object di trade_system.sql
+@JsonClass(generateAdapter = true)
+data class BuyTradeListingResult(
+    val listing_id: Long,
+    val character_mal_id: Int,
+    val character_name: String?,
+    val price_dm: Int,
+    val fee_dm: Int,
+    val remaining_balance: Int
+)
+
+// 1 baris listing di pasar - hasil select dari view trade_listings_market
+// (udah join karakter + username seller, jadi 1 request doang cukup buat
+// nampilin seluruh kartu pasar).
+@JsonClass(generateAdapter = true)
+data class TradeMarketListing(
+    val listing_id: Long,
+    val character_mal_id: Int,
+    val price_dm: Int,
+    val created_at: String?,
+    val seller_id: String,
+    val character_name: String?,
+    val character_image_url: String?,
+    val anime_title: String?,
+    val rarity: String,
+    val seller_username: String?,
+    val seller_avatar_url: String?
+)
+
+// 1 baris listing MILIK SENDIRI (aktif/sold/cancelled) - dipakai di tab
+// "Listing Saya" biar user bisa liat history & batalin yang masih aktif.
+@JsonClass(generateAdapter = true)
+data class MyTradeListing(
+    val id: Long,
+    val character_mal_id: Int,
+    val price_dm: Int,
+    val status: String,
+    val created_at: String?,
+    val sold_at: String?,
+    val characters: CharacterInfoDto?
+)
+
 // ─────────────── Quiz "Tebak Anime dari Poster" ───────────────
 // Request buat RPC play_quiz_round - dipanggil SEBELUM soal ditampilkan,
 // buat ngecek eligibility (wajib punya clan) + motong jatah harian/Diamond.

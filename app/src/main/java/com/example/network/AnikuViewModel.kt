@@ -4170,6 +4170,131 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ─────────────── Trade kartu gacha antar user ───────────────
+
+    private val _tradeMarket = MutableStateFlow<List<TradeMarketListing>>(emptyList())
+    val tradeMarket: StateFlow<List<TradeMarketListing>> = _tradeMarket.asStateFlow()
+
+    private val _myTradeListings = MutableStateFlow<List<MyTradeListing>>(emptyList())
+    val myTradeListings: StateFlow<List<MyTradeListing>> = _myTradeListings.asStateFlow()
+
+    // Browse pasar - semua listing aktif dari user lain (dan diri sendiri, biar
+    // kartu sendiri juga keliatan lagi ngejual). Panggil tiap kali tab Pasar dibuka.
+    fun loadTradeMarket(rarity: String? = null) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getTradeMarket(
+                    rarityFilter = rarity?.let { "eq.$it" },
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _tradeMarket.value = result
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadTradeMarket error", e)
+            }
+        }
+    }
+
+    // Listing milik sendiri (aktif + history) - buat tab "Listing Saya".
+    fun loadMyTradeListings() {
+        val uid = session.value.userId ?: return
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getMyTradeListings(
+                    sellerIdQuery = "eq.$uid",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _myTradeListings.value = result
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadMyTradeListings error", e)
+            }
+        }
+    }
+
+    // Jual kartu dari koleksi sendiri.
+    fun createTradeListing(characterMalId: Int, priceDm: Int, onResult: (CreateTradeListingResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createTradeListing(
+                    body = CreateTradeListingRequest(p_character_mal_id = characterMalId, p_price_dm = priceDm),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+                loadMyTradeListings()
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal bikin listing (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createTradeListing error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Batalin listing sendiri.
+    fun cancelTradeListing(listingId: Long, onResult: (Boolean, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.cancelTradeListing(
+                    body = TradeListingIdRequest(p_listing_id = listingId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(true, null)
+                loadMyTradeListings()
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(false, errorMsg ?: "Gagal batalin listing (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "cancelTradeListing error", e)
+                onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Beli listing dari pasar. Refresh saldo DM (refreshProfile), market, dan
+    // koleksi sendiri setelah sukses, biar UI langsung update tanpa re-login.
+    fun buyTradeListing(listingId: Long, onResult: (BuyTradeListingResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.buyTradeListing(
+                    body = TradeListingIdRequest(p_listing_id = listingId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+                loadTradeMarket()
+                loadGachaCollection()
+                refreshProfile()
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal beli kartu (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "buyTradeListing error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // ── Pajangan kartu karakter di profil (maks 6) ──
 
     // id karakter yang lagi dipajang punya USER SENDIRI (buat isi awal editor di GachaScreen)

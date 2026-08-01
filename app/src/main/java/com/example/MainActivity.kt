@@ -1102,7 +1102,14 @@ class MainActivity : FragmentActivity() {
                             GachaScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
-                                onTopUpClick = { navController.navigate("diamond_topup") }
+                                onTopUpClick = { navController.navigate("diamond_topup") },
+                                onTradeClick = { navController.navigate("trade") }
+                            )
+                        }
+                        composable("trade") {
+                            TradeScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("quiz") {

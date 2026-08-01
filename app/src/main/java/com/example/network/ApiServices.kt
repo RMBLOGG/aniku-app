@@ -913,6 +913,63 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<UserCharacterEntry>
 
+    // ─────────────── Trade kartu gacha antar user ───────────────
+
+    // Bikin listing jual 1 kartu dari koleksi sendiri. Semua validasi (beneran
+    // punya kartunya, harga minimum, max listing aktif) jalan di server lewat
+    // function create_trade_listing (SECURITY DEFINER).
+    @POST("rest/v1/rpc/create_trade_listing")
+    suspend fun createTradeListing(
+        @Body body: CreateTradeListingRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): CreateTradeListingResult
+
+    // Batalin listing sendiri yang masih aktif.
+    @POST("rest/v1/rpc/cancel_trade_listing")
+    suspend fun cancelTradeListing(
+        @Body body: TradeListingIdRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): CancelTradeListingResult
+
+    // Beli 1 listing - potong DM buyer, kredit DM seller (dipotong fee 10%),
+    // pindahin kepemilikan kartu. SEMUA logic atomic di server lewat function
+    // buy_trade_listing, gak bisa dicurangin dari client.
+    @POST("rest/v1/rpc/buy_trade_listing")
+    suspend fun buyTradeListing(
+        @Body body: TradeListingIdRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): BuyTradeListingResult
+
+    // Browse pasar - semua listing aktif dari SEMUA user, udah di-join sama
+    // data karakter + username seller lewat view trade_listings_market.
+    @GET("rest/v1/trade_listings_market")
+    suspend fun getTradeMarket(
+        @Query("select") select: String = "*",
+        @Query("rarity") rarityFilter: String? = null,
+        @Query("order") order: String = "created_at.desc",
+        @Query("limit") limit: Int = 100,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<TradeMarketListing>
+
+    // Listing milik user sendiri (aktif + history sold/cancelled) - RLS di
+    // trade_listings udah mastiin cuma baris "status=active" ATAU
+    // "seller_id=auth.uid()" yang keliatan, jadi query ini otomatis kefilter.
+    @GET("rest/v1/trade_listings")
+    suspend fun getMyTradeListings(
+        @Query("seller_id") sellerIdQuery: String,
+        @Query("select") select: String = "id,character_mal_id,price_dm,status,created_at,sold_at,characters(mal_id,name,image_url,anime_title,rarity)",
+        @Query("order") order: String = "created_at.desc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<MyTradeListing>
+
 
     @GET("rest/v1/chat_messages")
     suspend fun getChatMessages(
