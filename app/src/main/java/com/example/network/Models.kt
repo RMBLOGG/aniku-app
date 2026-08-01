@@ -1918,6 +1918,22 @@ data class AnimeinwebSearchResponse(
     val results: List<AnimeinwebItem>? = null
 )
 
+// Bentuk item /api/genres belum dikonfirmasi persis dari upstream, jadi semua
+// field dibikin nullable + beberapa alias nama biar toleran macam-macam shape JSON.
+@JsonClass(generateAdapter = true)
+data class AnimeinwebGenreItem(
+    val id: String? = null,
+    val name: String? = null,
+    val title: String? = null,
+    val slug: String? = null,
+    val value: String? = null
+) {
+    fun toGenreRaw() = GenreRaw(
+        name = (name ?: title ?: slug ?: value ?: "").trim(),
+        slug = (slug ?: value ?: id ?: name ?: "").trim()
+    )
+}
+
 @JsonClass(generateAdapter = true)
 data class AnimeinwebEpisodeItem(
     val id: String,

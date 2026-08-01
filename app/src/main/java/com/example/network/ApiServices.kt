@@ -229,6 +229,8 @@ interface AnimeinwebApi {
     suspend fun search(
         @Query("q") keyword: String = "",
         @Query("page") page: Int? = null,
+        @Query("sort") sort: String? = null,
+        @Query("genre_in") genreIn: String? = null,
         @Query("status") status: String? = null,
         @Query("type") type: String? = null
     ): AnimeinwebSearchResponse
@@ -241,6 +243,12 @@ interface AnimeinwebApi {
 
     @GET("episode/{episodeId}/stream")
     suspend fun getEpisodeStream(@Path("episodeId") episodeId: String): AnimeinwebStreamResponse
+
+    @GET("schedule")
+    suspend fun getSchedule(@Query("day") day: String): List<AnimeinwebItem>
+
+    @GET("genres")
+    suspend fun getGenres(): List<AnimeinwebGenreItem>
 }
 
 interface SupabaseFunctionsApi {

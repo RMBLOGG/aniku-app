@@ -12,6 +12,8 @@ import com.example.util.nullIfBlank
 import com.example.ui.theme.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -1256,12 +1258,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     } else if (dataSource.value == "Dayynime-v5") {
                         launch {
                             try {
+                                // Satu call /api/homepage udah ngasih semua section
+                                // (hot/new/today/popular) sekaligus — gak perlu call ganda.
                                 val homeRes = retryIO { animeinwebApi.getHome() }
                                 _homeRecent.value = (homeRes.new ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                                 _homeOngoing.value = (homeRes.hot ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                                 _homePopular.value = (homeRes.popular ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homeTodaySchedule.value = (homeRes.today ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                             } catch (he: Exception) { Log.e("AnikuVM", "Failed animeinweb home", he) }
                         }
@@ -1278,12 +1284,6 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _homeCompleted.value = (completedRes.results ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                             } catch (ce: Exception) { Log.e("AnikuVM", "Failed animeinweb home completed", ce) }
-                        }
-                        launch {
-                            // Animeinweb belum ada endpoint jadwal harian yang reliable dari
-                            // sisi wrapper kita — dikosongin sementara (mirip Donghua yang
-                            // ngosongin kategori Movie).
-                            _homeTodaySchedule.value = emptyList()
                         }
                     } else {
                         launch {
@@ -1457,12 +1457,15 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                 Pair(items, false)
             } else if (dataSource.value == "Dayynime-v5") {
-                val res = animeinwebApi.search(keyword = query, page = page)
+                // animeinweb /api/search 0-indexed (default page=0), sedangkan page
+                // pencarian kita mulai dari 1 — jadi dikurangi 1 di sini.
+                val apiPage = (page - 1).coerceAtLeast(0)
+                val res = animeinwebApi.search(keyword = query, page = apiPage)
                 val items = (res.results ?: emptyList())
                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                // Upstream animeinweb belum konfirmasi field pagination yang jelas,
-                // jadi dianggap page tunggal (aman, hanya "Muat lagi" gak akan muncul).
-                Pair(items, false)
+                // Belum ada field pagination eksplisit dari upstream — anggap masih ada
+                // halaman berikutnya selama page sekarang masih ngembaliin item.
+                Pair(items, items.isNotEmpty())
             } else {
                 val res = animeApi.search(query, page = page)
                 val items = (res.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
@@ -1485,6 +1488,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 } else if (dataSource.value == "Dayynime-v4") {
                     val res = retryIO { donghuaApi.getGenres() }
                     _genres.value = (res.data ?: emptyList()).map { it.toGenreRaw() }
+                        .sortedBy { it.name }
+                } else if (dataSource.value == "Dayynime-v5") {
+                    val res = retryIO { animeinwebApi.getGenres() }
+                    _genres.value = res.map { it.toGenreRaw() }
+                        .filter { it.name.isNotBlank() && it.slug.isNotBlank() }
                         .sortedBy { it.name }
                 } else {
                     val list = retryIO { animeApi.getGenres() }
@@ -1591,6 +1599,25 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 }
                             }
                         }
+                    } else if (dataSource.value == "Dayynime-v5") {
+                        // animeinweb /api/search is 0-indexed (default page=0), sedangkan
+                        // _explorePage kita mulai dari 1 — jadi dikurangi 1 di sini.
+                        val apiPage = (page - 1).coerceAtLeast(0)
+                        val iRes = if (_selectedGenreSlug.value != null) {
+                            animeinwebApi.search(page = apiPage, genreIn = _selectedGenreSlug.value)
+                        } else {
+                            when (_exploreTab.value) {
+                                "Ongoing" -> animeinwebApi.search(page = apiPage, status = "ONGOING")
+                                "Completed" -> animeinwebApi.search(page = apiPage, status = "FINISHED")
+                                "Movie" -> animeinwebApi.search(page = apiPage, type = "MOVIE")
+                                "Latest" -> animeinwebApi.search(page = apiPage, sort = "latest")
+                                else -> animeinwebApi.search(page = apiPage, status = "ONGOING")
+                            }
+                        }
+                        val items = (iRes.results ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                        // Belum ada field pagination eksplisit dari upstream — anggap masih
+                        // ada halaman berikutnya selama page sekarang masih ngembaliin item.
+                        Pair(items, items.isNotEmpty())
                     } else {
                         val aRes = if (_selectedGenreSlug.value != null) {
                             animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
@@ -1690,6 +1717,24 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         map[key] = (day.donghua_list ?: emptyList())
                             .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                     }
+                    _scheduleMap.value = map
+                } else if (dataSource.value == "Dayynime-v5") {
+                    // /api/schedule animeinweb cuma nerima 1 hari per call, jadi ditarik
+                    // paralel buat ketujuh harinya sekaligus.
+                    val days = listOf("Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu")
+                    val map = mutableMapOf<String, List<AnimeRaw>>()
+                    days.map { day ->
+                        async {
+                            val list: List<AnimeRaw> = try {
+                                retryIO { animeinwebApi.getSchedule(day = day.uppercase()) }
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (de: Exception) {
+                                Log.e("AnikuVM", "Failed animeinweb schedule for $day", de)
+                                emptyList()
+                            }
+                            day to list
+                        }
+                    }.awaitAll().forEach { (day, list) -> map[day] = list }
                     _scheduleMap.value = map
                 } else {
                     val res = retryIO { animeApi.getSchedule() }
