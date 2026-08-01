@@ -38,6 +38,22 @@ import com.example.network.UserCharacterEntry
 
 private enum class TradeTab { PASAR, JUAL_LISTING_SAYA }
 
+// Palet warna sendiri (nilai sama kayak "Neon" di GachaScreen.kt) - gak bisa
+// reuse langsung soalnya Neon di GachaScreen.kt dideklarasiin "private object",
+// jadi cuma keliatan di file itu sendiri walau satu package.
+private object TradeNeon {
+    val Cyan = Color(0xFF3DF4FF)
+    val Magenta = Color(0xFFFF3DA6)
+    val Purple = Color(0xFF9D4EFF)
+    val Gold = Color(0xFFFFD23F)
+    val Void = Color(0xFF05050B)
+    val Deep1 = Color(0xFF0A0A16)
+    val Deep2 = Color(0xFF130E24)
+    val CardBase = Color(0xFF14141F)
+    val Glass = Color(0x1AFFFFFF)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TradeScreen(
     viewModel: AnikuViewModel,
@@ -61,7 +77,7 @@ fun TradeScreen(
     }
 
     Scaffold(
-        containerColor = Neon.Void,
+        containerColor = TradeNeon.Void,
         topBar = {
             Column {
                 Row(
@@ -81,13 +97,13 @@ fun TradeScreen(
                         modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = { sellSheetOpen = true }) {
-                        Icon(Icons.Default.Sell, contentDescription = "Jual kartu", tint = Neon.Cyan)
+                        Icon(Icons.Default.Sell, contentDescription = "Jual kartu", tint = TradeNeon.Cyan)
                     }
                 }
                 TabRow(
                     selectedTabIndex = tab.ordinal,
                     containerColor = Color.Transparent,
-                    contentColor = Neon.Cyan
+                    contentColor = TradeNeon.Cyan
                 ) {
                     Tab(
                         selected = tab == TradeTab.PASAR,
@@ -190,7 +206,7 @@ private fun MarketCard(listing: TradeMarketListing, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(Neon.CardBase)
+            .background(TradeNeon.CardBase)
             .border(1.dp, rColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .padding(bottom = 10.dp)
@@ -225,9 +241,9 @@ private fun MarketCard(listing: TradeMarketListing, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Diamond, contentDescription = null, tint = Neon.Cyan, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Diamond, contentDescription = null, tint = TradeNeon.Cyan, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("${listing.price_dm} DM", color = Neon.Cyan, fontWeight = FontWeight.Bold)
+                Text("${listing.price_dm} DM", color = TradeNeon.Cyan, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -255,7 +271,7 @@ private fun MyListingsList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Neon.CardBase)
+                    .background(TradeNeon.CardBase)
                     .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -288,6 +304,7 @@ private fun statusLabel(status: String) = when (status) {
     else -> status
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SellCardSheet(
     collection: List<UserCharacterEntry>,
@@ -299,10 +316,10 @@ private fun SellCardSheet(
     var selected by remember { mutableStateOf<UserCharacterEntry?>(null) }
     var priceInput by remember { mutableStateOf("") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Neon.Deep1) {
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = TradeNeon.Deep1) {
         Column(Modifier.padding(16.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Storefront, contentDescription = null, tint = Neon.Cyan)
+                Icon(Icons.Default.Storefront, contentDescription = null, tint = TradeNeon.Cyan)
                 Spacer(Modifier.width(8.dp))
                 Text("Jual Kartu", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Spacer(Modifier.weight(1f))
@@ -325,7 +342,7 @@ private fun SellCardSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Neon.CardBase)
+                                .background(TradeNeon.CardBase)
                                 .then(
                                     if (alreadyListed) Modifier else Modifier.clickable { selected = entry }
                                 )
@@ -341,7 +358,7 @@ private fun SellCardSheet(
                                         .clip(RoundedCornerShape(8.dp))
                                 )
                                 if (alreadyListed) {
-                                    Text("Lagi dijual", color = Neon.Cyan, maxLines = 1)
+                                    Text("Lagi dijual", color = TradeNeon.Cyan, maxLines = 1)
                                 } else {
                                     Text("x${entry.count}", color = Color.White.copy(alpha = 0.7f))
                                 }
@@ -389,7 +406,7 @@ private fun SellCardSheet(
                         },
                         enabled = !busy && (priceInput.toIntOrNull() ?: 0) >= 10,
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Neon.Cyan)
+                        colors = ButtonDefaults.buttonColors(containerColor = TradeNeon.Cyan)
                     ) {
                         Text(if (busy) "Memproses..." else "Pasang Jual", color = Color.Black)
                     }
@@ -413,7 +430,7 @@ private fun BuyConfirmDialog(
         text = { Text("Kamu akan membayar ${listing.price_dm} DM ke ${listing.seller_username ?: "seller"}. Aksi ini gak bisa dibatalin.") },
         confirmButton = {
             TextButton(onClick = onConfirm, enabled = !busy) {
-                Text(if (busy) "Memproses..." else "Beli", color = Neon.Cyan)
+                Text(if (busy) "Memproses..." else "Beli", color = TradeNeon.Cyan)
             }
         },
         dismissButton = {
