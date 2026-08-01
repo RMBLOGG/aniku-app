@@ -1908,7 +1908,8 @@ data class AnimeinwebHomeResponse(
     val today: List<AnimeinwebItem>? = null,
     val popular: List<AnimeinwebItem>? = null,
     val trailer: List<AnimeinwebItem>? = null,
-    val random: List<AnimeinwebItem>? = null
+    val random: List<AnimeinwebItem>? = null,
+    val waiting: List<AnimeinwebItem>? = null
 )
 
 @JsonClass(generateAdapter = true)

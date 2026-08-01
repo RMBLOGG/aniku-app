@@ -1409,6 +1409,7 @@ fun HomeScreen(
     val moviesList by viewModel.homeMovies.collectAsState()
     val completedList by viewModel.homeCompleted.collectAsState()
     val todayScheduleList by viewModel.homeTodaySchedule.collectAsState()
+    val waitingList by viewModel.homeWaiting.collectAsState()
     val cardStyle by viewModel.cardStyle.collectAsState()
     val slidesList by viewModel.featuredSlides.collectAsState()
     val activeAnnouncement by viewModel.activeAnnouncement.collectAsState()
@@ -3094,6 +3095,74 @@ fun HomeScreen(
                                 val genreText = anim.genres?.take(2)?.joinToString(" · ")
                                 if (!genreText.isNullOrBlank()) {
                                     Text(genreText, color = Color.White.copy(0.5f), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Section 4b: Paling Ditunggu — cuma kepake source Dayynime-v5, otomatis
+            // gak nongol di source lain karena waitingList bakal kosong.
+            if (waitingList.isNotEmpty()) {
+                item { SectionHeader(title = "Paling Ditunggu", onSeeAllClick = { onSeeAllClicked("Waiting") }) }
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        itemsIndexed(waitingList, key = { idx, it -> "waiting_${it.slug}_${idx}" }) { _, anim ->
+                            Box(
+                                modifier = Modifier
+                                    .width(200.dp)
+                                    .aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF161616))
+                                    .clickable { onNavigateToDetail(anim.slug) }
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(anim.poster).crossfade(300).build(),
+                                    contentDescription = anim.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(modifier = Modifier.fillMaxSize().background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color.Transparent, Color.Black.copy(0.85f)),
+                                        startY = 80f
+                                    )
+                                ))
+                                // NANTI badge — beda warna dari MOVIE biar gampang dibedain
+                                Box(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF8B5CF6))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        .align(Alignment.TopStart)
+                                ) {
+                                    Text("NANTI", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                                }
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(8.dp)
+                                ) {
+                                    Text(
+                                        text = anim.title,
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        lineHeight = 14.sp
+                                    )
+                                    val genreText = anim.genres?.take(2)?.joinToString(" · ")
+                                    if (!genreText.isNullOrBlank()) {
+                                        Text(genreText, color = Color.White.copy(0.5f), fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
                                 }
                             }
                         }

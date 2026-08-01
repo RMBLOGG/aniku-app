@@ -525,6 +525,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _homeTodaySchedule = MutableStateFlow<List<AnimeRaw>>(emptyList())
     val homeTodaySchedule: StateFlow<List<AnimeRaw>> = _homeTodaySchedule.asStateFlow()
 
+    // "Paling Ditunggu" — cuma keisi buat Dayynime-v5 (animeinweb punya field "waiting"
+    // di /api/homepage). Source lain otomatis tetep emptyList().
+    private val _homeWaiting = MutableStateFlow<List<AnimeRaw>>(emptyList())
+    val homeWaiting: StateFlow<List<AnimeRaw>> = _homeWaiting.asStateFlow()
+
     private val _featuredSlides = MutableStateFlow<List<FeaturedAnimeDto>>(emptyList())
     val featuredSlides: StateFlow<List<FeaturedAnimeDto>> = _featuredSlides.asStateFlow()
 
@@ -1086,6 +1091,9 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 }
                 val blacklist = blacklistedResponse.map { it.anime_slug }.toSet()
                 _blacklistedSlugs.value = blacklist
+                // Cuma Dayynime-v5 yang punya section ini — di-reset dulu biar kalau
+                // pindah source lain, section-nya otomatis ilang (bukan nyisa data lama).
+                _homeWaiting.value = emptyList()
 
                 // 2. Semua section lain di-fetch PARALEL (bukan satu-satu berurutan).
                 // Dulu: total waktu = jumlah semua request. Sekarang: total waktu = request TERLAMA aja.
@@ -1268,6 +1276,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _homePopular.value = (homeRes.popular ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                                 _homeTodaySchedule.value = (homeRes.today ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homeWaiting.value = (homeRes.waiting ?: emptyList())
                                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
                             } catch (he: Exception) { Log.e("AnikuVM", "Failed animeinweb home", he) }
                         }
@@ -1609,6 +1619,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             when (_exploreTab.value) {
                                 "Ongoing" -> animeinwebApi.search(page = apiPage, status = "ONGOING")
                                 "Completed" -> animeinwebApi.search(page = apiPage, status = "FINISHED")
+                                "Waiting" -> animeinwebApi.search(page = apiPage, status = "WAITING")
                                 "Movie" -> animeinwebApi.search(page = apiPage, type = "MOVIE")
                                 "Latest" -> animeinwebApi.search(page = apiPage, sort = "latest")
                                 else -> animeinwebApi.search(page = apiPage, status = "ONGOING")
