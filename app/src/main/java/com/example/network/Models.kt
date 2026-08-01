@@ -1547,7 +1547,11 @@ data class Donation(
     val message: String? = null,
     val total_amount: Int? = 0,
     val created_at: String,
-    val is_announced: Boolean? = false
+    val is_announced: Boolean? = false,
+    // Ditambahin lewat migrasi: kalau udah ke-attach permanen ke akun asli
+    // (via user_id, bukan cocokin nama teks lagi), matching gak akan lepas
+    // lagi walau supporter itu ganti username.
+    val user_id: String? = null
 )
 
 // Watch live chat models

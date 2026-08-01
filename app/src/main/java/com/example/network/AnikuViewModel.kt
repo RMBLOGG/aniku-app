@@ -46,17 +46,29 @@ fun buildCombinedSupporterLeaderboard(
     val entries = mutableMapOf<String, SupporterLeaderboardEntry>()
 
     donationsList
-        .groupBy { it.supporter_name }
-        .forEach { (name, list) ->
+        .groupBy { donation ->
+            // Kalau udah ke-attach permanen lewat migrasi (user_id keisi),
+            // group pakai itu -- jangan cocokin nama teks lagi biar gak
+            // lepas kalau orangnya ganti username. Baru fallback ke
+            // supporter_name buat donasi lama yang belum di-reconcile.
+            donation.user_id ?: "name:${donation.supporter_name.trim().lowercase()}"
+        }
+        .forEach { (groupKey, list) ->
             val amount = list.sumOf { it.total_amount ?: 0 }
-            val matched = directory.firstOrNull {
-                it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
+            val donationUserId = list.firstOrNull()?.user_id
+            val matched = if (donationUserId != null) {
+                directory.firstOrNull { it.id == donationUserId }
+            } else {
+                val name = list.firstOrNull()?.supporter_name
+                directory.firstOrNull {
+                    it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
+                }
             }
-            val key = matched?.id ?: "name:${name?.trim()?.lowercase() ?: "anonim"}"
+            val key = donationUserId ?: matched?.id ?: groupKey
             val existing = entries[key]
             entries[key] = SupporterLeaderboardEntry(
                 key = key,
-                displayName = matched?.username ?: name ?: "Anonim",
+                displayName = matched?.username ?: list.firstOrNull()?.supporter_name ?: "Anonim",
                 amount = (existing?.amount ?: 0) + amount,
                 matchedProfile = matched ?: existing?.matchedProfile
             )
