@@ -1916,7 +1916,8 @@ data class AnimeinwebHomeResponse(
 data class AnimeinwebSearchResponse(
     val query: String? = null,
     val page: String? = null,
-    val results: List<AnimeinwebItem>? = null
+    val results: List<AnimeinwebItem>? = null,
+    val next_page: Int? = null
 )
 
 // Bentuk item /api/genres belum dikonfirmasi persis dari upstream, jadi semua

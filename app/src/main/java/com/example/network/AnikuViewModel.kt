@@ -600,6 +600,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     private val _explorePage = MutableStateFlow(1)
     private val _exploreHasNext = MutableStateFlow(true)
+    // Dayynime-v5 gak pake counter +1 biasa buat "next page" — backend bisa
+    // ngelompatin beberapa halaman upstream sekaligus dalam 1 response (biar
+    // filter status/type gak gampang mentok kayak sebelumnya), jadi app harus
+    // ngikutin cursor "next_page" yang dibalikin server, bukan ngitung sendiri.
+    private val _explorePageV5Raw = MutableStateFlow(0)
     val exploreHasNext: StateFlow<Boolean> = _exploreHasNext.asStateFlow()
 
     // Schedule state
@@ -1468,14 +1473,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 Pair(items, false)
             } else if (dataSource.value == "Dayynime-v5") {
                 // animeinweb /api/search 0-indexed (default page=0), sedangkan page
-                // pencarian kita mulai dari 1 — jadi dikurangi 1 di sini.
+                // pencarian kita mulai dari 1 — jadi dikurangi 1 di sini. Search kata
+                // kunci biasa (tanpa filter status/type) gak kena multi-page aggregation
+                // di server, jadi progresi +1 sederhana ini masih valid.
                 val apiPage = (page - 1).coerceAtLeast(0)
                 val res = animeinwebApi.search(keyword = query, page = apiPage)
                 val items = (res.results ?: emptyList())
                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                // Belum ada field pagination eksplisit dari upstream — anggap masih ada
-                // halaman berikutnya selama page sekarang masih ngembaliin item.
-                Pair(items, items.isNotEmpty())
+                Pair(items, res.next_page != null)
             } else {
                 val res = animeApi.search(query, page = page)
                 val items = (res.animes ?: emptyList()).filterNot { blacklist.contains(it.slug) }
@@ -1529,6 +1534,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
 
     private fun resetAndLoadExplore() {
         _explorePage.value = 1
+        _explorePageV5Raw.value = 0
         _exploreHasNext.value = true
         _exploreAnimes.value = emptyList()
         loadExplorePage()
@@ -1610,9 +1616,11 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             }
                         }
                     } else if (dataSource.value == "Dayynime-v5") {
-                        // animeinweb /api/search is 0-indexed (default page=0), sedangkan
-                        // _explorePage kita mulai dari 1 — jadi dikurangi 1 di sini.
-                        val apiPage = (page - 1).coerceAtLeast(0)
+                        // Server sekarang bisa nyisir beberapa halaman upstream sekaligus
+                        // dalam 1 response (biar filter status/type gak gampang mentok),
+                        // jadi page yang dikirim harus ngikutin cursor next_page dari
+                        // response sebelumnya, bukan ngitung +1 sendiri di app.
+                        val apiPage = _explorePageV5Raw.value
                         val iRes = if (_selectedGenreSlug.value != null) {
                             animeinwebApi.search(page = apiPage, genreIn = _selectedGenreSlug.value)
                         } else {
@@ -1626,9 +1634,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             }
                         }
                         val items = (iRes.results ?: emptyList()).map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
-                        // Belum ada field pagination eksplisit dari upstream — anggap masih
-                        // ada halaman berikutnya selama page sekarang masih ngembaliin item.
-                        Pair(items, items.isNotEmpty())
+                        _explorePageV5Raw.value = iRes.next_page ?: (apiPage + 1)
+                        Pair(items, iRes.next_page != null)
                     } else {
                         val aRes = if (_selectedGenreSlug.value != null) {
                             animeApi.getAnimeByGenre(slug = _selectedGenreSlug.value!!, page = page)
