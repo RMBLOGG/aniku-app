@@ -2231,6 +2231,67 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Restore/sinkron bookmark dari Supabase -- dipanggil pas BookmarkScreen dibuka.
+    // Kenapa perlu: tampilan bookmark selama ini cuma baca cache lokal di HP, jadi kalau
+    // cache-nya kehapus/kereset (clear data, ganti HP, reinstall), keliatan kosong walau
+    // datanya beneran masih aman ketulis di tabel user_bookmarks. Fungsi ini narik data
+    // server buat ngisi ulang cache lokal, DAN dorong balik entry lokal yang kebetulan
+    // belum kesimpen di server (misal ditambah pas lagi offline) -- biar dua arah nyambung.
+    fun syncBookmarksFromSupabase() {
+        val userId = session.value.userId ?: return
+        viewModelScope.launch {
+            try {
+                val remote = NetworkClient.supabaseDbApi.getUserBookmarks(
+                    userIdQuery = "eq.$userId",
+                    limit = 2000,
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+
+                val localSlugs = bookmarkManager.getBookmarks().map { it.slug }.toSet()
+                remote.forEach { dto ->
+                    if (dto.anime_slug !in localSlugs) {
+                        bookmarkManager.addBookmark(
+                            BookmarkedAnime(
+                                slug = dto.anime_slug,
+                                title = dto.title,
+                                poster = dto.poster ?: "",
+                                type = dto.type,
+                                episode = dto.episode
+                            )
+                        )
+                    }
+                }
+
+                val remoteSlugs = remote.map { it.anime_slug }.toSet()
+                bookmarkManager.getBookmarks()
+                    .filter { it.slug !in remoteSlugs }
+                    .forEach { local ->
+                        try {
+                            NetworkClient.supabaseDbApi.upsertUserBookmark(
+                                data = UserBookmarkRequest(
+                                    user_id = userId,
+                                    anime_slug = local.slug,
+                                    title = local.title,
+                                    poster = local.poster,
+                                    type = local.type,
+                                    episode = local.episode
+                                ),
+                                authHeader = getAuthHeader(),
+                                apiKey = SUPABASE_ANON_KEY
+                            )
+                        } catch (e: Exception) {
+                            Log.e("AnikuVM", "Gagal push bookmark lokal ke Supabase: ${e.message}")
+                        }
+                    }
+
+                refreshBookmarks()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal sinkron bookmark dari Supabase: ${e.message}")
+            }
+        }
+    }
+
     // Auth Actions: Login / Register / Get Profile
     suspend fun refreshSession() {
         val currentSession = session.value

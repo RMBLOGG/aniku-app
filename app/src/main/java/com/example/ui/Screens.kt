@@ -4064,6 +4064,7 @@ fun BookmarkScreen(
 
     LaunchedEffect(Unit) {
         viewModel.refreshBookmarks()
+        viewModel.syncBookmarksFromSupabase()
     }
 
     Column(
