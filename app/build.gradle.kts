@@ -90,6 +90,9 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
+  // Buat generate bitmap QR code dari string QRIS yang dibalikin Sakurupiah
+  // (mereka cuma ngasih raw string, bukan gambar).
+  implementation("com.google.zxing:core:3.5.3")
   // implementation(libs.androidx.camera.camera2)
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)

@@ -1798,7 +1798,8 @@ data class SakurupiahInvoiceResponse(
 // nominal rupiah, server yang hitung diamond_amount (rasio Rp4 = 1 DM).
 @JsonClass(generateAdapter = true)
 data class SakurupiahDiamondInvoiceRequest(
-    val amount: Int
+    val amount: Int,
+    val method: String = "QRIS"
 )
 
 @JsonClass(generateAdapter = true)
@@ -1808,6 +1809,18 @@ data class SakurupiahDiamondInvoiceResponse(
     val trx_id: String? = null,
     val merchant_ref: String? = null,
     val diamond_amount: Int? = null,
+    val method: String? = null,
+    val payment_no: Long? = null,
     val error: String? = null
+)
+
+// Dipakai buat polling status pembayaran diamond_topups selagi bottom sheet
+// invoice kebuka, biar bisa munculin popup begitu status berubah jadi
+// "credited" (berhasil) atau "invalid" (gagal/expired).
+@JsonClass(generateAdapter = true)
+data class DiamondTopupStatusDto(
+    val status: String? = null,
+    val payment_status: String? = null,
+    val diamond_amount: Int? = null
 )
 

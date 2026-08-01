@@ -3675,13 +3675,14 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // (rasio Rp4 = 1 DM) dan bikin baris di tabel diamond_topups.
     fun createSakurupiahDiamondInvoice(
         amount: Int,
+        method: String = "QRIS",
         onResult: (SakurupiahDiamondInvoiceResponse?, String?) -> Unit
     ) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val result = NetworkClient.supabaseDbApi.sakurupiahCreateDiamondInvoice(
-                    body = SakurupiahDiamondInvoiceRequest(amount = amount),
+                    body = SakurupiahDiamondInvoiceRequest(amount = amount, method = method),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
@@ -3700,6 +3701,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
             } catch (e: Exception) {
                 Log.e("AnikuVM", "createSakurupiahDiamondInvoice error", e)
                 onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Cek status top-up diamond sekali (dipanggil berulang dari UI selagi
+    // bottom sheet invoice kebuka, buat munculin popup begitu status
+    // berubah jadi "credited" atau "invalid").
+    fun getDiamondTopupStatus(
+        merchantRef: String,
+        onResult: (DiamondTopupStatusDto?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getDiamondTopupByRef(
+                    refQuery = "eq.$merchantRef",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull())
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "getDiamondTopupStatus error", e)
+                onResult(null)
             }
         }
     }

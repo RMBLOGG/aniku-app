@@ -805,6 +805,16 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): SakurupiahDiamondInvoiceResponse
+
+    // Cek status top-up diamond tertentu (buat polling "udah dibayar belum"
+    // selagi bottom sheet invoice kebuka).
+    @GET("rest/v1/diamond_topups")
+    suspend fun getDiamondTopupByRef(
+        @Query("payment_ref") refQuery: String,
+        @Query("select") select: String = "status,payment_status,diamond_amount",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<DiamondTopupStatusDto>
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
     // (bukan cuma "retry sampai berhasil 1x" kayak mekanisme lama).

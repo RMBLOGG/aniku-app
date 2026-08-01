@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import com.example.network.DiamondTopupStatusDto
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,12 +28,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import com.example.network.AnikuViewModel
 import com.example.network.SakurupiahDiamondInvoiceResponse
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,6 +55,8 @@ fun DiamondTopUpScreen(
     var invoiceError by remember { mutableStateOf<String?>(null) }
     var invoiceResult by remember { mutableStateOf<SakurupiahDiamondInvoiceResponse?>(null) }
     var showInvoiceSheet by remember { mutableStateOf(false) }
+    var selectedChannel by remember { mutableStateOf(PAYMENT_CHANNELS.first()) }
+    var channelMenuExpanded by remember { mutableStateOf(false) }
 
     val amountValue = amountInput.toIntOrNull() ?: 0
     val estimatedDiamond = amountValue / 4
@@ -110,6 +123,48 @@ fun DiamondTopUpScreen(
             }
 
             Spacer(modifier = Modifier.height(22.dp))
+            Text("Metode Pembayaran", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            ExposedDropdownMenuBox(
+                expanded = channelMenuExpanded,
+                onExpandedChange = { channelMenuExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = selectedChannel.label,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = channelMenuExpanded) },
+                    shape = RoundedCornerShape(14.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = channelMenuExpanded,
+                    onDismissRequest = { channelMenuExpanded = false }
+                ) {
+                    PAYMENT_CHANNELS.forEach { channel ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(channel.label, fontSize = 14.sp)
+                                    Text(
+                                        "Min Rp${channel.min.toLocaleIdString()} - Max Rp${channel.max.toLocaleIdString()}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                selectedChannel = channel
+                                channelMenuExpanded = false
+                                invoiceError = null
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
             Text("Masukin Nominal", fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -124,6 +179,12 @@ fun DiamondTopUpScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 shape = RoundedCornerShape(14.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Min Rp${selectedChannel.min.toLocaleIdString()} - Max Rp${selectedChannel.max.toLocaleIdString()} buat ${selectedChannel.label}",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -171,12 +232,12 @@ fun DiamondTopUpScreen(
             Button(
                 onClick = {
                     invoiceError = null
-                    if (amountValue < 5000) {
-                        invoiceError = "Nominal minimal Rp5.000"
+                    if (amountValue < selectedChannel.min || amountValue > selectedChannel.max) {
+                        invoiceError = "Nominal buat ${selectedChannel.label} harus antara Rp${selectedChannel.min.toLocaleIdString()} - Rp${selectedChannel.max.toLocaleIdString()}"
                         return@Button
                     }
                     isCreatingInvoice = true
-                    viewModel.createSakurupiahDiamondInvoice(amountValue) { result, error ->
+                    viewModel.createSakurupiahDiamondInvoice(amountValue, selectedChannel.code) { result, error ->
                         isCreatingInvoice = false
                         if (result != null) {
                             invoiceResult = result
@@ -186,7 +247,7 @@ fun DiamondTopUpScreen(
                         }
                     }
                 },
-                enabled = amountValue >= 5000 && !isCreatingInvoice,
+                enabled = amountValue in selectedChannel.min..selectedChannel.max && !isCreatingInvoice,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B2FBF))
@@ -196,7 +257,7 @@ fun DiamondTopUpScreen(
                 } else {
                     Icon(Icons.Default.QrCode, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Bayar dengan QRIS", fontWeight = FontWeight.Bold)
+                    Text("Bayar dengan ${selectedChannel.label}", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -213,6 +274,7 @@ fun DiamondTopUpScreen(
     if (showInvoiceSheet && invoiceResult != null) {
         DiamondInvoiceSheet(
             invoice = invoiceResult!!,
+            viewModel = viewModel,
             onDismiss = {
                 showInvoiceSheet = false
                 invoiceResult = null
@@ -226,20 +288,108 @@ fun DiamondTopUpScreen(
 @Composable
 private fun DiamondInvoiceSheet(
     invoice: SakurupiahDiamondInvoiceResponse,
+    viewModel: AnikuViewModel,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val qrString = invoice.qr
+
+    var latestStatus by remember(invoice.merchant_ref) { mutableStateOf<DiamondTopupStatusDto?>(null) }
+    var keepPolling by remember(invoice.merchant_ref) { mutableStateOf(true) }
+
+    // Polling tiap 4 detik selagi sheet ini kebuka, biar begitu callback
+    // Sakurupiah keproses di server, popup berhasil/gagal langsung muncul
+    // otomatis tanpa user harus refresh manual.
+    LaunchedEffect(invoice.merchant_ref) {
+        val ref = invoice.merchant_ref
+        if (ref.isNullOrBlank()) return@LaunchedEffect
+        while (keepPolling) {
+            delay(4000)
+            viewModel.getDiamondTopupStatus(ref) { result ->
+                latestStatus = result
+                if (result?.status == "credited" || result?.status == "invalid") {
+                    keepPolling = false
+                }
+            }
+        }
+    }
+
+    val qrBitmap: ImageBitmap? = remember(qrString) {
+        if (qrString.isNullOrBlank()) return@remember null
+        try {
+            generateQrBitmap(qrString, 512).asImageBitmap()
+        } catch (e: Exception) {
+            Log.e("DiamondTopUpScreen", "Failed to generate QR bitmap", e)
+            null
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text("Invoice Top-up Diamond Dibuat!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Selesaikan pembayaran QRIS buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi.",
+                when {
+                    qrBitmap != null -> "Scan QRIS di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                    invoice.payment_no != null -> "Transfer ke nomor Virtual Account di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                    else -> "Selesaikan pembayaran buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                },
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (qrBitmap != null) {
+                Box(
+                    modifier = Modifier
+                        .size(240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = qrBitmap,
+                        contentDescription = "QRIS Top-up Diamond",
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            } else if (invoice.payment_no != null) {
+                val clipboardManager = LocalClipboardManager.current
+                val vaNumberText = invoice.payment_no.toString()
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF2FA8BF).copy(alpha = 0.1f))
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            invoice.method ?: "Virtual Account",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Text(vaNumberText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    IconButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(vaNumberText))
+                    }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Salin nomor")
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             Button(
                 onClick = {
                     val url = invoice.checkout_url
@@ -253,7 +403,7 @@ private fun DiamondInvoiceSheet(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Bayar Sekarang")
+                Text(if (qrBitmap != null || invoice.payment_no != null) "Buka Halaman Pembayaran" else "Bayar Sekarang")
             }
             Spacer(modifier = Modifier.height(12.dp))
             Button(
@@ -264,6 +414,32 @@ private fun DiamondInvoiceSheet(
                 Text("Tutup", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
             }
         }
+    }
+
+    if (latestStatus?.status == "credited") {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            icon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2FBF6D)) },
+            title = { Text("Top-up Berhasil!") },
+            text = {
+                Text("Saldo ${latestStatus?.diamond_amount ?: invoice.diamond_amount ?: 0} DM udah masuk ke akun kamu.")
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Oke") }
+            }
+        )
+    } else if (latestStatus?.status == "invalid") {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            icon = { Icon(Icons.Default.Cancel, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Pembayaran Gagal/Expired") },
+            text = {
+                Text("Invoice ini udah gak berlaku. Kalau kamu udah bayar tapi ini muncul, hubungi admin di Chat Room ya.")
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) { Text("Oke") }
+            }
+        )
     }
 }
 
@@ -337,5 +513,62 @@ private fun BenefitCard(icon: ImageVector, title: String, subtitle: String, modi
         Text(title, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Text(subtitle, fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
+}
+
+// Generate bitmap QR code dari raw string QRIS yang dibalikin Sakurupiah
+// (mereka ngasih string EMVCo QRIS mentah, bukan gambar - jadi kita yang
+// render sendiri di device biar gak perlu buka browser buat lihat QR-nya).
+private fun generateQrBitmap(content: String, size: Int): Bitmap {
+    val writer = QRCodeWriter()
+    val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+    for (x in 0 until size) {
+        for (y in 0 until size) {
+            bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) AndroidColor.BLACK else AndroidColor.WHITE)
+        }
+    }
+    return bitmap
+}
+
+data class PaymentChannelOption(
+    val code: String,
+    val label: String,
+    val min: Int,
+    val max: Int
+)
+
+// Daftar channel pembayaran aktif Sakurupiah, HARUS sinkron sama limit yang
+// divalidasi di edge function sakurupiah-create-diamond-invoice (server tetap
+// validasi ulang, ini cuma buat UX biar user gak input nominal yang bakal
+// ditolak server).
+val PAYMENT_CHANNELS = listOf(
+    PaymentChannelOption("QRIS", "QRIS", 500, 2_000_000),
+    PaymentChannelOption("QRISMU", "QRISMU", 500, 5_000_000),
+    PaymentChannelOption("QRIS2", "QRIS2", 100, 10_000_000),
+    PaymentChannelOption("QRISC", "QRISC", 200, 20_000_000),
+    PaymentChannelOption("ShopeePay", "ShopeePay", 1_000, 2_000_000),
+    PaymentChannelOption("DANA", "DANA E-Wallet", 1_000, 2_000_000),
+    PaymentChannelOption("GOPAY", "GoPay E-Wallet", 500, 5_000_000),
+    PaymentChannelOption("OVO", "OVO E-Wallet", 1_000, 2_000_000),
+    PaymentChannelOption("LinkAja", "LinkAja", 1_000, 2_000_000),
+    PaymentChannelOption("BCAVA", "BCA Virtual Account", 10_000, 15_000_000),
+    PaymentChannelOption("BNIVA", "BNI Virtual Account", 10_000, 20_000_000),
+    PaymentChannelOption("BRIVA", "BRI Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("MANDIRIVA", "Mandiri Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("PERMATAVA", "Permata Virtual Account", 10_000, 20_000_000),
+    PaymentChannelOption("CIMBVA", "CIMB Niaga Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("DANAMON", "Danamon Virtual Account", 10_000, 15_000_000),
+    PaymentChannelOption("OCBC", "OCBC Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("BSIVA", "BSI Virtual Account", 10_000, 20_000_000),
+    PaymentChannelOption("MUAMALAT", "Muamalat Virtual Account", 10_000, 15_000_000),
+    PaymentChannelOption("SINARMAS", "Sinarmas Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("BNCVA", "BNC Virtual Account", 10_000, 10_000_000),
+    PaymentChannelOption("BAGVA", "BAG Virtual Account", 10_000, 15_000_000),
+    PaymentChannelOption("ALFAMART", "Alfamart", 10_000, 5_000_000),
+    PaymentChannelOption("INDOMARET", "Indomaret", 10_000, 2_500_000)
+)
+
+private fun Int.toLocaleIdString(): String {
+    return "%,d".format(this).replace(",", ".")
 }
 
