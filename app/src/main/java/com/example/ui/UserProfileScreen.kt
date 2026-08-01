@@ -129,6 +129,7 @@ fun UserProfileScreen(
     LaunchedEffect(userId) {
         viewModel.loadPublicUserProfile(userId)
         viewModel.loadPublicUserActivity(userId)
+        viewModel.refreshProfile()
         hasMounted = true
     }
 

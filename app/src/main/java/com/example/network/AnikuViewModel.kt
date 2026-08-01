@@ -3127,6 +3127,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val diamondBalance: StateFlow<Int> = _diamondBalance.asStateFlow()
 
     // Refresh saldo Diamond dari profile sendiri (dipanggil setelah create/join/contribute clan)
+    // Sebelumnya fungsi ini cuma update diamond_balance. Bug-nya: status admin/moderator/
+    // beta/premium/banned di UserSession itu cuma keisi sekali pas LOGIN, dan gak pernah
+    // di-refresh lagi selama sesi berjalan. Jadi kalau user dikasih Premium (Gift Premium)
+    // pas app-nya udah lagi login, session lokal di HP-nya tetep nganggep "bukan premium"
+    // sampe dia logout-login ulang -- makanya tombol yang butuh premium (misal gift Diamond
+    // di profil orang lain, atau Sumber Data v5) gak muncul walau premium-nya beneran aktif
+    // di server. Sekarang refreshProfile() sekalian nyegerin seluruh status session ini.
     fun refreshProfile() {
         val uid = session.value.userId ?: return
         viewModelScope.launch {
@@ -3138,9 +3145,23 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         apiKey = SUPABASE_ANON_KEY
                     )
                 }
-                _diamondBalance.value = result.firstOrNull()?.diamond_balance ?: 0
+                val profile = result.firstOrNull()
+                _diamondBalance.value = profile?.diamond_balance ?: 0
+                if (profile != null) {
+                    val updatedSession = session.value.copy(
+                        isAdmin = profile.isAdmin(),
+                        isModerator = profile.isModerator(),
+                        isBeta = profile.isBeta(),
+                        isBanned = profile.is_banned ?: false,
+                        customNameColor = profile.custom_name_color,
+                        userNumber = profile.user_number,
+                        premiumUntil = profile.premium_until,
+                        supportPoints = profile.support_points
+                    )
+                    settingsStore.saveSession(updatedSession)
+                }
             } catch (e: Exception) {
-                Log.e("AnikuVM", "refreshProfile (diamond) error: ${e.message}")
+                Log.e("AnikuVM", "refreshProfile error: ${e.message}")
             }
         }
     }
