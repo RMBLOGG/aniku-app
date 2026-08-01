@@ -815,6 +815,14 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<DiamondTopupStatusDto>
+
+    // Data top-up Diamond publik (dari view diamond_topups_public), dipakai
+    // buat gabungin ke leaderboard Top Supporter.
+    @GET("rest/v1/diamond_topups_public")
+    suspend fun getDiamondTopupsPublic(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<DiamondTopupPublicDto>
     // log_watch_event di atas, biar gak ganggu skema/data lama). Dipanggil tiap 3 menit aktif
     // nonton, sama kayak sebelumnya, tapi sekarang checkpoint ke-2/3/4 juga beneran kehitung
     // (bukan cuma "retry sampai berhasil 1x" kayak mekanisme lama).
@@ -1258,7 +1266,7 @@ interface SupabaseDbApi {
 
 interface CloudinaryApi {
     @Multipart
-    @POST("v1_1/biwlhrhi/image/upload")
+    @POST("v1_1/dzfkklsza/image/upload")
     suspend fun uploadAvatar(
         @Part file: MultipartBody.Part,
         @Part("upload_preset") uploadPreset: RequestBody
@@ -1267,7 +1275,7 @@ interface CloudinaryApi {
     // Upload video anime requestan, pakai preset khusus "anime_request_video"
     // (folder anime_requests, terpisah dari avatar/banner)
     @Multipart
-    @POST("v1_1/biwlhrhi/video/upload")
+    @POST("v1_1/dzfkklsza/video/upload")
     suspend fun uploadRequestedVideo(
         @Part file: MultipartBody.Part,
         @Part("upload_preset") uploadPreset: RequestBody

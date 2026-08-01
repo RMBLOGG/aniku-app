@@ -2235,20 +2235,15 @@ fun HomeScreen(
                             userDirectory.sortedByDescending { it.season_xp ?: 0 }.take(10)
                         }
                         val donationsForHome by viewModel.donations.collectAsState()
-                        val topSupporters = remember(donationsForHome, userDirectory) {
-                            donationsForHome
-                                .groupBy { it.supporter_name }
-                                .map { (name, list) -> (name ?: "Anonim") to list.sumOf { it.total_amount ?: 0 } }
-                                .sortedByDescending { it.second }
+                        val diamondTopupsForHome by viewModel.diamondTopupsPublic.collectAsState()
+                        val topSupporters = remember(donationsForHome, diamondTopupsForHome, userDirectory) {
+                            buildCombinedSupporterLeaderboard(donationsForHome, diamondTopupsForHome, userDirectory)
                                 .take(5)
-                                .map { (name, amount) ->
-                                    val matchedUser = userDirectory.firstOrNull {
-                                        it.username?.trim()?.equals(name.trim(), ignoreCase = true) == true
-                                    }
+                                .map { entry ->
                                     SupporterEntry(
-                                        name = name,
-                                        amount = amount,
-                                        avatarUrl = matchedUser?.avatar_url
+                                        name = entry.displayName,
+                                        amount = entry.amount,
+                                        avatarUrl = entry.matchedProfile?.avatar_url
                                     )
                                 }
                         }
@@ -10817,28 +10812,22 @@ fun TopSupporterScreen(
     onBack: () -> Unit
 ) {
     val donations by viewModel.donations.collectAsState()
+    val diamondTopups by viewModel.diamondTopupsPublic.collectAsState()
     val userDirectory by viewModel.userDirectory.collectAsState()
     val scope = rememberCoroutineScope()
 
-    // Group by supporter_name dan jumlahkan total_amount, terus dicocokkan ke
-    // akun Aniku (avatar/level/nomor ID) kalau username-nya sama persis --
-    // pola sama kayak widget "Top Supporter" di Home.
-    val leaderboard = donations
-        .groupBy { it.supporter_name }
-        .map { (name, list) ->
-            val amount = list.sumOf { it.total_amount ?: 0 }
-            val matched = userDirectory.firstOrNull {
-                it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
-            }
-            SupporterRow(name = name ?: "Anonim", amount = amount, matchedProfile = matched)
-        }
-        .sortedByDescending { it.amount }
+    // Gabungan donasi Trakteer + top-up Diamond via Sakurupiah, dicocokkan ke
+    // akun Aniku (avatar/level/nomor ID) -- pola sama kayak widget "Top
+    // Supporter" di Home.
+    val leaderboard = buildCombinedSupporterLeaderboard(donations, diamondTopups, userDirectory)
+        .map { entry -> SupporterRow(name = entry.displayName, amount = entry.amount, matchedProfile = entry.matchedProfile) }
 
     var isRefreshing by remember { mutableStateOf(false) }
     var hasLoadedOnce by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadDonations()
+        viewModel.loadDiamondTopupsPublic()
         viewModel.loadUserDirectory()
         hasLoadedOnce = true
     }
@@ -10847,6 +10836,7 @@ fun TopSupporterScreen(
         scope.launch {
             isRefreshing = true
             viewModel.loadDonations()
+            viewModel.loadDiamondTopupsPublic()
             delay(450)
             isRefreshing = false
         }

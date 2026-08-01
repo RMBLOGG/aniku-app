@@ -391,12 +391,14 @@ fun UserProfileScreen(
                     // (donations, sama persis sumbernya kayak widget "TOP SUPPORTER"
                     // di Home), BUKAN dari support_points fitur Gift Premium.
                     val donationsForRank by viewModel.donations.collectAsState()
+                    val diamondTopupsForRank by viewModel.diamondTopupsPublic.collectAsState()
                     val directoryForRank by viewModel.userDirectory.collectAsState()
                     LaunchedEffect(Unit) {
                         if (donationsForRank.isEmpty()) viewModel.loadDonations()
+                        if (diamondTopupsForRank.isEmpty()) viewModel.loadDiamondTopupsPublic()
                         if (directoryForRank.isEmpty()) viewModel.loadUserDirectory()
                     }
-                    val supportRank = remember(donationsForRank, directoryForRank, p.username) {
+                    val supportRank = remember(donationsForRank, diamondTopupsForRank, directoryForRank, p.username) {
                         viewModel.getSupporterRank(p.username)
                     }
                     supportRank?.let { rank ->

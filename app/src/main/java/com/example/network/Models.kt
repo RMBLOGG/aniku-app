@@ -1824,3 +1824,14 @@ data class DiamondTopupStatusDto(
     val diamond_amount: Int? = null
 )
 
+// Dari view diamond_topups_public (cuma expose data yang aman buat publik --
+// user_id & amount_rupiah doang, gak ada payment_ref/trx_id/checkout_url).
+// Dipakai buat gabungin total top-up Diamond ke leaderboard Top Supporter,
+// biar top-up lewat Sakurupiah juga ikut ngangkat ranking, gak cuma donasi
+// Trakteer doang.
+@JsonClass(generateAdapter = true)
+data class DiamondTopupPublicDto(
+    val user_id: String? = null,
+    val amount_rupiah: Int? = null
+)
+

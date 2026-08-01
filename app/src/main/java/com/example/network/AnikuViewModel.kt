@@ -23,6 +23,63 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 
+// Satu baris leaderboard "Top Supporter" gabungan dari 2 sumber: donasi
+// Trakteer (tabel donations) dan top-up Diamond via Sakurupiah (view
+// diamond_topups_public). `key` dipakai buat gabungin dua sumber tersebut
+// biar gak dobel-hitung orang yang sama.
+data class SupporterLeaderboardEntry(
+    val key: String,
+    val displayName: String,
+    val amount: Int,
+    val matchedProfile: ProfileDto?
+)
+
+// Donasi Trakteer dicocokkan ke akun Aniku via fuzzy-match username (karena
+// supporter_name di Trakteer cuma teks bebas). Top-up Diamond dicocokkan
+// exact via user_id (FK asli ke profiles, gak perlu fuzzy match). Kalau
+// keduanya kena orang yang sama, amount-nya digabung jadi satu baris.
+fun buildCombinedSupporterLeaderboard(
+    donationsList: List<Donation>,
+    diamondTopupsList: List<DiamondTopupPublicDto>,
+    directory: List<ProfileDto>
+): List<SupporterLeaderboardEntry> {
+    val entries = mutableMapOf<String, SupporterLeaderboardEntry>()
+
+    donationsList
+        .groupBy { it.supporter_name }
+        .forEach { (name, list) ->
+            val amount = list.sumOf { it.total_amount ?: 0 }
+            val matched = directory.firstOrNull {
+                it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
+            }
+            val key = matched?.id ?: "name:${name?.trim()?.lowercase() ?: "anonim"}"
+            val existing = entries[key]
+            entries[key] = SupporterLeaderboardEntry(
+                key = key,
+                displayName = matched?.username ?: name ?: "Anonim",
+                amount = (existing?.amount ?: 0) + amount,
+                matchedProfile = matched ?: existing?.matchedProfile
+            )
+        }
+
+    diamondTopupsList
+        .groupBy { it.user_id }
+        .forEach { (userId, list) ->
+            if (userId.isNullOrBlank()) return@forEach
+            val amount = list.sumOf { it.amount_rupiah ?: 0 }
+            val matched = directory.firstOrNull { it.id == userId }
+            val existing = entries[userId]
+            entries[userId] = SupporterLeaderboardEntry(
+                key = userId,
+                displayName = matched?.username ?: existing?.displayName ?: "Anonim",
+                amount = (existing?.amount ?: 0) + amount,
+                matchedProfile = matched ?: existing?.matchedProfile
+            )
+        }
+
+    return entries.values.sortedByDescending { it.amount }
+}
+
 class AnikuViewModel(context: Context) : ViewModel() {
     private val appContext = context.applicationContext
     val settingsStore = SettingsStore(appContext)
@@ -841,6 +898,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         loadSearchPopular()
         checkForUpdate()
         loadDonations()
+        loadDiamondTopupsPublic()
         loadFeatureFlags()
         // Presence: heartbeat + polling total online seluruh aplikasi
         startAppPresenceHeartbeat()
@@ -3413,28 +3471,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _premiumPackages = MutableStateFlow<List<PremiumPackageDto>>(emptyList())
     val premiumPackages: StateFlow<List<PremiumPackageDto>> = _premiumPackages.asStateFlow()
 
-    // Hitung rank "Top Support" berdasarkan donasi Trakteer (donations), BUKAN
-    // support_points dari fitur Gift Premium -- disamakan persis sama logic
-    // yang dipakai widget "TOP SUPPORTER" di Home / TopSupporterScreen, biar
-    // badge di profil dan leaderboard di Home selalu konsisten satu sumber.
+    // Hitung rank "Top Support" berdasarkan gabungan donasi Trakteer
+    // (donations) + top-up Diamond via Sakurupiah (diamond_topups_public) --
+    // disamakan persis sama logic yang dipakai widget "TOP SUPPORTER" di
+    // Home / TopSupporterScreen, biar badge di profil dan leaderboard di
+    // Home selalu konsisten satu sumber.
     fun getSupporterRank(username: String?, topN: Int = 50): Int? {
         if (username.isNullOrBlank()) return null
-        val donationsList = _donations.value
-        val directory = _userDirectory.value
-        if (donationsList.isEmpty()) return null
+        val leaderboard = buildCombinedSupporterLeaderboard(
+            _donations.value, _diamondTopupsPublic.value, _userDirectory.value
+        )
+        if (leaderboard.isEmpty()) return null
 
-        val leaderboard = donationsList
-            .groupBy { it.supporter_name }
-            .map { (name, list) ->
-                val amount = list.sumOf { it.total_amount ?: 0 }
-                val matchedUsername = directory.firstOrNull {
-                    it.username?.trim()?.equals(name?.trim(), ignoreCase = true) == true
-                }?.username
-                (matchedUsername ?: name) to amount
-            }
-            .sortedByDescending { it.second }
-
-        val rank = leaderboard.indexOfFirst { it.first.equals(username.trim(), ignoreCase = true) }
+        val rank = leaderboard.indexOfFirst {
+            (it.matchedProfile?.username ?: it.displayName).equals(username.trim(), ignoreCase = true)
+        }
         if (rank < 0) return null
         val rank1Based = rank + 1
         return if (rank1Based <= topN) rank1Based else null
@@ -4960,6 +5011,25 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 if (result.isNotEmpty()) _latestDonation.value = result.first()
             } catch (e: Exception) {
                 Log.e("AnikuVM", "loadDonations error: ${e.message}")
+            }
+        }
+    }
+
+    // Data top-up Diamond via Sakurupiah yang sudah "credited" (dari view
+    // publik diamond_topups_public), digabung sama _donations buat hitung
+    // leaderboard Top Supporter (lihat buildCombinedSupporterLeaderboard).
+    private val _diamondTopupsPublic = MutableStateFlow<List<DiamondTopupPublicDto>>(emptyList())
+    val diamondTopupsPublic: StateFlow<List<DiamondTopupPublicDto>> = _diamondTopupsPublic.asStateFlow()
+
+    fun loadDiamondTopupsPublic() {
+        viewModelScope.launch {
+            try {
+                _diamondTopupsPublic.value = NetworkClient.supabaseDbApi.getDiamondTopupsPublic(
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "loadDiamondTopupsPublic error: ${e.message}")
             }
         }
     }
