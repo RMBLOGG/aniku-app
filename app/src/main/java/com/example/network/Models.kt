@@ -1839,3 +1839,124 @@ data class DiamondTopupPublicDto(
     val amount_rupiah: Int? = null
 )
 
+// ─────────────────────────────────────────────────────────────────────────
+// Animeinweb (Dayynime-v5) — wrapper Flask sendiri, deploy Vercel:
+// https://animeinweb-api.vercel.app/api/
+// Beda dari source lain: identifier-nya numeric "id" (bukan slug string),
+// tapi tetap dilewatkan lewat field AnimeRaw.slug / DetailEpisodeRaw.slug
+// biar konsisten sama alur navigasi yang udah ada.
+// Video-nya udah direct mp4 (storages.animein.net), jadi gak butuh
+// VideoExtractor sama sekali — cukup fast-path ".mp4" yang udah ada.
+// ─────────────────────────────────────────────────────────────────────────
+@JsonClass(generateAdapter = true)
+data class AnimeinwebItem(
+    val id: String,
+    val title: String,
+    val synonyms: String? = null,
+    val synopsis: String? = null,
+    val genre: String? = null,
+    val status: String? = null,
+    val type: String? = null,
+    val year: String? = null,
+    val day: String? = null,
+    val views: String? = null,
+    val favorites: String? = null,
+    val image_poster: String? = null,
+    val image_cover: String? = null,
+    val aired_start: String? = null
+) {
+    fun toAnimeRaw() = AnimeRaw(
+        title = title,
+        slug = id,
+        poster = image_poster?.takeIf { it.isNotBlank() } ?: image_cover ?: "",
+        episode = null,
+        status_or_day = day?.takeIf { it.isNotBlank() && it != "RANDOM" } ?: status,
+        type = type,
+        genres = genre?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() },
+        release = year,
+        status = status,
+        episode_count = null,
+        score = null,
+        estimation = null
+    )
+
+    fun toDetailData(episodes: List<AnimeinwebEpisodeItem>) = DetailData(
+        title = title,
+        synonym = synonyms,
+        poster = image_poster?.takeIf { it.isNotBlank() } ?: image_cover ?: "",
+        rating = null,
+        synopsis = synopsis,
+        trailer = null,
+        genres = genre?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?.map { DetailGenreRaw(name = it, slug = it.lowercase().replace(" ", "-")) },
+        status = status,
+        aired = aired_start,
+        type = type,
+        duration = null,
+        author = null,
+        studio = null,
+        season = null,
+        episodes = episodes.map { it.toDetailEpisodeRaw() },
+        characters = null
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebHomeResponse(
+    val hot: List<AnimeinwebItem>? = null,
+    val new: List<AnimeinwebItem>? = null,
+    val today: List<AnimeinwebItem>? = null,
+    val popular: List<AnimeinwebItem>? = null,
+    val trailer: List<AnimeinwebItem>? = null,
+    val random: List<AnimeinwebItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebSearchResponse(
+    val query: String? = null,
+    val page: String? = null,
+    val results: List<AnimeinwebItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebEpisodeItem(
+    val id: String,
+    val id_movie: String? = null,
+    val image: String? = null,
+    val index: String? = null,
+    val is_new: String? = null,
+    val key_time: String? = null,
+    val title: String? = null,
+    val views: String? = null
+) {
+    fun toDetailEpisodeRaw() = DetailEpisodeRaw(
+        name = title?.takeIf { it.isNotBlank() } ?: "Episode ${index ?: id}",
+        slug = id
+    )
+}
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebStreamServer(
+    val id: String? = null,
+    val name: String? = null,
+    val quality: String? = null,
+    val link: String? = null,
+    val type: String? = null,
+    val server_id: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebEpisodeDetail(
+    val id: String? = null,
+    val title: String? = null,
+    val index: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class AnimeinwebStreamResponse(
+    val episode: AnimeinwebEpisodeDetail? = null,
+    val episodeNext: AnimeinwebEpisodeDetail? = null,
+    val servers: List<AnimeinwebStreamServer>? = null
+)
+
+

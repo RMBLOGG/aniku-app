@@ -15,7 +15,7 @@ class SettingsStore(private val context: Context) {
         val TEXT_SIZE = stringPreferencesKey("text_size") // "Kecil", "Sedang", "Besar"
         val ACCENT_COLOR = stringPreferencesKey("accent_color") // "Red", "Green", "Blue", "Purple", "Orange"
         val GRID_LAYOUT = stringPreferencesKey("grid_layout") // "2", "3", "List"
-        val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4"
+        val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5"
         val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "Netflix", "Midnight"
         val CARD_STYLE = stringPreferencesKey("card_style") // "Rounded", "Sharp", "Poster", "Wide"
         val NAV_STYLE = stringPreferencesKey("nav_style") // "IconLabel", "IconOnly", "PillLabel", "PillIcon"

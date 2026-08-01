@@ -218,6 +218,31 @@ interface DonghuaApi {
     suspend fun getBySeason(@Path("year") year: String): DonghuaGenreDetailResponse
 }
 
+// Animeinweb (Dayynime-v5) — wrapper Flask sendiri, deploy Vercel:
+// https://animeinweb-api.vercel.app/api/
+// Semua video-nya udah direct mp4 (storages.animein.net), gak perlu VideoExtractor.
+interface AnimeinwebApi {
+    @GET("homepage")
+    suspend fun getHome(): AnimeinwebHomeResponse
+
+    @GET("search")
+    suspend fun search(
+        @Query("q") keyword: String = "",
+        @Query("page") page: Int? = null,
+        @Query("status") status: String? = null,
+        @Query("type") type: String? = null
+    ): AnimeinwebSearchResponse
+
+    @GET("anime/{id}")
+    suspend fun getDetail(@Path("id") id: String): AnimeinwebItem
+
+    @GET("anime/{id}/episodes")
+    suspend fun getEpisodes(@Path("id") id: String): List<AnimeinwebEpisodeItem>
+
+    @GET("episode/{episodeId}/stream")
+    suspend fun getEpisodeStream(@Path("episodeId") episodeId: String): AnimeinwebStreamResponse
+}
+
 interface SupabaseFunctionsApi {
     @POST("functions/v1/register-ip-guard")
     suspend fun checkIpGuard(
@@ -1410,6 +1435,14 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(DonghuaApi::class.java)
+
+    fun animeinwebApi(context: Context): AnimeinwebApi =
+        Retrofit.Builder()
+            .baseUrl("https://animeinweb-api.vercel.app/api/")
+            .client(animeOkHttpClient(context))
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(AnimeinwebApi::class.java)
 
     val supabaseAuthApi: SupabaseAuthApi by lazy {
         Retrofit.Builder()

@@ -200,6 +200,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val samehadakuApi: SamehadakuApi by lazy { NetworkClient.samehadakuApi(appContext) }
     private val animekompiApi: AnimekompiApi by lazy { NetworkClient.animekompiApi(appContext) }
     private val donghuaApi: DonghuaApi by lazy { NetworkClient.donghuaApi(appContext) }
+    private val animeinwebApi: AnimeinwebApi by lazy { NetworkClient.animeinwebApi(appContext) }
 
     // Nama hari Indonesia sesuai urutan Calendar.DAY_OF_WEEK (1=Minggu ... 7=Sabtu),
     // dipakai buat mapping jadwal tayang Animekompi (Dayynime-v3) yang sudah pakai nama hari Indonesia.
@@ -346,7 +347,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val navStyle = settingsStore.navStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "IconLabel")
     // Semua source yang ada di app, dipake sebagai fallback terakhir kalau
     // default_data_source dari remote config kebetulan juga lagi disable.
-    private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4")
+    private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5")
 
     // Source aktif: normalnya pilihan user sendiri, TAPI kalau user belum pernah
     // milih (raw == null) atau source pilihannya kena disable dari Firebase Remote
@@ -1252,6 +1253,38 @@ class AnikuViewModel(context: Context) : ViewModel() {
                                 _homeTodaySchedule.value = todayList.filterNot { blacklist.contains(it.slug) }
                             } catch (se: Exception) { Log.e("AnikuVM", "Failed donghua home schedule", se) }
                         }
+                    } else if (dataSource.value == "Dayynime-v5") {
+                        launch {
+                            try {
+                                val homeRes = retryIO { animeinwebApi.getHome() }
+                                _homeRecent.value = (homeRes.new ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homeOngoing.value = (homeRes.hot ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                                _homePopular.value = (homeRes.popular ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (he: Exception) { Log.e("AnikuVM", "Failed animeinweb home", he) }
+                        }
+                        launch {
+                            try {
+                                val moviesRes = retryIO { animeinwebApi.search(type = "MOVIE") }
+                                _homeMovies.value = (moviesRes.results ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (me: Exception) { Log.e("AnikuVM", "Failed animeinweb home movies", me) }
+                        }
+                        launch {
+                            try {
+                                val completedRes = retryIO { animeinwebApi.search(status = "FINISHED") }
+                                _homeCompleted.value = (completedRes.results ?: emptyList())
+                                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                            } catch (ce: Exception) { Log.e("AnikuVM", "Failed animeinweb home completed", ce) }
+                        }
+                        launch {
+                            // Animeinweb belum ada endpoint jadwal harian yang reliable dari
+                            // sisi wrapper kita — dikosongin sementara (mirip Donghua yang
+                            // ngosongin kategori Movie).
+                            _homeTodaySchedule.value = emptyList()
+                        }
                     } else {
                         launch {
                             try {
@@ -1341,6 +1374,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     val res = retryIO { donghuaApi.getLatest() }
                     _searchPopular.value = (res.latest_donghua ?: emptyList())
                         .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
+                } else if (dataSource.value == "Dayynime-v5") {
+                    val res = retryIO { animeinwebApi.getHome() }
+                    _searchPopular.value = (res.popular ?: emptyList())
+                        .map { it.toAnimeRaw() }.filterNot { _blacklistedSlugs.value.contains(it.slug) }
                 } else {
                     val res = retryIO { animeApi.getPopular(page = 1) }
                     _searchPopular.value = (res.animes ?: emptyList()).filterNot { _blacklistedSlugs.value.contains(it.slug) }
@@ -1418,6 +1455,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 val res = donghuaApi.search(query)
                 val items = (res.data ?: emptyList())
                     .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                Pair(items, false)
+            } else if (dataSource.value == "Dayynime-v5") {
+                val res = animeinwebApi.search(keyword = query, page = page)
+                val items = (res.results ?: emptyList())
+                    .map { it.toAnimeRaw() }.filterNot { blacklist.contains(it.slug) }
+                // Upstream animeinweb belum konfirmasi field pagination yang jelas,
+                // jadi dianggap page tunggal (aman, hanya "Muat lagi" gak akan muncul).
                 Pair(items, false)
             } else {
                 val res = animeApi.search(query, page = page)
@@ -1693,6 +1737,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 } else if (dataSource.value == "Dayynime-v4") {
                     val res = retryIO { donghuaApi.getDetail(slug) }
                     _animeDetail.value = res.toDetailData()
+                } else if (dataSource.value == "Dayynime-v5") {
+                    // Dua call terpisah: detail anime + list episode (animeinweb
+                    // gak gabungin keduanya dalam satu response kayak source lain).
+                    val detailRes = retryIO { animeinwebApi.getDetail(slug) }
+                    val episodesRes = retryIO { animeinwebApi.getEpisodes(slug) }
+                    _animeDetail.value = detailRes.toDetailData(episodesRes)
                 } else {
                     val res = retryIO { animeApi.getDetail(slug) }
                     _animeDetail.value = res.detail
@@ -1868,6 +1918,40 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     } else {
                         _streamError.value = "Tidak ada tautan streaming yang tersedia."
                     }
+                } else if (dataSource.value == "Dayynime-v5") {
+                    val res = retryIO { animeinwebApi.getEpisodeStream(slug) }
+                    _streamEpisodeTitle.value = res.episode?.title ?: "Tonton Tayangan"
+
+                    // Server animeinweb udah dikasih tipe "direct" + link mp4 langsung
+                    // (storages.animein.net) — gak butuh VideoExtractor sama sekali,
+                    // fast-path ".mp4" di VideoExtractor.resolve() bakal langsung pass-through.
+                    val rawServers = res.servers ?: emptyList()
+                    val streamList = rawServers
+                        .filter { !it.link.isNullOrBlank() }
+                        .sortedByDescending { qualityRank(it.quality) }
+                        .map { StreamRaw(name = "${it.name ?: "Server"} (${it.quality ?: "?"})", url = it.link!!) }
+                    _streams.value = streamList
+
+                    if (streamList.isNotEmpty()) {
+                        _selectedStreamIndex.value = 0
+                        val firstUrl = streamList[0].url
+                        val resolved = withContext(Dispatchers.IO) {
+                            VideoExtractor.resolve(firstUrl, null, appContext)
+                        }
+                        if (resolved != null) {
+                            _activeStreamUrl.value = resolved.url
+                            _resolvedHeaders.value = resolved.headers
+                            _isDirectStream.value = true
+                            _extractDebugInfo.value = null
+                            _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
+                        } else {
+                            _activeStreamUrl.value = firstUrl
+                            _resolvedHeaders.value = emptyMap()
+                            _isDirectStream.value = isDirectUrl(firstUrl)
+                        }
+                    } else {
+                        _streamError.value = "Tidak ada tautan streaming yang tersedia."
+                    }
                 } else {
                     val res = retryIO { animeApi.getEpisode(slug) }
                     _streamEpisodeTitle.value = res.title ?: "Tonton Tayangan"
@@ -2000,6 +2084,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private fun isDirectUrl(url: String): Boolean {
         val lower = url.lowercase()
         return lower.contains(".mp4") || lower.contains(".m3u8") || lower.contains(".mkv")
+    }
+
+    // Dipake buat urutin server animeinweb (Dayynime-v5) berdasarkan kualitas,
+    // 1080p paling atas biar jadi pilihan default.
+    private fun qualityRank(quality: String?): Int {
+        return when {
+            quality == null -> -1
+            quality.contains("1080") -> 4
+            quality.contains("720") -> 3
+            quality.contains("480") -> 2
+            quality.contains("360") -> 1
+            else -> 0
+        }
     }
 
     // Bangun teks buat dialog "Info stream". Kalau hasilnya HLS (isHls=true),

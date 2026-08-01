@@ -1653,7 +1653,8 @@ fun HomeScreen(
             "Dayynime-v1" to "Server 1 (Utama)",
             "Dayynime-v2" to "Server 2 (Alternatif)",
             "Dayynime-v3" to "Server 3 (Animekompi)",
-            "Dayynime-v4" to "Server 4 (Donghua)"
+            "Dayynime-v4" to "Server 4 (Donghua)",
+            "Dayynime-v5" to "Server 5 (Animeinweb)"
         )
         Box(modifier = Modifier.fillMaxSize()) {
             // Tombol settings tetap bisa diakses di pojok kanan atas
@@ -4964,6 +4965,7 @@ fun NobarRoomCard(
                     "Dayynime-v2" -> "Server 2 (Alternatif)"
                     "Dayynime-v3" -> "Server 3 (Animekompi)"
                     "Dayynime-v4" -> "Server 4 (Donghua)"
+                    "Dayynime-v5" -> "Server 5 (Animeinweb)"
                     else -> room.dataSource
                 }
                 Box(
@@ -10732,7 +10734,8 @@ fun SumberDataScreen(
                 "Dayynime-v1" to "Sumber utama (server 1)",
                 "Dayynime-v2" to "Sumber alternatif (server 2)",
                 "Dayynime-v3" to "Animekompi (server 3)",
-                "Dayynime-v4" to "Donghua (server 4)"
+                "Dayynime-v4" to "Donghua (server 4)",
+                "Dayynime-v5" to "Animeinweb (server 5)"
             )
 
             sources.forEach { (sourceKey, sourceDesc) ->
