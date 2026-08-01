@@ -1935,8 +1935,12 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     if (streamList.isNotEmpty()) {
                         _selectedStreamIndex.value = 0
                         val firstUrl = streamList[0].url
+                        // PENTING: storages.animein.net nolak request tanpa Referer yang
+                        // sesuai (403 Forbidden) - hotlink protection khas CDN video.
+                        // Referer harus domain animeinweb, BUKAN url video itu sendiri
+                        // (yang jadi default kalau referer di-null-kan).
                         val resolved = withContext(Dispatchers.IO) {
-                            VideoExtractor.resolve(firstUrl, null, appContext)
+                            VideoExtractor.resolve(firstUrl, "https://animeinweb.com/", appContext)
                         }
                         if (resolved != null) {
                             _activeStreamUrl.value = resolved.url
@@ -1946,7 +1950,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                             _lastResolvedUrlInfo.value = buildResolvedInfoText(firstUrl, resolved)
                         } else {
                             _activeStreamUrl.value = firstUrl
-                            _resolvedHeaders.value = emptyMap()
+                            _resolvedHeaders.value = mapOf("Referer" to "https://animeinweb.com/")
                             _isDirectStream.value = isDirectUrl(firstUrl)
                         }
                     } else {
@@ -2046,14 +2050,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _isStreamLoading.value = true
                 _activeStreamUrl.value = null
                 _isDirectStream.value = false
+                // storages.animein.net (Dayynime-v5) nolak request tanpa Referer yang
+                // sesuai (403 Forbidden) - beda dari source lain yang gak butuh referer.
+                val referer = if (dataSource.value == "Dayynime-v5") "https://animeinweb.com/" else null
                 viewModelScope.launch {
                     // Blogger butuh Main thread (WebView), host lain pakai IO
                     val isBlogger = rawUrl.contains("blogger.com") || rawUrl.contains("blogspot.com")
                     val resolved = if (isBlogger) {
-                        VideoExtractor.resolve(rawUrl, null, appContext)
+                        VideoExtractor.resolve(rawUrl, referer, appContext)
                     } else {
                         withContext(Dispatchers.IO) {
-                            VideoExtractor.resolve(rawUrl, null, appContext)
+                            VideoExtractor.resolve(rawUrl, referer, appContext)
                         }
                     }
                     if (resolved != null) {
@@ -2063,8 +2070,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         _extractDebugInfo.value = null
                         _lastResolvedUrlInfo.value = buildResolvedInfoText(rawUrl, resolved)
                     } else {
-                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, null)
-                        _resolvedHeaders.value = emptyMap()
+                        _activeStreamUrl.value = VideoExtractor.resolveForWebViewFallback(rawUrl, referer)
+                        _resolvedHeaders.value = if (referer != null) mapOf("Referer" to referer) else emptyMap()
                         _isDirectStream.value = isDirectUrl(rawUrl)
                         _extractDebugInfo.value = VideoExtractor.lastDebugSnippet
                         _lastResolvedUrlInfo.value = "embedUrl: $rawUrl\nresolve GAGAL total -> fallback WebView\nfallbackUrl: ${_activeStreamUrl.value}"
