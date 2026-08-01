@@ -1810,7 +1810,7 @@ data class SakurupiahDiamondInvoiceResponse(
     val merchant_ref: String? = null,
     val diamond_amount: Int? = null,
     val method: String? = null,
-    val payment_no: Long? = null,
+    val payment_no: String? = null,
     val error: String? = null
 )
 

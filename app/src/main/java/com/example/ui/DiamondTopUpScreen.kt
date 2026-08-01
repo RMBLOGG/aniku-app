@@ -324,6 +324,14 @@ private fun DiamondInvoiceSheet(
         }
     }
 
+    // "payment_no" isinya beda-beda tergantung channel: buat Virtual Account
+    // itu nomor VA asli (angka), tapi buat e-wallet REDIRECT (GoPay/DANA/
+    // ShopeePay/OVO/LinkAja) itu sebenarnya deep link URL ke app-nya, bukan
+    // nomor yang bisa di-copy.
+    val isRedirectLink = invoice.payment_no?.startsWith("http") == true
+    val vaNumber = if (invoice.payment_no != null && !isRedirectLink) invoice.payment_no else null
+    val primaryActionUrl = if (isRedirectLink) invoice.payment_no else invoice.checkout_url
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -337,7 +345,8 @@ private fun DiamondInvoiceSheet(
             Text(
                 when {
                     qrBitmap != null -> "Scan QRIS di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
-                    invoice.payment_no != null -> "Transfer ke nomor Virtual Account di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                    vaNumber != null -> "Transfer ke nomor Virtual Account di bawah buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
+                    isRedirectLink -> "Buka aplikasi ${invoice.method ?: "pembayaran"} buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
                     else -> "Selesaikan pembayaran buat top-up ${invoice.diamond_amount ?: 0} DM. Diamond otomatis masuk setelah pembayaran terverifikasi."
                 },
                 fontSize = 13.sp,
@@ -361,9 +370,8 @@ private fun DiamondInvoiceSheet(
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-            } else if (invoice.payment_no != null) {
+            } else if (vaNumber != null) {
                 val clipboardManager = LocalClipboardManager.current
-                val vaNumberText = invoice.payment_no.toString()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -379,10 +387,10 @@ private fun DiamondInvoiceSheet(
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
-                        Text(vaNumberText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(vaNumber, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     IconButton(onClick = {
-                        clipboardManager.setText(AnnotatedString(vaNumberText))
+                        clipboardManager.setText(AnnotatedString(vaNumber))
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "Salin nomor")
                     }
@@ -392,18 +400,24 @@ private fun DiamondInvoiceSheet(
 
             Button(
                 onClick = {
-                    val url = invoice.checkout_url
+                    val url = primaryActionUrl
                     if (!url.isNullOrBlank()) {
                         try {
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         } catch (e: Exception) {
-                            Log.e("DiamondTopUpScreen", "Failed to open checkout url", e)
+                            Log.e("DiamondTopUpScreen", "Failed to open payment url", e)
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (qrBitmap != null || invoice.payment_no != null) "Buka Halaman Pembayaran" else "Bayar Sekarang")
+                Text(
+                    when {
+                        isRedirectLink -> "Buka ${invoice.method ?: "Aplikasi"}"
+                        qrBitmap != null || vaNumber != null -> "Buka Halaman Pembayaran"
+                        else -> "Bayar Sekarang"
+                    }
+                )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Button(
