@@ -10761,6 +10761,8 @@ fun SumberDataScreen(
     val disabledSources by viewModel.disabledDataSources.collectAsState()
     val accentColorName by viewModel.accentColorName.collectAsState()
     val accentColor = getAccentColor(accentColorName)
+    val session by viewModel.session.collectAsState()
+    val isPremium = session.isPremiumActive() || session.isAdmin || session.isModerator || session.isBeta
 
     Column(
         modifier = Modifier
@@ -10800,16 +10802,17 @@ fun SumberDataScreen(
             )
 
             val sources = listOf(
-                "Dayynime-v1" to "Sumber utama (server 1)",
-                "Dayynime-v2" to "Sumber alternatif (server 2)",
-                "Dayynime-v3" to "Animekompi (server 3)",
-                "Dayynime-v4" to "Donghua (server 4)",
-                "Dayynime-v5" to "Animeinweb (server 5)"
+                Triple("Dayynime-v1", "Sumber utama (server 1)", false),
+                Triple("Dayynime-v2", "Sumber alternatif (server 2)", false),
+                Triple("Dayynime-v3", "Animekompi (server 3)", false),
+                Triple("Dayynime-v4", "Donghua (server 4)", false),
+                Triple("Dayynime-v5", "Streaming lancar & loading cepat (server 5)", true)
             )
 
-            sources.forEach { (sourceKey, sourceDesc) ->
+            sources.forEach { (sourceKey, sourceDesc, premiumOnly) ->
+                val isLocked = premiumOnly && !isPremium
                 val isSelected = currentSource == sourceKey
-                val isDisabled = sourceKey in disabledSources
+                val isDisabled = (sourceKey in disabledSources) || isLocked
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = when {
@@ -10836,34 +10839,62 @@ fun SumberDataScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    sourceKey,
+                                    color = if (isDisabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                        else if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                if (premiumOnly) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        color = accentColor.copy(alpha = if (isLocked) 0.15f else 0.18f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            "PREMIUM",
+                                            color = accentColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Text(
-                                sourceKey,
-                                color = if (isDisabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    else if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                if (isDisabled) "Sementara nonaktif" else sourceDesc,
+                                if (sourceKey in disabledSources) "Sementara nonaktif"
+                                    else if (isLocked) "Khusus untuk member premium"
+                                    else sourceDesc,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isDisabled) 0.5f else 0.8f),
                                 fontSize = 12.sp
                             )
                         }
-                        Switch(
-                            checked = isSelected && !isDisabled,
-                            enabled = !isDisabled,
-                            onCheckedChange = {
-                                viewModel.changeDataSource(sourceKey)
-                                viewModel.loadHomeData()
-                                viewModel.loadSearchPopular()
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = accentColor,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        if (isLocked) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = "Premium",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
                             )
-                        )
+                        } else {
+                            Switch(
+                                checked = isSelected && !isDisabled,
+                                enabled = !isDisabled,
+                                onCheckedChange = {
+                                    viewModel.changeDataSource(sourceKey)
+                                    viewModel.loadHomeData()
+                                    viewModel.loadSearchPopular()
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = accentColor,
+                                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            )
+                        }
                     }
                 }
             }

@@ -351,23 +351,8 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // default_data_source dari remote config kebetulan juga lagi disable.
     private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5")
 
-    // Source aktif: normalnya pilihan user sendiri, TAPI kalau user belum pernah
-    // milih (raw == null) atau source pilihannya kena disable dari Firebase Remote
-    // Config, otomatis jatuh ke default_data_source (atau source pertama yang masih
-    // nyala kalau defaultnya sendiri ikut kena disable).
-    val dataSource: StateFlow<String> = combine(
-        settingsStore.dataSourceRawFlow,
-        remoteConfigManager.disabledSources,
-        remoteConfigManager.defaultDataSource
-    ) { rawSource, disabled, remoteDefault ->
-        val fallback = remoteDefault.takeIf { it.isNotBlank() && it !in disabled }
-            ?: ALL_DATA_SOURCES.firstOrNull { it !in disabled }
-            ?: "Dayynime-v1"
-        if (rawSource == null || rawSource in disabled) fallback else rawSource
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
-
-    // Dipake di SumberDataScreen buat nge-grey-out card source yang lagi dimatiin.
-    val disabledDataSources: StateFlow<Set<String>> = remoteConfigManager.disabledSources
+    // Source yang cuma boleh dipakai member premium (atau beta/mod/admin).
+    private val PREMIUM_ONLY_SOURCES = setOf("Dayynime-v5")
 
     // Session flow
     val session = settingsStore.sessionFlow.stateIn(
@@ -375,6 +360,28 @@ class AnikuViewModel(context: Context) : ViewModel() {
         SharingStarted.Eagerly,
         UserSession(null, null, null, null, null, null, false, false, false, null, false)
     )
+
+    // Source aktif: normalnya pilihan user sendiri, TAPI kalau user belum pernah
+    // milih (raw == null), source pilihannya kena disable dari Firebase Remote
+    // Config, ATAU source itu khusus premium dan usernya bukan premium/beta/mod/admin,
+    // otomatis jatuh ke default_data_source (atau source pertama yang masih nyala
+    // dan boleh diakses, kalau defaultnya sendiri ikut kena disable/terkunci).
+    val dataSource: StateFlow<String> = combine(
+        settingsStore.dataSourceRawFlow,
+        remoteConfigManager.disabledSources,
+        remoteConfigManager.defaultDataSource,
+        session
+    ) { rawSource, disabled, remoteDefault, sess ->
+        val isPremiumUser = sess.isPremiumActive() || sess.isAdmin || sess.isModerator || sess.isBeta
+        fun isAllowed(src: String) = src !in disabled && (src !in PREMIUM_ONLY_SOURCES || isPremiumUser)
+        val fallback = remoteDefault.takeIf { it.isNotBlank() && isAllowed(it) }
+            ?: ALL_DATA_SOURCES.firstOrNull { isAllowed(it) }
+            ?: "Dayynime-v1"
+        if (rawSource == null || !isAllowed(rawSource)) fallback else rawSource
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, "Dayynime-v1")
+
+    // Dipake di SumberDataScreen buat nge-grey-out card source yang lagi dimatiin.
+    val disabledDataSources: StateFlow<Set<String>> = remoteConfigManager.disabledSources
 
     init {
         // Begitu userId muncul (login/restore session), langsung sync FCM token
