@@ -11198,7 +11198,7 @@ fun TopSupporterScreen(
                     ) {
                         // Pill "Papan Peringkat Donasi", pas di lekukan panel
                         item {
-                            AnimatedVisibility(
+                            androidx.compose.animation.AnimatedVisibility(
                                 visible = contentVisible,
                                 enter = fadeIn(tween(400, delayMillis = 200))
                             ) {
@@ -11241,7 +11241,7 @@ fun TopSupporterScreen(
 
                         // Rekap ranking 1-3 gaya "award row"
                         itemsIndexed(top3) { i, row ->
-                            AnimatedVisibility(
+                            androidx.compose.animation.AnimatedVisibility(
                                 visible = contentVisible,
                                 enter = fadeIn(tween(360, delayMillis = 260 + i * 70)) + slideInHorizontally(
                                     initialOffsetX = { it / 8 },
@@ -11286,7 +11286,7 @@ fun TopSupporterScreen(
                                     rowVisible = true
                                 }
                             }
-                            AnimatedVisibility(
+                            androidx.compose.animation.AnimatedVisibility(
                                 visible = rowVisible,
                                 enter = fadeIn(tween(320)) + slideInHorizontally(
                                     initialOffsetX = { it / 6 },
@@ -11392,7 +11392,7 @@ fun TopSupporterScreen(
                         }
 
                         item {
-                            AnimatedVisibility(
+                            androidx.compose.animation.AnimatedVisibility(
                                 visible = contentVisible,
                                 enter = fadeIn(tween(400, delayMillis = 300 + rest.size * 55))
                             ) {
