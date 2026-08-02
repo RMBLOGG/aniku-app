@@ -239,7 +239,10 @@ interface AnimeinwebApi {
     suspend fun getDetail(@Path("id") id: String): AnimeinwebItem
 
     @GET("anime/{id}/episodes")
-    suspend fun getEpisodes(@Path("id") id: String): List<AnimeinwebEpisodeItem>
+    suspend fun getEpisodes(
+        @Path("id") id: String,
+        @Query("page") page: Int? = null
+    ): List<AnimeinwebEpisodeItem>
 
     @GET("episode/{episodeId}/stream")
     suspend fun getEpisodeStream(@Path("episodeId") episodeId: String): AnimeinwebStreamResponse

@@ -1811,9 +1811,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 } else if (dataSource.value == "Dayynime-v5") {
                     // Dua call terpisah: detail anime + list episode (animeinweb
                     // gak gabungin keduanya dalam satu response kayak source lain).
+                    // Episode-nya dipaginasi upstream (30/halaman) — buat anime yang
+                    // episode-nya banyak (One Piece dkk bisa 1000+), kita loop semua
+                    // halaman di sini (client-side, bukan di server, jadi gak nambah
+                    // resiko timeout Vercel) sampe ketemu halaman kosong.
+                    // PENTING: batch pertama itu request TANPA page param sama sekali
+                    // (bukan page=1) — page=1 itu udah batch KEDUA di upstream.
                     val detailRes = retryIO { animeinwebApi.getDetail(slug) }
-                    val episodesRes = retryIO { animeinwebApi.getEpisodes(slug) }
-                    _animeDetail.value = detailRes.toDetailData(episodesRes)
+                    val allEpisodes = mutableListOf<AnimeinwebEpisodeItem>()
+                    val firstBatch = retryIO { animeinwebApi.getEpisodes(slug, page = null) }
+                    allEpisodes.addAll(firstBatch)
+                    if (firstBatch.isNotEmpty()) {
+                        var epPage = 1
+                        val MAX_EPISODE_PAGES = 60 // ~1800 episode, jauh di atas anime terpanjang yang ada
+                        while (epPage <= MAX_EPISODE_PAGES) {
+                            val pageResult = retryIO { animeinwebApi.getEpisodes(slug, page = epPage) }
+                            if (pageResult.isEmpty()) break
+                            allEpisodes.addAll(pageResult)
+                            epPage++
+                        }
+                    }
+                    _animeDetail.value = detailRes.toDetailData(allEpisodes)
                 } else {
                     val res = retryIO { animeApi.getDetail(slug) }
                     _animeDetail.value = res.detail
