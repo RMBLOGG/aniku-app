@@ -10807,7 +10807,7 @@ fun SumberDataScreen(
                 Triple("Dayynime-v2", "Sumber alternatif (server 2)", false),
                 Triple("Dayynime-v3", "Animekompi (server 3)", false),
                 Triple("Dayynime-v4", "Donghua (server 4)", false),
-                Triple("Dayynime-v5", "Streaming lancar & loading cepat (server 5)", true)
+                Triple("Dayynime-v5", "Streaming lancar & loading cepat (server 5)", false)
             )
 
             sources.forEach { (sourceKey, sourceDesc, premiumOnly) ->
