@@ -1356,7 +1356,7 @@ interface SupabaseDbApi {
 
 interface CloudinaryApi {
     @Multipart
-    @POST("v1_1/dzfkklsza/image/upload")
+    @POST("v1_1/biwlhrhi/image/upload")
     suspend fun uploadAvatar(
         @Part file: MultipartBody.Part,
         @Part("upload_preset") uploadPreset: RequestBody
@@ -1365,7 +1365,7 @@ interface CloudinaryApi {
     // Upload video anime requestan, pakai preset khusus "anime_request_video"
     // (folder anime_requests, terpisah dari avatar/banner)
     @Multipart
-    @POST("v1_1/dzfkklsza/video/upload")
+    @POST("v1_1/biwlhrhi/video/upload")
     suspend fun uploadRequestedVideo(
         @Part file: MultipartBody.Part,
         @Part("upload_preset") uploadPreset: RequestBody
