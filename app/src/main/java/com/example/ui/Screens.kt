@@ -10999,54 +10999,58 @@ fun TopSupporterScreen(
         label = "trophyFloat"
     )
 
-    Scaffold(
-        containerColor = heroBottom,
-        topBar = {
-            androidx.compose.material3.TopAppBar(
-                title = {
-                    Text("Top Supporter", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textPrimary)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = textPrimary)
-                    }
-                },
-                actions = {
-                    val refreshTransition = rememberInfiniteTransition(label = "refreshSpin")
-                    val continuousRotation by refreshTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(700, easing = LinearEasing)
-                        ),
-                        label = "continuousRotation"
-                    )
-                    IconButton(onClick = { refresh() }, enabled = !isRefreshing) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Muat ulang",
-                            tint = if (isRefreshing) gold else textDim,
-                            modifier = Modifier.graphicsLayer {
-                                rotationZ = if (isRefreshing) continuousRotation else 0f
-                            }
-                        )
-                    }
-                },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+    // Baris back/refresh ngambang transparan -- nempel langsung di gradasi hero,
+    // gak pakai TopAppBar terpisah (itu yang bikin ada "bar" kotak yang ganggu).
+    @Composable
+    fun FloatingTopControls() {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Kembali", tint = textPrimary)
+            }
+            val refreshTransition = rememberInfiniteTransition(label = "refreshSpin")
+            val continuousRotation by refreshTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(animation = tween(700, easing = LinearEasing)),
+                label = "continuousRotation"
             )
+            IconButton(onClick = { refresh() }, enabled = !isRefreshing) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = "Muat ulang",
+                    tint = if (isRefreshing) gold else textDim,
+                    modifier = Modifier.graphicsLayer {
+                        rotationZ = if (isRefreshing) continuousRotation else 0f
+                    }
+                )
+            }
         }
-    ) { padding ->
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+    ) {
         if (leaderboard.isEmpty()) {
             // ===== Empty state =====
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Brush.verticalGradient(listOf(heroTop, heroBottom)))
-                    .padding(padding),
-                contentAlignment = Alignment.Center
             ) {
+                FloatingTopControls()
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
                 if (!hasLoadedOnce) {
                     CircularProgressIndicator(color = gold, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
                 } else {
@@ -11079,6 +11083,7 @@ fun TopSupporterScreen(
                         )
                     }
                 }
+                }
             }
         } else {
             val top3 = leaderboard.take(3)
@@ -11087,11 +11092,11 @@ fun TopSupporterScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(Brush.verticalGradient(listOf(heroTop, heroBottom)))
             ) {
+                FloatingTopControls()
                 // ===== Hero: judul + podium 3 besar (semua pakai mahkota) =====
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = contentVisible,
                     enter = fadeIn(tween(500)) + slideInVertically(
                         initialOffsetY = { -it / 3 },
@@ -11239,22 +11244,15 @@ fun TopSupporterScreen(
                         }
                         item { Spacer(modifier = Modifier.height(6.dp)) }
 
-                        // Rekap ranking 1-3 gaya "award row"
+                        // Rekap ranking 1-3 gaya "award row" -- render langsung, gak pakai
+                        // animasi masuk per-baris biar gak "re-trigger" pas di-scroll
+                        // lewat lagi (itu yang bikin kerasa nge-lag/loading ulang).
                         itemsIndexed(top3) { i, row ->
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = contentVisible,
-                                enter = fadeIn(tween(360, delayMillis = 260 + i * 70)) + slideInHorizontally(
-                                    initialOffsetX = { it / 8 },
-                                    animationSpec = tween(360, delayMillis = 260 + i * 70, easing = FastOutSlowInEasing)
-                                )
-                            ) {
-                                AwardRow(
-                                    rank = i + 1,
-                                    row = row,
-                                    accent = when (i) { 0 -> gold; 1 -> silver; else -> bronze },
-                                    delayMillis = 260 + i * 70
-                                )
-                            }
+                            AwardRow(
+                                rank = i + 1,
+                                row = row,
+                                accent = when (i) { 0 -> gold; 1 -> silver; else -> bronze }
+                            )
                         }
 
                         item {
@@ -11278,21 +11276,11 @@ fun TopSupporterScreen(
                         }
 
                         // ===== Sisa daftar (rank 4+), baris flat di dalam panel =====
+                        // Render langsung, gak ada animasi masuk per-baris atau count-up --
+                        // dulu ini yang bikin scroll kerasa "loading ulang" tiap baris baru
+                        // muncul di viewport, soalnya LazyColumn nge-recompose baris yang
+                        // discroll lewat dan animasinya ke-trigger lagi dari awal.
                         itemsIndexed(rest, key = { i, item -> item.name.ifBlank { "anon-$i" } + "-$i" }) { idx, row ->
-                            var rowVisible by remember(row.name, idx) { mutableStateOf(false) }
-                            LaunchedEffect(contentVisible) {
-                                if (contentVisible) {
-                                    delay(260L + idx * 55L)
-                                    rowVisible = true
-                                }
-                            }
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = rowVisible,
-                                enter = fadeIn(tween(320)) + slideInHorizontally(
-                                    initialOffsetX = { it / 6 },
-                                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                                )
-                            ) {
                                 Column {
                                     Row(
                                         modifier = Modifier
@@ -11378,17 +11366,15 @@ fun TopSupporterScreen(
                                             }
                                         }
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        AnimatedRupiahText(
-                                            target = row.amount,
+                                        Text(
+                                            formatRupiah(row.amount),
                                             fontSize = 12.5.sp,
                                             fontWeight = FontWeight.Normal,
-                                            color = textDim,
-                                            delayMillis = 260 + idx * 55
+                                            color = textDim
                                         )
                                     }
                                     HorizontalDivider(color = dividerColor, modifier = Modifier.padding(horizontal = 22.dp))
                                 }
-                            }
                         }
 
                         item {
@@ -11458,26 +11444,35 @@ private fun PodiumMember(
 ) {
     val avatarSize = if (isFirst) 66.dp else 50.dp
 
-    val crownTransition = rememberInfiniteTransition(label = "crownFloat$rank")
-    val crownOffset by crownTransition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1300 + rank * 120, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "crownOffset$rank"
-    )
-    val glowTransition = rememberInfiniteTransition(label = "podiumGlow$rank")
-    val glowAlpha by glowTransition.animateFloat(
-        initialValue = 0.12f,
-        targetValue = if (isFirst) 0.5f else 0.22f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha$rank"
-    )
+    // Cuma juara 1 yang dapet animasi napas terus-menerus -- perak/perunggu statis
+    // biar gak ada kerjaan render yang jalan nonstop di background pas layar diam.
+    val crownOffset: Float
+    val glowAlpha: Float
+    if (isFirst) {
+        val crownTransition = rememberInfiniteTransition(label = "crownFloat")
+        crownOffset = crownTransition.animateFloat(
+            initialValue = -3f,
+            targetValue = 3f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1300, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "crownOffset"
+        ).value
+        val glowTransition = rememberInfiniteTransition(label = "podiumGlow")
+        glowAlpha = glowTransition.animateFloat(
+            initialValue = 0.18f,
+            targetValue = 0.5f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "glowAlpha"
+        ).value
+    } else {
+        crownOffset = 0f
+        glowAlpha = 0.16f
+    }
 
     Column(
         modifier = modifier.padding(bottom = if (isFirst) 0.dp else 12.dp),
