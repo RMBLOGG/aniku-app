@@ -1909,7 +1909,8 @@ data class DiamondTopupStatusDto(
 @JsonClass(generateAdapter = true)
 data class DiamondTopupPublicDto(
     val user_id: String? = null,
-    val amount_rupiah: Int? = null
+    val amount_rupiah: Int? = null,
+    val credited_at: String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────────────

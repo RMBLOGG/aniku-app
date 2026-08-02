@@ -850,9 +850,11 @@ interface SupabaseDbApi {
     ): List<DiamondTopupStatusDto>
 
     // Data top-up Diamond publik (dari view diamond_topups_public), dipakai
-    // buat gabungin ke leaderboard Top Supporter.
+    // buat gabungin ke leaderboard Top Supporter, DAN buat banner "Support baru
+    // masuk!" (order desc biar item [0] selalu yang paling baru, sama kayak donations).
     @GET("rest/v1/diamond_topups_public")
     suspend fun getDiamondTopupsPublic(
+        @Query("order") order: String = "credited_at.desc",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<DiamondTopupPublicDto>

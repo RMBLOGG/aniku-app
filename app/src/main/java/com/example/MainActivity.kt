@@ -307,8 +307,8 @@ class MainActivity : FragmentActivity() {
                 val hasUnreadChat by viewModel.hasUnreadChat.collectAsState()
                 val nobarEnabled by viewModel.remoteConfigManager.nobarEnabled.collectAsState()
                 val feedEnabled by viewModel.remoteConfigManager.feedEnabled.collectAsState()
-                val hasNewDonation by viewModel.hasNewDonation.collectAsState()
-                val latestDonation by viewModel.latestDonation.collectAsState()
+                val hasNewSupportEvent by viewModel.hasNewSupportEvent.collectAsState()
+                val latestSupportEvent by viewModel.latestSupportEvent.collectAsState()
                 var showDonationBanner by remember { mutableStateOf(false) }
 
                 // Popup ban real-time — muncul begitu ban kedeteksi (polling tiap 15s),
@@ -340,13 +340,13 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                // Banner donasi popup — modern: animasi masuk/keluar, swipe buat nutup, progress bar countdown
-                LaunchedEffect(hasNewDonation) {
-                    if (hasNewDonation) {
+                // Banner support popup (Trakteer + Top-up Diamond) — modern: animasi masuk/keluar, swipe buat nutup, progress bar countdown
+                LaunchedEffect(hasNewSupportEvent) {
+                    if (hasNewSupportEvent) {
                         showDonationBanner = true
                         kotlinx.coroutines.delay(5000)
                         showDonationBanner = false
-                        viewModel.markDonationSeen()
+                        viewModel.markSupportEventSeen()
                     }
                 }
 
@@ -358,7 +358,7 @@ class MainActivity : FragmentActivity() {
                     contentAlignment = Alignment.TopCenter
                 ) {
                     AnimatedVisibility(
-                        visible = showDonationBanner && latestDonation != null,
+                        visible = showDonationBanner && latestSupportEvent != null,
                         enter = fadeIn(tween(280)) + slideInVertically(
                             initialOffsetY = { -it },
                             animationSpec = spring(
@@ -371,8 +371,8 @@ class MainActivity : FragmentActivity() {
                             animationSpec = tween(220, easing = FastOutSlowInEasing)
                         )
                     ) {
-                        val donation = latestDonation
-                        if (donation != null) {
+                        val event = latestSupportEvent
+                        if (event != null) {
                             val scope = rememberCoroutineScope()
                             val offsetX = remember { Animatable(0f) }
                             val density = LocalDensity.current
@@ -380,12 +380,12 @@ class MainActivity : FragmentActivity() {
 
                             fun dismiss() {
                                 showDonationBanner = false
-                                viewModel.markDonationSeen()
+                                viewModel.markSupportEventSeen()
                             }
 
                             // Progress bar countdown 5 detik, ngikutin auto-dismiss di atas
                             val progress = remember { Animatable(1f) }
-                            LaunchedEffect(donation.id) {
+                            LaunchedEffect(event.key) {
                                 progress.snapTo(1f)
                                 progress.animateTo(0f, animationSpec = tween(5000, easing = LinearEasing))
                             }
@@ -410,7 +410,7 @@ class MainActivity : FragmentActivity() {
                                         alpha = 1f - (kotlin.math.abs(offsetX.value) / dismissThresholdPx / 1.6f)
                                             .coerceIn(0f, 0.85f)
                                     }
-                                    .pointerInput(donation.id) {
+                                    .pointerInput(event.key) {
                                         detectHorizontalDragGestures(
                                             onDragEnd = {
                                                 scope.launch {
@@ -461,7 +461,7 @@ class MainActivity : FragmentActivity() {
                                                     ),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Text("☕", fontSize = 20.sp)
+                                                Text(if (event.isDiamond) "💎" else "☕", fontSize = 20.sp)
                                             }
                                             Box(
                                                 modifier = Modifier
@@ -482,7 +482,8 @@ class MainActivity : FragmentActivity() {
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    "${donation.supporter_name} men-support",
+                                                    if (event.isDiamond) "${event.displayName} top-up Diamond"
+                                                        else "${event.displayName} men-support",
                                                     fontSize = 12.sp,
                                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
                                                 )
@@ -494,7 +495,7 @@ class MainActivity : FragmentActivity() {
                                                         .padding(horizontal = 7.dp, vertical = 1.5.dp)
                                                 ) {
                                                     Text(
-                                                        "${donation.amount} ${donation.unit ?: "cup"}",
+                                                        event.amountLabel,
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.SemiBold,
                                                         color = MaterialTheme.colorScheme.primary

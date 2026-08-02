@@ -5432,6 +5432,56 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _lastSeenDonationId.value = _donations.value.firstOrNull()?.id
     }
 
+    // ── Banner "Support baru masuk!" -- gabungan Trakteer & Top-up Diamond ──
+    // Sebelumnya cuma nge-listen ke _donations (Trakteer doang), jadi user yang
+    // dukung lewat Top-up Diamond gak pernah dapet banner popup ini walau tetep
+    // keitung di leaderboard Top Supporter. Sekarang dibandingin timestamp-nya,
+    // siapa pun yang paling baru (Trakteer atau Diamond) itu yang ditampilin.
+    data class SupportBannerEvent(
+        val key: String,
+        val displayName: String,
+        val amountLabel: String,
+        val isDiamond: Boolean,
+        val timestamp: String
+    )
+
+    val latestSupportEvent: StateFlow<SupportBannerEvent?> = combine(
+        _donations, _diamondTopupsPublic, _userDirectory
+    ) { donations, topups, directory ->
+        val fromDonation = donations.firstOrNull()?.let {
+            SupportBannerEvent(
+                key = "donation:${it.id}",
+                displayName = it.supporter_name,
+                amountLabel = "${it.amount} ${it.unit ?: "cup"}",
+                isDiamond = false,
+                timestamp = it.created_at
+            )
+        }
+        val fromTopup = topups.firstOrNull()?.let { topup ->
+            val name = directory.firstOrNull { it.id == topup.user_id }?.username ?: "Seseorang"
+            SupportBannerEvent(
+                key = "diamond:${topup.user_id}:${topup.credited_at}",
+                displayName = name,
+                amountLabel = "Rp${(topup.amount_rupiah ?: 0)}",
+                isDiamond = true,
+                timestamp = topup.credited_at ?: ""
+            )
+        }
+        listOfNotNull(fromDonation, fromTopup).maxByOrNull { it.timestamp }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _lastSeenSupportEventKey = MutableStateFlow<String?>(null)
+
+    val hasNewSupportEvent: StateFlow<Boolean> = combine(
+        latestSupportEvent, _lastSeenSupportEventKey
+    ) { event, lastSeen ->
+        event != null && event.key != lastSeen
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun markSupportEventSeen() {
+        _lastSeenSupportEventKey.value = latestSupportEvent.value?.key
+    }
+
     // ─────────────── SEASON XP / LEVEL ───────────────
     private val _seasonXp = MutableStateFlow(0)
     val seasonXp: StateFlow<Int> = _seasonXp.asStateFlow()
