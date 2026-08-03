@@ -1660,6 +1660,10 @@ fun GiftPremiumSheet(
 
     LaunchedEffect(Unit) {
         if (packages.isEmpty()) viewModel.loadPremiumPackages()
+        // Sheet ini bisa dipanggil dari mana aja (Chat, Profil, dll) tanpa lewat
+        // Home/Profil dulu, jadi session lokal soal premium_until bisa aja basi.
+        // Refresh di sini biar keputusan payFromOwnPremium selalu pakai data terbaru.
+        viewModel.refreshProfile()
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
