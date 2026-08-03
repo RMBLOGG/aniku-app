@@ -1802,6 +1802,13 @@ fun GiftPremiumSheet(
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
+            // DEBUG SEMENTARA -- hapus baris ini setelah masalah premium_until ketemu
+            Text(
+                "[debug] premiumUntil=${session.premiumUntil} isPremiumActive=${session.isPremiumActive()} isAdmin=${session.isAdmin}",
+                fontSize = 9.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
             packages.forEach { pkg ->
                 val isSelected = selectedPackageId == pkg.id
                 val requiredDays = pkg.duration_days * (if (mode == "giveaway") slotCount else 1)
