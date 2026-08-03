@@ -3153,8 +3153,16 @@ class AnikuViewModel(context: Context) : ViewModel() {
     // sampe dia logout-login ulang -- makanya tombol yang butuh premium (misal gift Diamond
     // di profil orang lain, atau Sumber Data v5) gak muncul walau premium-nya beneran aktif
     // di server. Sekarang refreshProfile() sekalian nyegerin seluruh status session ini.
+    // DEBUG SEMENTARA -- buat nemuin kenapa refreshProfile() gagal update premiumUntil
+    private val _debugLastRefreshProfileError = MutableStateFlow<String?>(null)
+    val debugLastRefreshProfileError: StateFlow<String?> = _debugLastRefreshProfileError.asStateFlow()
+
     fun refreshProfile() {
-        val uid = session.value.userId ?: return
+        val uid = session.value.userId
+        if (uid == null) {
+            _debugLastRefreshProfileError.value = "userId null di session, gak jadi manggil API"
+            return
+        }
         viewModelScope.launch {
             try {
                 val result = withValidToken { token ->
@@ -3178,9 +3186,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
                         supportPoints = profile.support_points
                     )
                     settingsStore.saveSession(updatedSession)
+                    _debugLastRefreshProfileError.value = "OK, premium_until dari API = ${profile.premium_until}"
+                } else {
+                    _debugLastRefreshProfileError.value = "Profile gak ketemu (result kosong) buat uid=$uid"
                 }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "refreshProfile error: ${e.message}")
+                _debugLastRefreshProfileError.value = "EXCEPTION: ${e::class.simpleName}: ${e.message}"
             }
         }
     }

@@ -1803,8 +1803,9 @@ fun GiftPremiumSheet(
                 )
             }
             // DEBUG SEMENTARA -- hapus baris ini setelah masalah premium_until ketemu
+            val debugRefreshInfo by viewModel.debugLastRefreshProfileError.collectAsState()
             Text(
-                "[debug] premiumUntil=${session.premiumUntil} isPremiumActive=${session.isPremiumActive()} isAdmin=${session.isAdmin}",
+                "[debug] premiumUntil=${session.premiumUntil} isPremiumActive=${session.isPremiumActive()} isAdmin=${session.isAdmin}\n[debug2] $debugRefreshInfo",
                 fontSize = 9.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(bottom = 8.dp)
