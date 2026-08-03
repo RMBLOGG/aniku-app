@@ -3853,6 +3853,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Versi "createPremiumClaim" yang bayarnya potong sisa hari Premium
+    // PENGIRIM sendiri (bukan uang) -- dipakai kalau session.isPremiumActive().
+    fun createPremiumClaimFromPremium(
+        targetUserId: String,
+        packageId: String,
+        onResult: (PremiumClaimDto?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createPremiumClaimFromPremium(
+                    body = CreatePremiumClaimRequest(
+                        p_target_user_id = targetUserId,
+                        p_package_id = packageId
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat gift premium (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createPremiumClaimFromPremium error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Bikin giveaway "War di Chat Global" - target_user_id kosong dulu,
     // nanti diisi otomatis pas ada yang menang klaim. maxClaims = jumlah
     // orang yang bisa menang (default 1 = siapa cepat dia dapat).
@@ -3879,6 +3912,36 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 onResult(null, errorMsg ?: "Gagal membuat giveaway (HTTP ${e.code()})")
             } catch (e: Exception) {
                 Log.e("AnikuVM", "createGiveawayClaim error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Versi "createGiveawayClaim" yang bayarnya potong sisa hari Premium
+    // PENGIRIM sendiri (bukan uang) -- dipakai kalau session.isPremiumActive().
+    fun createGiveawayClaimFromPremium(
+        packageId: String,
+        maxClaims: Int = 1,
+        onResult: (PremiumClaimDto?, String?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createGiveawayClaimFromPremium(
+                    body = CreateGiveawayClaimRequest(p_package_id = packageId, p_max_claims = maxClaims),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal membuat giveaway (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createGiveawayClaimFromPremium error", e)
                 onResult(null, e.message ?: "Terjadi kesalahan")
             }
         }

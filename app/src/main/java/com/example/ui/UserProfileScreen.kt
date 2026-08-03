@@ -1631,6 +1631,7 @@ fun GiftPremiumSheet(
     onDismiss: () -> Unit
 ) {
     val packages by viewModel.premiumPackages.collectAsState()
+    val session by viewModel.session.collectAsState()
     var selectedPackageId by remember { mutableStateOf<String?>(null) }
     // "direct" atau "giveaway" - kalau selfMode, mode ini ga ditampilin (selalu "direct").
     // Kalau giveawayOnly (dipanggil dari chat, tanpa target spesifik), dipaksa "giveaway".
@@ -1639,6 +1640,23 @@ fun GiftPremiumSheet(
     var isLoading by remember { mutableStateOf(false) }
     var resultClaim by remember { mutableStateOf<PremiumClaimDto?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    // Kalau bukan beli buat diri sendiri (selfMode), dan pengirimnya lagi Premium
+    // aktif, gift/giveaway-nya dibayar pakai SISA HARI PREMIUM sendiri (gratis,
+    // gak perlu QRIS lagi) -- bukan uang. Sisa hari dihitung dari session.premiumUntil.
+    val payFromOwnPremium = !selfMode && session.isPremiumActive()
+    val remainingPremiumDays: Long = remember(session.premiumUntil) {
+        val until = session.premiumUntil
+        if (until.isNullOrBlank()) 0L else try {
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val untilDate = parser.parse(until.take(19))
+            if (untilDate != null) {
+                val diffMs = untilDate.time - System.currentTimeMillis()
+                (diffMs / (1000L * 60 * 60 * 24)).coerceAtLeast(0L)
+            } else 0L
+        } catch (e: Exception) { 0L }
+    }
 
     LaunchedEffect(Unit) {
         if (packages.isEmpty()) viewModel.loadPremiumPackages()
@@ -1652,6 +1670,31 @@ fun GiftPremiumSheet(
         ) {
             val claim = resultClaim
             if (claim != null) {
+                // amount_expected == 0 nandain ini claim GRATIS (dibayar dari sisa hari
+                // Premium pengirim sendiri), jadi status-nya udah langsung 'ready' di server
+                // -- gak perlu bikin invoice QRIS sama sekali, langsung tampilin sukses.
+                if (claim.amount_expected == 0) {
+                    Text("Berhasil!", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        if (mode == "giveaway")
+                            "Giveaway udah aktif di chat, tinggal nunggu yang klaim. Dibayar pakai sisa hari Premium kamu, gak ada QRIS yang perlu diselesaikan."
+                        else
+                            "Gift Premium buat $targetUsername udah aktif. Dibayar pakai sisa hari Premium kamu, gak ada QRIS yang perlu diselesaikan.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Tutup")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    return@Column
+                }
+
                 var invoice by remember(claim.id) { mutableStateOf<SakurupiahInvoiceResponse?>(null) }
                 var invoiceError by remember(claim.id) { mutableStateOf<String?>(null) }
                 var isCreatingInvoice by remember(claim.id) { mutableStateOf(true) }
@@ -1747,8 +1790,17 @@ fun GiftPremiumSheet(
 
             Text("Pilih Paket", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
+            if (payFromOwnPremium) {
+                Text(
+                    "Kamu Premium aktif — gift/giveaway ini GRATIS, dibayar pakai sisa hari Premium kamu sendiri (sisa: $remainingPremiumDays hari)",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
             packages.forEach { pkg ->
                 val isSelected = selectedPackageId == pkg.id
+                val requiredDays = pkg.duration_days * (if (mode == "giveaway") slotCount else 1)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1762,8 +1814,17 @@ fun GiftPremiumSheet(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(pkg.label, fontWeight = FontWeight.SemiBold)
-                    val priceText = if (mode == "giveaway" && !selfMode) "Rp${pkg.price * slotCount}" else "Rp${pkg.price}"
-                    Text(priceText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    val priceText = when {
+                        payFromOwnPremium -> "$requiredDays hari"
+                        mode == "giveaway" && !selfMode -> "Rp${pkg.price * slotCount}"
+                        else -> "Rp${pkg.price}"
+                    }
+                    Text(
+                        priceText,
+                        color = if (payFromOwnPremium && requiredDays > remainingPremiumDays)
+                            MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
@@ -1837,6 +1898,12 @@ fun GiftPremiumSheet(
             Button(
                 onClick = {
                     val pkgId = selectedPackageId ?: return@Button
+                    val pkg = packages.firstOrNull { it.id == pkgId }
+                    val requiredDays = (pkg?.duration_days ?: 0) * (if (mode == "giveaway") slotCount else 1)
+                    if (payFromOwnPremium && requiredDays > remainingPremiumDays) {
+                        errorMsg = "Sisa hari Premium kamu gak cukup ($remainingPremiumDays hari, butuh $requiredDays hari)"
+                        return@Button
+                    }
                     isLoading = true
                     errorMsg = null
                     when {
@@ -1846,8 +1913,20 @@ fun GiftPremiumSheet(
                                 if (claim != null) resultClaim = claim else errorMsg = error
                             }
                         }
+                        mode == "direct" && payFromOwnPremium -> {
+                            viewModel.createPremiumClaimFromPremium(targetUserId, pkgId) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
+                        }
                         mode == "direct" -> {
                             viewModel.createPremiumClaim(targetUserId, pkgId) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
+                        }
+                        payFromOwnPremium -> {
+                            viewModel.createGiveawayClaimFromPremium(pkgId, slotCount) { claim, error ->
                                 isLoading = false
                                 if (claim != null) resultClaim = claim else errorMsg = error
                             }
@@ -1866,7 +1945,7 @@ fun GiftPremiumSheet(
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 } else {
-                    Text(if (selfMode) "Beli Sekarang" else "Buat Gift Premium")
+                    Text(if (selfMode) "Beli Sekarang" else if (payFromOwnPremium) "Kirim Gratis (Pakai Hari Premium)" else "Buat Gift Premium")
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))

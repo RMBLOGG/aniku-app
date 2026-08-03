@@ -779,9 +779,27 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): PremiumClaimDto
 
+    // Versi gift langsung yang bayarnya potong sisa hari Premium PENGIRIM sendiri
+    // (bukan uang) -- cuma bisa dipanggil kalau pengirim lagi Premium aktif.
+    @POST("rest/v1/rpc/create_premium_claim_from_premium")
+    suspend fun createPremiumClaimFromPremium(
+        @Body body: CreatePremiumClaimRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): PremiumClaimDto
+
     // Bikin giveaway "War di Chat Global" (belum ada target user)
     @POST("rest/v1/rpc/create_giveaway_claim")
     suspend fun createGiveawayClaim(
+        @Body body: CreateGiveawayClaimRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): PremiumClaimDto
+
+    // Versi giveaway yang bayarnya potong sisa hari Premium PENGIRIM sendiri
+    // (bukan uang) -- cuma bisa dipanggil kalau pengirim lagi Premium aktif.
+    @POST("rest/v1/rpc/create_giveaway_claim_from_premium")
+    suspend fun createGiveawayClaimFromPremium(
         @Body body: CreateGiveawayClaimRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
