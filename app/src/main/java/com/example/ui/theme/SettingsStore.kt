@@ -33,6 +33,11 @@ class SettingsStore(private val context: Context) {
         val IS_BETA = booleanPreferencesKey("is_beta")
         val CUSTOM_NAME_COLOR = stringPreferencesKey("custom_name_color")
         val IS_BANNED = booleanPreferencesKey("is_banned")
+        // Bug lama: 2 field ini ada di UserSession & dipakai (isPremiumActive(), badge
+        // Top Support) tapi kelewatan gak pernah ditulis/dibaca dari DataStore, jadi
+        // premiumUntil selalu balik null tiap kali session di-refresh & disimpen ulang.
+        val PREMIUM_UNTIL = stringPreferencesKey("premium_until")
+        val SUPPORT_POINTS = intPreferencesKey("support_points")
         val LAST_CHAT_READ = stringPreferencesKey("last_chat_read")
         val CHAT_NOTIF_ENABLED = booleanPreferencesKey("chat_notif_enabled")
         val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
@@ -93,7 +98,9 @@ class SettingsStore(private val context: Context) {
             isBeta = preferences[IS_BETA] ?: false,
             customNameColor = preferences[CUSTOM_NAME_COLOR],
             isBanned = preferences[IS_BANNED] ?: false,
-            userNumber = preferences[USER_NUMBER]
+            userNumber = preferences[USER_NUMBER],
+            premiumUntil = preferences[PREMIUM_UNTIL],
+            supportPoints = preferences[SUPPORT_POINTS] ?: 0
         )
     }
 
@@ -163,6 +170,12 @@ class SettingsStore(private val context: Context) {
             }
             preferences[IS_BANNED] = session.isBanned
             session.userNumber?.let { preferences[USER_NUMBER] = it }
+            if (session.premiumUntil != null) {
+                preferences[PREMIUM_UNTIL] = session.premiumUntil
+            } else {
+                preferences.remove(PREMIUM_UNTIL)
+            }
+            preferences[SUPPORT_POINTS] = session.supportPoints ?: 0
         }
     }
 
