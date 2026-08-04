@@ -780,10 +780,12 @@ interface SupabaseDbApi {
     ): PremiumClaimDto
 
     // Versi gift langsung yang bayarnya potong sisa hari Premium PENGIRIM sendiri
-    // (bukan uang) -- cuma bisa dipanggil kalau pengirim lagi Premium aktif.
+    // (bukan uang) -- durasi BEBAS per hari, gak kebatas paket 7/30/90.
+    // Nama RPC sama kayak versi paket (overload di server, dibedain PostgREST
+    // dari nama parameter di body: p_duration_days vs p_package_id).
     @POST("rest/v1/rpc/create_premium_claim_from_premium")
     suspend fun createPremiumClaimFromPremium(
-        @Body body: CreatePremiumClaimRequest,
+        @Body body: CreatePremiumClaimFromDaysRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): PremiumClaimDto
@@ -797,10 +799,10 @@ interface SupabaseDbApi {
     ): PremiumClaimDto
 
     // Versi giveaway yang bayarnya potong sisa hari Premium PENGIRIM sendiri
-    // (bukan uang) -- cuma bisa dipanggil kalau pengirim lagi Premium aktif.
+    // (bukan uang) -- durasi BEBAS per hari, gak kebatas paket 7/30/90.
     @POST("rest/v1/rpc/create_giveaway_claim_from_premium")
     suspend fun createGiveawayClaimFromPremium(
-        @Body body: CreateGiveawayClaimRequest,
+        @Body body: CreateGiveawayClaimFromDaysRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): PremiumClaimDto

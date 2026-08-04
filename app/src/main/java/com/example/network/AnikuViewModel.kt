@@ -3854,19 +3854,20 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Versi "createPremiumClaim" yang bayarnya potong sisa hari Premium
-    // PENGIRIM sendiri (bukan uang) -- dipakai kalau session.isPremiumActive().
+    // PENGIRIM sendiri (bukan uang) -- durasiDays BEBAS (misal 1 hari doang),
+    // gak kebatas paket 7/30/90. Dipakai kalau session.isPremiumActive().
     fun createPremiumClaimFromPremium(
         targetUserId: String,
-        packageId: String,
+        durationDays: Int,
         onResult: (PremiumClaimDto?, String?) -> Unit
     ) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
                 val result = NetworkClient.supabaseDbApi.createPremiumClaimFromPremium(
-                    body = CreatePremiumClaimRequest(
+                    body = CreatePremiumClaimFromDaysRequest(
                         p_target_user_id = targetUserId,
-                        p_package_id = packageId
+                        p_duration_days = durationDays
                     ),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
@@ -3918,9 +3919,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     }
 
     // Versi "createGiveawayClaim" yang bayarnya potong sisa hari Premium
-    // PENGIRIM sendiri (bukan uang) -- dipakai kalau session.isPremiumActive().
+    // PENGIRIM sendiri (bukan uang) -- durasiDays BEBAS (misal 1 hari doang),
+    // gak kebatas paket 7/30/90. Dipakai kalau session.isPremiumActive().
     fun createGiveawayClaimFromPremium(
-        packageId: String,
+        durationDays: Int,
         maxClaims: Int = 1,
         onResult: (PremiumClaimDto?, String?) -> Unit
     ) {
@@ -3928,7 +3930,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 val result = NetworkClient.supabaseDbApi.createGiveawayClaimFromPremium(
-                    body = CreateGiveawayClaimRequest(p_package_id = packageId, p_max_claims = maxClaims),
+                    body = CreateGiveawayClaimFromDaysRequest(p_duration_days = durationDays, p_max_claims = maxClaims),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )

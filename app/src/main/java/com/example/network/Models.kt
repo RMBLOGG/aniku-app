@@ -1815,6 +1815,22 @@ data class CreateGiveawayClaimRequest(
     val p_max_claims: Int = 1
 )
 
+// Versi gift langsung dengan durasi hari BEBAS (bukan paket fixed) -- dibayar
+// dari sisa hari Premium pengirim sendiri, cocok buat "gift 1 hari doang".
+@JsonClass(generateAdapter = true)
+data class CreatePremiumClaimFromDaysRequest(
+    val p_target_user_id: String,
+    val p_duration_days: Int
+)
+
+// Versi giveaway dengan durasi hari BEBAS (bukan paket fixed) -- dibayar
+// dari sisa hari Premium pengirim sendiri.
+@JsonClass(generateAdapter = true)
+data class CreateGiveawayClaimFromDaysRequest(
+    val p_duration_days: Int,
+    val p_max_claims: Int = 1
+)
+
 // Body buat manggil RPC claim_giveaway (user tap tombol "Klaim" di chat)
 @JsonClass(generateAdapter = true)
 data class ClaimGiveawayRequest(

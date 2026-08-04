@@ -1637,6 +1637,9 @@ fun GiftPremiumSheet(
     // Kalau giveawayOnly (dipanggil dari chat, tanpa target spesifik), dipaksa "giveaway".
     var mode by remember { mutableStateOf(if (giveawayOnly) "giveaway" else "direct") }
     var slotCount by remember { mutableStateOf(1) }
+    // Durasi bebas per hari, cuma dipakai kalau payFromOwnPremium (gratis dari
+    // sisa hari Premium sendiri) -- gak kebatas paket 7/30/90 kayak mode bayar.
+    var customDurationDays by remember { mutableStateOf(1) }
     var isLoading by remember { mutableStateOf(false) }
     var resultClaim by remember { mutableStateOf<PremiumClaimDto?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -1792,45 +1795,74 @@ fun GiftPremiumSheet(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Pilih Paket", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
             if (payFromOwnPremium) {
                 Text(
                     "Kamu Premium aktif — gift/giveaway ini GRATIS, dibayar pakai sisa hari Premium kamu sendiri (sisa: $remainingPremiumDays hari)",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
-            }
-            packages.forEach { pkg ->
-                val isSelected = selectedPackageId == pkg.id
-                val requiredDays = pkg.duration_days * (if (mode == "giveaway") slotCount else 1)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        .clickable { selectedPackageId = pkg.id }
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(pkg.label, fontWeight = FontWeight.SemiBold)
-                    val priceText = when {
-                        payFromOwnPremium -> "$requiredDays hari"
-                        mode == "giveaway" && !selfMode -> "Rp${pkg.price * slotCount}"
-                        else -> "Rp${pkg.price}"
-                    }
-                    Text(
-                        priceText,
-                        color = if (payFromOwnPremium && requiredDays > remainingPremiumDays)
-                            MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                val requiredDaysCustom = customDurationDays * (if (mode == "giveaway") slotCount else 1)
+                Text("Durasi per Hadiah (hari)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    IconButton(
+                        onClick = { if (customDurationDays > 1) customDurationDays-- },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text("-", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("$customDurationDays hari", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    IconButton(
+                        onClick = { if (customDurationDays < 365) customDurationDays++ },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    if (mode == "giveaway")
+                        "Total dipotong: $requiredDaysCustom hari ($customDurationDays hari × $slotCount pemenang)"
+                    else
+                        "Total dipotong: $requiredDaysCustom hari",
+                    fontSize = 12.sp,
+                    color = if (requiredDaysCustom > remainingPremiumDays)
+                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Text("Pilih Paket", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(8.dp))
+                packages.forEach { pkg ->
+                    val isSelected = selectedPackageId == pkg.id
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .clickable { selectedPackageId = pkg.id }
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(pkg.label, fontWeight = FontWeight.SemiBold)
+                        val priceText = if (mode == "giveaway" && !selfMode) "Rp${pkg.price * slotCount}" else "Rp${pkg.price}"
+                        Text(priceText, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
 
             if (!selfMode) {
@@ -1901,13 +1933,29 @@ fun GiftPremiumSheet(
 
             Button(
                 onClick = {
-                    val pkgId = selectedPackageId ?: return@Button
-                    val pkg = packages.firstOrNull { it.id == pkgId }
-                    val requiredDays = (pkg?.duration_days ?: 0) * (if (mode == "giveaway") slotCount else 1)
-                    if (payFromOwnPremium && requiredDays > remainingPremiumDays) {
-                        errorMsg = "Sisa hari Premium kamu gak cukup ($remainingPremiumDays hari, butuh $requiredDays hari)"
+                    if (payFromOwnPremium) {
+                        val requiredDays = customDurationDays * (if (mode == "giveaway") slotCount else 1)
+                        if (requiredDays > remainingPremiumDays) {
+                            errorMsg = "Sisa hari Premium kamu gak cukup ($remainingPremiumDays hari, butuh $requiredDays hari)"
+                            return@Button
+                        }
+                        isLoading = true
+                        errorMsg = null
+                        if (mode == "direct") {
+                            viewModel.createPremiumClaimFromPremium(targetUserId, customDurationDays) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
+                        } else {
+                            viewModel.createGiveawayClaimFromPremium(customDurationDays, slotCount) { claim, error ->
+                                isLoading = false
+                                if (claim != null) resultClaim = claim else errorMsg = error
+                            }
+                        }
                         return@Button
                     }
+
+                    val pkgId = selectedPackageId ?: return@Button
                     isLoading = true
                     errorMsg = null
                     when {
@@ -1917,20 +1965,8 @@ fun GiftPremiumSheet(
                                 if (claim != null) resultClaim = claim else errorMsg = error
                             }
                         }
-                        mode == "direct" && payFromOwnPremium -> {
-                            viewModel.createPremiumClaimFromPremium(targetUserId, pkgId) { claim, error ->
-                                isLoading = false
-                                if (claim != null) resultClaim = claim else errorMsg = error
-                            }
-                        }
                         mode == "direct" -> {
                             viewModel.createPremiumClaim(targetUserId, pkgId) { claim, error ->
-                                isLoading = false
-                                if (claim != null) resultClaim = claim else errorMsg = error
-                            }
-                        }
-                        payFromOwnPremium -> {
-                            viewModel.createGiveawayClaimFromPremium(pkgId, slotCount) { claim, error ->
                                 isLoading = false
                                 if (claim != null) resultClaim = claim else errorMsg = error
                             }
@@ -1943,7 +1979,7 @@ fun GiftPremiumSheet(
                         }
                     }
                 },
-                enabled = selectedPackageId != null && !isLoading,
+                enabled = (payFromOwnPremium || selectedPackageId != null) && !isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (isLoading) {
