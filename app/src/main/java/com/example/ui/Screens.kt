@@ -2068,7 +2068,6 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // ── Premium banner ──
-                        var showBuyPremiumSheet by remember { mutableStateOf(false) }
                         Row(
                             modifier = Modifier
                                 .padding(horizontal = 20.dp)
@@ -2076,7 +2075,7 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color.White.copy(alpha = 0.06f))
                                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
-                                .clickable { if (isLoggedIn) showBuyPremiumSheet = true else onShowLoginDialog() }
+                                .clickable { if (isLoggedIn) navController.navigate("premium_list") else onShowLoginDialog() }
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -2103,15 +2102,6 @@ fun HomeScreen(
                                 )
                             }
                             Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = Color.White.copy(alpha = 0.5f))
-                        }
-                        if (showBuyPremiumSheet) {
-                            GiftPremiumSheet(
-                                targetUserId = session.userId ?: "",
-                                targetUsername = session.username ?: "Kamu",
-                                viewModel = viewModel,
-                                selfMode = true,
-                                onDismiss = { showBuyPremiumSheet = false }
-                            )
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))

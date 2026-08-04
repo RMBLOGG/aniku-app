@@ -1775,7 +1775,8 @@ data class PremiumPackageDto(
     val label: String,
     val duration_days: Int,
     val price: Int,
-    val is_active: Boolean? = true
+    val is_active: Boolean? = true,
+    val bonus_diamond: Int? = 0
 )
 
 @JsonClass(generateAdapter = true)

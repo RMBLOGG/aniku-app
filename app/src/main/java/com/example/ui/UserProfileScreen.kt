@@ -97,7 +97,8 @@ fun UserProfileScreen(
     onBack: () -> Unit,
     onEditOwnProfile: () -> Unit,
     onNavigateToAnime: (String) -> Unit = {},
-    onOpenPrivateChat: (String) -> Unit = {}
+    onOpenPrivateChat: (String) -> Unit = {},
+    onOpenPremiumList: () -> Unit = {}
 ) {
     val session by viewModel.session.collectAsState()
     val profile by viewModel.viewedProfile.collectAsState()
@@ -473,9 +474,8 @@ fun UserProfileScreen(
                         Text("Edit Profil Saya", fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    var showBuyPremiumSheet by remember { mutableStateOf(false) }
                     OutlinedButton(
-                        onClick = { showBuyPremiumSheet = true },
+                        onClick = onOpenPremiumList,
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, Color(0xFFFFA000).copy(alpha = 0.5f)),
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -487,15 +487,6 @@ fun UserProfileScreen(
                         Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = Color(0xFFFFA000), modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Beli Premium", fontWeight = FontWeight.Bold)
-                    }
-                    if (showBuyPremiumSheet) {
-                        GiftPremiumSheet(
-                            targetUserId = p.id,
-                            targetUsername = p.username ?: "Kamu",
-                            viewModel = viewModel,
-                            selfMode = true,
-                            onDismiss = { showBuyPremiumSheet = false }
-                        )
                     }
                 } else {
                     val showBanButton = canModerate
@@ -1628,11 +1619,14 @@ fun GiftPremiumSheet(
     viewModel: AnikuViewModel,
     selfMode: Boolean = false,
     giveawayOnly: Boolean = false,
+    // Dipakai kalau sheet ini dibuka dari halaman List Premium yang baru
+    // (user udah milih paket duluan di situ) -- jadi gak perlu milih ulang.
+    preselectedPackageId: String? = null,
     onDismiss: () -> Unit
 ) {
     val packages by viewModel.premiumPackages.collectAsState()
     val session by viewModel.session.collectAsState()
-    var selectedPackageId by remember { mutableStateOf<String?>(null) }
+    var selectedPackageId by remember { mutableStateOf(preselectedPackageId) }
     // "direct" atau "giveaway" - kalau selfMode, mode ini ga ditampilin (selalu "direct").
     // Kalau giveawayOnly (dipanggil dari chat, tanpa target spesifik), dipaksa "giveaway".
     var mode by remember { mutableStateOf(if (giveawayOnly) "giveaway" else "direct") }

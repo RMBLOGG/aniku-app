@@ -1061,7 +1061,8 @@ class MainActivity : FragmentActivity() {
                                     navController.navigate("profile")
                                 },
                                 onNavigateToAnime = { slug -> navController.navigate("detail/$slug") },
-                                onOpenPrivateChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") }
+                                onOpenPrivateChat = { otherUserId -> navController.navigate("private_chat/$otherUserId") },
+                                onOpenPremiumList = { navController.navigate("premium_list") }
                             )
                         }
                         composable("user_list") {
@@ -1123,6 +1124,12 @@ class MainActivity : FragmentActivity() {
                         }
                         composable("diamond_topup") {
                             DiamondTopUpScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable("premium_list") {
+                            PremiumListScreen(
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() }
                             )
