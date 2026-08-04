@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.delay
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -1723,6 +1724,41 @@ fun GiftPremiumSheet(
                     }
                 }
 
+                // Polling tiap 4 detik selagi sheet ini kebuka, biar begitu callback
+                // Sakurupiah keproses di server, sukses langsung ketauan otomatis
+                // tanpa user harus keluar-buka sheet lagi -- sama pola kayak Top-up Diamond.
+                var claimStatus by remember(claim.id) { mutableStateOf(claim.status) }
+                var keepPollingClaim by remember(claim.id) { mutableStateOf(true) }
+                LaunchedEffect(claim.id, invoice) {
+                    if (invoice == null) return@LaunchedEffect
+                    while (keepPollingClaim) {
+                        delay(4000)
+                        viewModel.getPremiumClaimStatus(claim.id) { result ->
+                            if (result != null) claimStatus = result.status
+                            if (result?.status == "claimed" || result?.status == "ready") {
+                                keepPollingClaim = false
+                                if (selfMode) viewModel.refreshProfile()
+                            }
+                        }
+                    }
+                }
+
+                if (claimStatus == "claimed" || claimStatus == "ready") {
+                    Text("Pembayaran Berhasil!", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        if (selfMode) "Premium kamu udah aktif." else "Gift Premium buat $targetUsername udah aktif.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                        Text("Tutup")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    return@Column
+                }
+
                 Text(
                     if (selfMode) "Pembelian Premium Dibuat!" else "Gift Premium Berhasil Dibuat!",
                     fontSize = 18.sp, fontWeight = FontWeight.Bold
@@ -1746,12 +1782,45 @@ fun GiftPremiumSheet(
                         )
                     }
                     invoice != null -> {
+                        // PENTING: field "qr" dari Sakurupiah itu URL ke GAMBAR PNG QR code
+                        // yang udah jadi, BUKAN raw string EMVCo QRIS -- jadi langsung
+                        // ditampilin apa adanya, gak di-generate ulang. Lihat catatan
+                        // yang sama di DiamondInvoiceSheet (DiamondTopUpScreen.kt).
+                        val qrImageUrl = invoice?.qr
+                        val hasQrImage = !qrImageUrl.isNullOrBlank()
+
                         Text(
-                            "Selesaikan pembayaran QRIS buat aktifin Premium-nya. Otomatis aktif setelah pembayaran terverifikasi.",
+                            "Scan QRIS di bawah buat selesaikan pembayaran. Otomatis aktif setelah pembayaran terverifikasi.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(16.dp))
+
+                        if (hasQrImage) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 40.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(240.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color.White)
+                                        .padding(12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    AsyncImage(
+                                        model = qrImageUrl,
+                                        contentDescription = "QRIS Pembayaran Premium",
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
                         Button(
                             onClick = {
                                 val url = invoice?.checkout_url
@@ -1765,7 +1834,7 @@ fun GiftPremiumSheet(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Bayar Sekarang")
+                            Text(if (hasQrImage) "Buka Halaman Pembayaran" else "Bayar Sekarang")
                         }
                     }
                 }

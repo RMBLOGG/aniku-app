@@ -4108,6 +4108,29 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Cek status klaim premium sekali (dipanggil berulang dari UI selagi
+    // bottom sheet invoice kebuka, buat munculin popup begitu status
+    // berubah jadi "claimed" / "ready" -- sama pola kayak getDiamondTopupStatus.
+    fun getPremiumClaimStatus(
+        claimId: String,
+        onResult: (PremiumClaimDto?) -> Unit
+    ) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getPremiumClaimById(
+                    idQuery = "eq.$claimId",
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                onResult(result.firstOrNull())
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "getPremiumClaimStatus error", e)
+                onResult(null)
+            }
+        }
+    }
+
     // Cek status top-up diamond sekali (dipanggil berulang dari UI selagi
     // bottom sheet invoice kebuka, buat munculin popup begitu status
     // berubah jadi "credited" atau "invalid").
