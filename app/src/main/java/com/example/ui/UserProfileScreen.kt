@@ -1663,6 +1663,19 @@ fun GiftPremiumSheet(
         viewModel.refreshProfile()
     }
 
+    // Kalau dibuka dari halaman List Premium (paket udah dipilih di situ),
+    // langsung generate invoice-nya, gak perlu klik "Beli Sekarang" lagi.
+    LaunchedEffect(preselectedPackageId) {
+        if (selfMode && preselectedPackageId != null && resultClaim == null && !isLoading) {
+            isLoading = true
+            errorMsg = null
+            viewModel.createSelfPremiumClaim(preselectedPackageId) { claim, error ->
+                isLoading = false
+                if (claim != null) resultClaim = claim else errorMsg = error
+            }
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
