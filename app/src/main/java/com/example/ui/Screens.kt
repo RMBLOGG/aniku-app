@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.webkit.WebChromeClient
@@ -63,6 +64,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.FontFamily
@@ -2342,181 +2344,153 @@ fun HomeScreen(
 
             activeAnnouncement?.let { ann ->
                 item {
-                    var dismissed by remember { mutableStateOf(false) }
-                    val visible = remember { MutableTransitionState(false).apply { targetState = true } }
+                    val ctx = LocalContext.current
+                    val annPrefs = remember { ctx.getSharedPreferences("aniku_announcement_prefs", Context.MODE_PRIVATE) }
+                    var dismissed by remember(ann.id) {
+                        mutableStateOf(annPrefs.getString("hidden_ann_id", null) == ann.id)
+                    }
                     if (!dismissed) {
-                        AnimatedVisibility(
-                            visibleState = visible,
-                            enter = slideInVertically(
-                                initialOffsetY = { -it },
-                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-                            ) + fadeIn(animationSpec = tween(300)),
-                            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                        Dialog(
+                            onDismissRequest = { dismissed = true },
+                            properties = DialogProperties(usePlatformDefaultWidth = false)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .padding(horizontal = 16.dp, vertical = 6.dp)
                                     .fillMaxWidth()
+                                    .padding(horizontal = 28.dp)
                             ) {
-                                // Bottom glow
-                                Box(
+                                Column(
                                     modifier = Modifier
-                                        .fillMaxWidth(0.8f)
-                                        .height(12.dp)
-                                        .align(Alignment.BottomCenter)
-                                        .offset(y = 6.dp)
+                                        .fillMaxWidth()
                                         .background(
-                                            brush = Brush.horizontalGradient(
-                                                colors = listOf(Color.Transparent, Color(0x33E53935), Color.Transparent)
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0xFF1C0A0A), Color(0xFF141414), Color(0xFF1A0D0D))
                                             ),
-                                            shape = RoundedCornerShape(50)
+                                            shape = RoundedCornerShape(20.dp)
                                         )
-                                )
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(18.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                        .border(
+                                            width = 1.dp,
+                                            brush = Brush.linearGradient(
+                                                colors = listOf(Color(0x66E53935), Color(0x33E53935), Color(0x66E53935))
+                                            ),
+                                            shape = RoundedCornerShape(20.dp)
+                                        )
+                                        .padding(22.dp)
                                 ) {
+                                    // Header: icon + title
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text("📢", fontSize = 20.sp)
+                                        Text(
+                                            "PENGUMUMAN",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 17.sp,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+
+                                    if (!ann.created_at.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text(
+                                            text = ann.created_at,
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(Color(0xFF1C0A0A), Color(0xFF141414), Color(0xFF1A0D0D))
-                                                ),
-                                                shape = RoundedCornerShape(18.dp)
-                                            )
-                                            .border(
-                                                width = 1.dp,
-                                                brush = Brush.linearGradient(
-                                                    colors = listOf(Color(0x44E53935), Color(0x22E53935), Color(0x44E53935))
-                                                ),
-                                                shape = RoundedCornerShape(18.dp)
-                                            )
+                                            .height(1.dp)
+                                            .background(Color.White.copy(alpha = 0.1f))
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Scrollable body so long announcements don't overflow the screen
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 380.dp)
+                                            .verticalScroll(rememberScrollState())
                                     ) {
-                                        // Shimmer top line
+                                        Text(
+                                            text = ann.title,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = ann.message,
+                                            color = Color.White.copy(alpha = 0.75f),
+                                            fontSize = 13.5.sp,
+                                            lineHeight = 20.sp
+                                        )
+                                    }
+
+                                    // Download button (only if download_url exists)
+                                    if (!ann.download_url.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
                                         Box(
                                             modifier = Modifier
-                                                .fillMaxWidth(0.7f)
-                                                .height(1.dp)
-                                                .align(Alignment.TopCenter)
+                                                .fillMaxWidth()
                                                 .background(
-                                                    brush = Brush.horizontalGradient(
-                                                        colors = listOf(Color.Transparent, Color(0x88FF6464), Color.Transparent)
-                                                    )
+                                                    brush = Brush.linearGradient(
+                                                        colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
+                                                    ),
+                                                    shape = RoundedCornerShape(10.dp)
                                                 )
-                                        )
-                                        Row(
-                                            modifier = Modifier.padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                                .clickable {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url))
+                                                    ctx.startActivity(intent)
+                                                }
+                                                .padding(vertical = 11.dp),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            // Icon box
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(44.dp)
-                                                    .background(
-                                                        brush = Brush.linearGradient(
-                                                            colors = listOf(Color(0x44E53935), Color(0x22B71C1C))
-                                                        ),
-                                                        shape = RoundedCornerShape(14.dp)
-                                                    )
-                                                    .border(1.dp, Color(0x44E53935), RoundedCornerShape(14.dp)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text("📢", fontSize = 22.sp)
-                                            }
-                                            // Content
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                // Badge with pulse dot
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier
-                                                        .background(Color(0x22E53935), RoundedCornerShape(6.dp))
-                                                        .border(1.dp, Color(0x33E53935), RoundedCornerShape(6.dp))
-                                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                                ) {
-                                                    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                                                    val pulseAlpha by infiniteTransition.animateFloat(
-                                                        initialValue = 1f, targetValue = 0.3f,
-                                                        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
-                                                        label = "pulseAlpha"
-                                                    )
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(5.dp)
-                                                            .background(Color(0xFFFF5252).copy(alpha = pulseAlpha), CircleShape)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(5.dp))
-                                                    Text(
-                                                        "PENGUMUMAN",
-                                                        color = Color(0xFFFF6B6B),
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        letterSpacing = 1.5.sp
-                                                    )
+                                            Text("Download", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(18.dp))
+
+                                    // Bottom actions: Close + Jangan tampilkan lagi
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .background(Color(0xFFE53935), RoundedCornerShape(10.dp))
+                                                .clickable { dismissed = true }
+                                                .padding(vertical = 11.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text("Tutup", color = Color.White, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    annPrefs.edit().putString("hidden_ann_id", ann.id).apply()
+                                                    dismissed = true
                                                 }
-                                                Spacer(modifier = Modifier.height(5.dp))
-                                                Text(
-                                                    text = ann.title,
-                                                    color = Color.White,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    fontSize = 14.sp,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = ann.message,
-                                                    color = Color.White.copy(alpha = 0.5f),
-                                                    fontSize = 11.5.sp,
-                                                    maxLines = Int.MAX_VALUE,
-                                                    overflow = TextOverflow.Visible
-                                                )
-                                            }
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                // Close button
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(28.dp)
-                                                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                                                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                                                        .clickable { dismissed = true },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text("✕", color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
-                                                }
-                                                // Download button (only if download_url exists)
-                                                if (!ann.download_url.isNullOrBlank()) {
-                                                    val ctx = LocalContext.current
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .background(
-                                                                brush = Brush.linearGradient(
-                                                                    colors = listOf(Color(0xFFE53935), Color(0xFFB71C1C))
-                                                                ),
-                                                                shape = RoundedCornerShape(8.dp)
-                                                            )
-                                                            .clickable {
-                                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ann.download_url))
-                                                                ctx.startActivity(intent)
-                                                            }
-                                                            .padding(horizontal = 8.dp, vertical = 5.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            "Download",
-                                                            color = Color.White,
-                                                            fontSize = 10.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                }
-                                            }
+                                                .padding(vertical = 11.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "Jangan tampilkan lagi",
+                                                color = Color.White.copy(alpha = 0.85f),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                textAlign = TextAlign.Center
+                                            )
                                         }
                                     }
                                 }
