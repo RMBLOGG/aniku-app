@@ -4651,6 +4651,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
                     "download_url" to downloadUrl
                 )
                 if (annId.isNullOrEmpty()) {
+                    if (active) {
+                        // Nonaktifkan semua pengumuman lama dulu, biar cuma 1 yang aktif & tampil ke user
+                        try {
+                            NetworkClient.supabaseDbApi.deactivateAllAnnouncements(
+                                authHeader = authHeader,
+                                apiKey = SUPABASE_ANON_KEY
+                            )
+                        } catch (de: Exception) {
+                            Log.e("AnikuVM", "Failed deactivating old announcements", de)
+                        }
+                    }
                     NetworkClient.supabaseDbApi.insertAnnouncement(inputBody, authHeader, SUPABASE_ANON_KEY)
                 } else {
                     NetworkClient.supabaseDbApi.updateAnnouncement("eq.$annId", inputBody, authHeader, SUPABASE_ANON_KEY)

@@ -314,6 +314,7 @@ interface SupabaseDbApi {
     @GET("rest/v1/announcements")
     suspend fun getAnnouncements(
         @Query("is_active") isActive: String = "eq.true",
+        @Query("order") order: String = "created_at.desc",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<AnnouncementDto>
@@ -624,6 +625,15 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
     ): List<AnnouncementDto>
+
+    @PATCH("rest/v1/announcements")
+    suspend fun deactivateAllAnnouncements(
+        @Query("is_active") isActive: String = "eq.true",
+        @Body data: Map<String, @JvmSuppressWildcards Any?> = mapOf("is_active" to false),
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=minimal"
+    ): retrofit2.Response<Unit>
 
     @DELETE("rest/v1/announcements")
     suspend fun deleteAnnouncement(
