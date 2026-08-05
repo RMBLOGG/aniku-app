@@ -1647,85 +1647,152 @@ private fun GiveawayBubble(
     }
     var isLoading by remember { mutableStateOf(false) }
     var resultText by remember { mutableStateOf<String?>(null) }
+    var isWinner by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .padding(horizontal = 20.dp, vertical = 6.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFFFFD54F), Color(0xFFFF8A65))
+                    Brush.verticalGradient(
+                        listOf(Color(0xFFFFC94A), Color(0xFFFF7A45))
                     )
                 )
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                .padding(16.dp)
         ) {
-            Text(text = "🎁", fontSize = 32.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message.message,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (isClaimed) {
+            // ── Header: siapa yang bikin giveaway-nya ──
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.3f))
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = resultText ?: "Sudah diklaim",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
-                    )
-                }
-            } else {
-                Button(
-                    onClick = {
-                        if (isLoading) return@Button
-                        val claimId = message.giveaway_claim_id ?: return@Button
-                        isLoading = true
-                        viewModel.claimGiveaway(claimId) { result, error ->
-                            isLoading = false
-                            isClaimed = true
-                            resultText = if (result != null && result.success) {
-                                val left = result.slots_left
-                                if (left != null && left > 0) {
-                                    "Kamu dapat Premium ${result.package_label ?: ""}! (Sisa $left slot)"
-                                } else {
-                                    "Kamu dapat Premium ${result.package_label ?: ""}!"
-                                }
-                            } else {
-                                result?.message ?: error ?: "Giveaway sudah diklaim orang lain"
-                            }
-                        }
-                    },
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color(0xFFFF6F00)
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFFFF6F00)
+                    if (!message.avatar_url.isNullOrBlank()) {
+                        AsyncImage(
+                            model = message.avatar_url,
+                            contentDescription = message.username,
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
                     } else {
-                        Text("Klaim Sekarang", fontWeight = FontWeight.Bold)
+                        Text(
+                            message.username.take(1).uppercase(),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        message.username,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        "membagikan Giveaway Premium",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 10.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ── Isi giveaway ──
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.14f))
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🎁", fontSize = 26.sp)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = message.message,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                if (isClaimed) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.White.copy(alpha = 0.9f))
+                            .padding(horizontal = 18.dp, vertical = 9.dp)
+                    ) {
+                        Text(if (isWinner) "🎉" else "✅", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = resultText ?: "Sudah diklaim",
+                            color = Color(0xFFFF6F00),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.5.sp
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            if (isLoading) return@Button
+                            val claimId = message.giveaway_claim_id ?: return@Button
+                            isLoading = true
+                            viewModel.claimGiveaway(claimId) { result, error ->
+                                isLoading = false
+                                isClaimed = true
+                                isWinner = result != null && result.success
+                                resultText = if (result != null && result.success) {
+                                    val left = result.slots_left
+                                    if (left != null && left > 0) {
+                                        "Kamu dapat Premium ${result.package_label ?: ""}! (Sisa $left slot)"
+                                    } else {
+                                        "Kamu dapat Premium ${result.package_label ?: ""}!"
+                                    }
+                                } else {
+                                    result?.message ?: error ?: "Giveaway sudah diklaim orang lain"
+                                }
+                            }
+                        },
+                        enabled = !isLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color(0xFFFF6F00)
+                        ),
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFFFF6F00)
+                            )
+                        } else {
+                            Text("🎁  Klaim Sekarang", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
