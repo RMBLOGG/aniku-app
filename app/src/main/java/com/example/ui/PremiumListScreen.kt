@@ -2,13 +2,16 @@ package com.example.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +36,7 @@ fun PremiumListScreen(
     val packages by viewModel.premiumPackages.collectAsState()
     val session by viewModel.session.collectAsState()
     var chosenPackageId by remember { mutableStateOf<String?>(null) }
+    var showManualSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (packages.isEmpty()) viewModel.loadPremiumPackages()
@@ -95,8 +99,35 @@ fun PremiumListScreen(
                     PremiumPackageCard(pkg = pkg, onChoose = { chosenPackageId = pkg.id })
                     Spacer(modifier = Modifier.height(14.dp))
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                        .clickable { showManualSheet = true }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Bayar dari luar negeri", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("QRIS otomatis gak kebaca? Bayar manual, direview admin", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+                    }
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                }
             }
         }
+    }
+
+    if (showManualSheet) {
+        ManualPremiumSheet(
+            packages = activePackages,
+            viewModel = viewModel,
+            onDismiss = { showManualSheet = false }
+        )
     }
 
     if (chosenPackageId != null && session.userId != null) {

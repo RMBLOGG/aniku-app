@@ -4154,6 +4154,115 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── Manual QRIS (bayar dari luar negeri) ────────────────────────────
+    // Beda dari Sakurupiah otomatis di atas: checkout & upload bukti bayar
+    // manggil aniku-store.my.id (Next.js), BUKAN Supabase. Setelah row-nya
+    // kebikin, polling status TETAP lewat getPremiumClaimStatus /
+    // getDiamondTopupStatus yang udah ada -- cek juga field manual_review_status
+    // buat bedain "masih nunggu admin" vs "ditolak" (status jadi 'invalid' juga
+    // pas ditolak, sama kayak Sakurupiah expired/gagal).
+
+    private fun parseStoreApiError(e: retrofit2.HttpException): String? {
+        return try {
+            val errorBody = e.response()?.errorBody()?.string()
+            val json = errorBody?.let { org.json.JSONObject(it) }
+            json?.optString("error")?.takeIf { it.isNotBlank() }
+        } catch (parseErr: Exception) { null }
+    }
+
+    fun manualPremiumCheckout(
+        packageId: String,
+        onResult: (ManualCheckoutResponseDto?, String?) -> Unit
+    ) {
+        val userNumber = session.value.userNumber
+        if (userNumber == null) {
+            onResult(null, "ID Aniku kamu belum kebaca, coba refresh profil dulu")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.anikuStoreApi.premiumManualCheckout(
+                    ManualPremiumCheckoutRequest(user_number = userNumber, package_id = packageId)
+                )
+                if (result.error != null) onResult(null, result.error) else onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                onResult(null, parseStoreApiError(e) ?: "Gagal membuat pesanan (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "manualPremiumCheckout error", e)
+                onResult(null, e.message ?: "Gagal menghubungi server, coba lagi")
+            }
+        }
+    }
+
+    fun manualDiamondCheckout(
+        amount: Int,
+        onResult: (ManualCheckoutResponseDto?, String?) -> Unit
+    ) {
+        val userNumber = session.value.userNumber
+        if (userNumber == null) {
+            onResult(null, "ID Aniku kamu belum kebaca, coba refresh profil dulu")
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.anikuStoreApi.diamondManualCheckout(
+                    ManualDiamondCheckoutRequest(user_number = userNumber, amount = amount)
+                )
+                if (result.error != null) onResult(null, result.error) else onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                onResult(null, parseStoreApiError(e) ?: "Gagal membuat pesanan (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "manualDiamondCheckout error", e)
+                onResult(null, e.message ?: "Gagal menghubungi server, coba lagi")
+            }
+        }
+    }
+
+    // type: "premium" | "diamond". id: claim_id (premium) atau merchant_ref (diamond) --
+    // sama kayak form-data yang diharapkan /api/manual-proof di web.
+    fun uploadManualProof(
+        type: String,
+        id: String,
+        note: String,
+        imageUri: Uri,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val contentResolver = appContext.contentResolver
+                val inputStream = contentResolver.openInputStream(imageUri)
+                val byteBuffer = ByteArrayOutputStream()
+                val buffer = ByteArray(1024)
+                var len: Int
+                if (inputStream != null) {
+                    while (inputStream.read(buffer).also { len = it } != -1) {
+                        byteBuffer.write(buffer, 0, len)
+                    }
+                    inputStream.close()
+                }
+                val fileBytes = byteBuffer.toByteArray()
+                if (fileBytes.isEmpty()) {
+                    onResult(false, "Gagal baca gambar, coba pilih ulang")
+                    return@launch
+                }
+
+                val requestFile = fileBytes.toRequestBody("image/*".toMediaTypeOrNull(), 0, fileBytes.size)
+                val filePart = MultipartBody.Part.createFormData("file", "manual_proof.jpg", requestFile)
+                val typePart = type.toRequestBody("text/plain".toMediaTypeOrNull())
+                val idPart = id.toRequestBody("text/plain".toMediaTypeOrNull())
+                val notePart = note.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                val result = NetworkClient.anikuStoreApi.uploadManualProof(typePart, idPart, notePart, filePart)
+                if (result.error != null) onResult(false, result.error) else onResult(true, null)
+            } catch (e: retrofit2.HttpException) {
+                onResult(false, parseStoreApiError(e) ?: "Gagal upload bukti bayar (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "uploadManualProof error", e)
+                onResult(false, e.message ?: "Gagal menghubungi server, coba lagi")
+            }
+        }
+    }
+
     // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
     // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
     // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.

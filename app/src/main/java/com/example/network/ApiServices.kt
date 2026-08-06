@@ -877,7 +877,7 @@ interface SupabaseDbApi {
     @GET("rest/v1/diamond_topups")
     suspend fun getDiamondTopupByRef(
         @Query("payment_ref") refQuery: String,
-        @Query("select") select: String = "status,payment_status,diamond_amount",
+        @Query("select") select: String = "status,payment_status,diamond_amount,payment_method,manual_review_status",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<DiamondTopupStatusDto>
@@ -1389,6 +1389,30 @@ interface SupabaseDbApi {
     ): retrofit2.Response<Unit>
 }
 
+// Aniku Store (aniku-store.my.id) -- Next.js, host TERPISAH dari Supabase.
+// Cuma dipakai buat flow manual QRIS (bayar dari luar negeri): checkout bikin
+// row pending di premium_claims/diamond_topups (payment_method='manual_qris'),
+// upload bukti bayar disimpen di storage privat, admin approve manual lewat
+// /admin/manual-payments di web. Polling status TETAP lewat supabaseDbApi
+// (getPremiumClaimById / getDiamondTopupByRef) yang udah ada, gak lewat sini.
+interface AnikuStoreApi {
+    @POST("api/premium/manual-checkout")
+    suspend fun premiumManualCheckout(@Body body: ManualPremiumCheckoutRequest): ManualCheckoutResponseDto
+
+    @POST("api/diamond/manual-checkout")
+    suspend fun diamondManualCheckout(@Body body: ManualDiamondCheckoutRequest): ManualCheckoutResponseDto
+
+    // type: "premium" | "diamond". id: claim_id (premium) atau merchant_ref (diamond).
+    @Multipart
+    @POST("api/manual-proof")
+    suspend fun uploadManualProof(
+        @Part("type") type: RequestBody,
+        @Part("id") id: RequestBody,
+        @Part("note") note: RequestBody,
+        @Part file: MultipartBody.Part
+    ): ManualProofResponseDto
+}
+
 interface CloudinaryApi {
     @Multipart
     @POST("v1_1/biwlhrhi/image/upload")
@@ -1578,6 +1602,15 @@ object NetworkClient {
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(CloudinaryApi::class.java)
+    }
+
+    val anikuStoreApi: AnikuStoreApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://aniku-store.my.id/")
+            .client(defaultOkHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(AnikuStoreApi::class.java)
     }
 
     val jikanApi: JikanApi by lazy {

@@ -1792,13 +1792,51 @@ data class PremiumClaimDto(
     val max_claims: Int? = 1,
     val claims_filled: Int? = 0,
     val created_at: String? = null,
-    val expires_at: String? = null
+    val expires_at: String? = null,
+    // Ditambahin buat flow manual QRIS (bayar dari luar negeri) -- null/tak
+    // ada kalau claim-nya bayar via Sakurupiah otomatis kayak biasa.
+    val payment_method: String? = null,
+    val manual_review_status: String? = null
 )
 
 // Body buat manggil RPC create_self_premium_claim (beli premium buat diri sendiri)
 @JsonClass(generateAdapter = true)
 data class CreateSelfPremiumClaimRequest(
     val p_package_id: String
+)
+
+// ─── Manual QRIS (bayar dari luar negeri) ──────────────────────────────────
+// Dipanggil ke aniku-store.my.id (Next.js), BUKAN Supabase -- endpoint yang
+// sama persis dipakai halaman web /premium/manual & /diamond/manual. Row
+// yang dihasilin tetap masuk ke premium_claims/diamond_topups yang sama,
+// cuma payment_method='manual_qris', jadi status-nya tetap bisa dipoll pake
+// getPremiumClaimStatus / getDiamondTopupStatus yang udah ada.
+@JsonClass(generateAdapter = true)
+data class ManualPremiumCheckoutRequest(
+    val user_number: Int,
+    val package_id: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ManualDiamondCheckoutRequest(
+    val user_number: Int,
+    val amount: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class ManualCheckoutResponseDto(
+    val claim_id: String? = null, // premium
+    val merchant_ref: String? = null, // dipake buat query status diamond
+    val amount: Int? = null,
+    val diamond_amount: Int? = null,
+    val username: String? = null,
+    val error: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ManualProofResponseDto(
+    val ok: Boolean? = null,
+    val error: String? = null
 )
 
 // Body buat manggil RPC create_premium_claim (gift langsung ke user tertentu)
@@ -1915,7 +1953,10 @@ data class SakurupiahDiamondInvoiceResponse(
 data class DiamondTopupStatusDto(
     val status: String? = null,
     val payment_status: String? = null,
-    val diamond_amount: Int? = null
+    val diamond_amount: Int? = null,
+    // Sama kayak di PremiumClaimDto -- null/tak ada kalau via Sakurupiah otomatis.
+    val payment_method: String? = null,
+    val manual_review_status: String? = null
 )
 
 // Dari view diamond_topups_public (cuma expose data yang aman buat publik --

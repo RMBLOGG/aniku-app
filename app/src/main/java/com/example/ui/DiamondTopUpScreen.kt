@@ -7,6 +7,7 @@ import androidx.compose.animation.core.*
 import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -15,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,6 +53,7 @@ fun DiamondTopUpScreen(
     var showInvoiceSheet by remember { mutableStateOf(false) }
     var selectedChannel by remember { mutableStateOf(PAYMENT_CHANNELS.first()) }
     var channelMenuExpanded by remember { mutableStateOf(false) }
+    var showManualSheet by remember { mutableStateOf(false) }
 
     val amountValue = amountInput.toIntOrNull() ?: 0
     val estimatedDiamond = amountValue / 4
@@ -261,8 +264,35 @@ fun DiamondTopUpScreen(
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                    .clickable { showManualSheet = true }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Bayar dari luar negeri", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("QRIS otomatis gak kebaca? Bayar manual, direview admin", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showManualSheet) {
+        ManualDiamondSheet(
+            viewModel = viewModel,
+            onDismiss = { showManualSheet = false }
+        )
     }
 
     if (showInvoiceSheet && invoiceResult != null) {
