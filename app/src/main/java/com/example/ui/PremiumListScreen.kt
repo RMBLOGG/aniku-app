@@ -69,6 +69,32 @@ fun PremiumListScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            // Bayar dari luar negeri - dipindah ke paling atas biar langsung
+            // ketemu user asing/luar negeri sebelum mereka bingung liat QRIS.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+                    .clickable { showManualSheet = true }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Bayar dari luar negeri", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("QRIS otomatis gak kebaca? Bayar manual, direview admin", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
+                }
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Ringkasan keuntungan Premium biar user paham apa yang dia dapat
+            // sebelum milih paket.
+            PremiumBenefitsCard()
+            Spacer(modifier = Modifier.height(16.dp))
+
             if (session.isPremiumActive()) {
                 Row(
                     modifier = Modifier
@@ -99,25 +125,6 @@ fun PremiumListScreen(
                     PremiumPackageCard(pkg = pkg, onChoose = { chosenPackageId = pkg.id })
                     Spacer(modifier = Modifier.height(14.dp))
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
-                        .clickable { showManualSheet = true }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Bayar dari luar negeri", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text("QRIS otomatis gak kebaca? Bayar manual, direview admin", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f))
-                    }
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
-                }
             }
         }
     }
@@ -139,6 +146,47 @@ fun PremiumListScreen(
             preselectedPackageId = chosenPackageId,
             onDismiss = { chosenPackageId = null }
         )
+    }
+}
+
+@Composable
+private fun PremiumBenefitsCard() {
+    val benefits = listOf(
+        Triple("⚡", "XP Booster 2x", "Semua sumber XP (nonton episode & quiz) dilipatgandakan 2x selama Premium aktif"),
+        Triple("😍", "Reaction Chat Eksklusif", "Kasih reaction emoji bebas di Chat Global & Clan — fitur khusus member Premium"),
+        Triple("📡", "Server 5 - Streaming Cepat", "Akses sumber nonton \"Dayynime-v5\", loading lebih cepat & lancar dibanding server biasa")
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFFFC94A).copy(alpha = 0.08f))
+            .border(1.dp, Color(0xFFFFC94A).copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFFFFC94A), modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Keuntungan Premium", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFFFFC94A))
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        benefits.forEachIndexed { index, (emoji, title, desc) ->
+            Row(verticalAlignment = Alignment.Top) {
+                Text(emoji, fontSize = 16.sp, modifier = Modifier.padding(top = 1.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        desc,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+            if (index != benefits.lastIndex) Spacer(modifier = Modifier.height(12.dp))
+        }
     }
 }
 
