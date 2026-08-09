@@ -44,11 +44,13 @@ fun BadgeStoreScreen(
     val diamondBalance by viewModel.diamondBalance.collectAsState()
 
     var busyClanId by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         viewModel.loadBadgeCatalog()
         viewModel.loadMyOwnedBadges()
         viewModel.loadEquippedBadgesPublic()
+        isLoading = false
     }
 
     val ownedIds = remember(owned) { owned.map { it.clan_id }.toSet() }
@@ -84,7 +86,7 @@ fun BadgeStoreScreen(
             )
         }
     ) { padding ->
-        if (catalog.isEmpty()) {
+        if (isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
@@ -94,9 +96,24 @@ fun BadgeStoreScreen(
             return@Scaffold
         }
 
+        if (catalog.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Kamu belum join clan. Join clan dulu buat bisa beli badge tag clan kamu sendiri.",
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFF9AA3AF),
+                    fontSize = 14.sp
+                )
+            }
+            return@Scaffold
+        }
+
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Text(
-                "Tag badge kosmetik dari clan publik - bisa dipajang di chat walau kamu bukan anggotanya",
+                "Tag badge clan kamu sendiri - beli buat dipajang di chat",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
