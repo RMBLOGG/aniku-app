@@ -784,38 +784,21 @@ class MainActivity : FragmentActivity() {
                 Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    bottomBar = {
-                        // "Floating" dirender lewat overlay Box di bawah (sibling Scaffold),
-                        // BUKAN lewat slot bottomBar ini -- karena Scaffold.bottomBar selalu
-                        // mereservasi area solid di belakangnya, jadi nav-nya gak bisa beneran
-                        // "ngambang" di atas konten kayak punya Kuroflix.
-                        if (showBottomBar && navStyle != "Floating") {
-                            CurvedBottomNav(
-                                mainNavItems = mainNavItems,
-                                currentRoute = currentRoute,
-                                isSheetRouteActive = isSheetRouteActive,
-                                hasUnreadChat = hasUnreadChat,
-                                onNavigate = { route ->
-                                    navController.navigate(route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                onMoreClick = { showMoreSheet = true },
-                                navStyle = navStyle
-                            )
-                        }
-                    }
+                    containerColor = MaterialTheme.colorScheme.background
+                    // bottomBar slot sengaja DIKOSONGKAN total. Bottom nav sekarang SELALU
+                    // dirender lewat overlay Box di bawah (sibling Scaffold, lihat area
+                    // "Bottom nav Floating" beberapa baris ke bawah) -- karena
+                    // Scaffold.bottomBar selalu mereservasi area solid di belakangnya
+                    // (itu penyebab "kotak hitam yang motong layar" di style lama),
+                    // sedangkan overlay Box beneran ngambang di atas konten, persis
+                    // kayak punya Kuroflix.
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(
-                            // "Floating" gak butuh bottom padding -- konten sengaja scroll di
-                            // BELAKANG nav overlay-nya, persis kayak Kuroflix.
-                            bottom = if (showBottomBar && navStyle != "Floating") 76.dp else 0.dp
+                            // Konten sengaja scroll di BELAKANG nav overlay -- persis Kuroflix.
+                            bottom = 0.dp
                         ),
                         enterTransition = {
                             val toTab = isTabRoute(targetState.destination.route)
@@ -1221,10 +1204,11 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                // Bottom nav "Floating" — overlay beneran ngambang di atas konten,
-                // niru persis FloatingBottomNavigation-nya Kuroflix (bukan lewat
-                // Scaffold.bottomBar yang reserve area solid).
-                if (showBottomBar && navStyle == "Floating") {
+                // Bottom nav — SATU-SATUNYA jalur render, selalu overlay beneran ngambang
+                // di atas konten, niru persis FloatingBottomNavigation-nya Kuroflix (bukan
+                // lewat Scaffold.bottomBar yang reserve area solid). Tidak lagi bergantung
+                // pada navStyle -- desain nav dikunci ke bentuk ini di semua kondisi.
+                if (showBottomBar) {
                     CurvedBottomNav(
                         mainNavItems = mainNavItems,
                         currentRoute = currentRoute,
@@ -1238,7 +1222,6 @@ class MainActivity : FragmentActivity() {
                             }
                         },
                         onMoreClick = { showMoreSheet = true },
-                        navStyle = navStyle,
                         modifier = Modifier.align(Alignment.BottomCenter)
                     )
                 }

@@ -1430,7 +1430,7 @@ fun HomeScreen(
     // jadi konten di sini butuh ekstra bottom padding sendiri biar item terakhir gak
     // ketutup nav -- persis pattern "space for bottom floating navigation bar" di Kuroflix.
     val navStyle by viewModel.navStyle.collectAsState()
-    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
+    val floatingNavClearance = 100.dp // overlay nav selalu floating sekarang, clearance selalu diterapkan
     // Lambda stabil dishare ke semua card di screen ini, jadi gak bikin instance baru tiap card/tiap recomposition
     val onShowLoginDialog = remember { { showLoginDialog = true } }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
@@ -3344,7 +3344,7 @@ fun SearchScreen(
     // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val navStyle by viewModel.navStyle.collectAsState()
-    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
+    val floatingNavClearance = 100.dp // overlay nav selalu floating sekarang, clearance selalu diterapkan
     val accentColor = MaterialTheme.colorScheme.primary
     val cardStyle by viewModel.cardStyle.collectAsState()
     val gridLayout by viewModel.gridLayout.collectAsState()
@@ -3556,7 +3556,7 @@ fun ExploreScreen(
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
     val navStyle by viewModel.navStyle.collectAsState()
-    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
+    val floatingNavClearance = 100.dp // overlay nav selalu floating sekarang, clearance selalu diterapkan
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
@@ -4037,7 +4037,7 @@ fun BookmarkScreen(
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
     val navStyle by viewModel.navStyle.collectAsState()
-    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
+    val floatingNavClearance = 100.dp // overlay nav selalu floating sekarang, clearance selalu diterapkan
 
     LaunchedEffect(Unit) {
         viewModel.refreshBookmarks()
@@ -10435,53 +10435,13 @@ fun TampilanScreen(
             }
 
             // ── Section: Nav Style ──
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Style Bottom Navigation", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    val navOptions = listOf(
-                        "IconLabel" to "Icon + Label",
-                        "IconOnly"  to "Icon + titik aktif",
-                        "PillLabel" to "Pill label aktif",
-                        "PillIcon"  to "Pill icon only",
-                        "Floating"  to "Floating (ala Kuroflix)"
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        navOptions.forEach { (style, desc) ->
-                            val isSelected = activeNavStyle == style
-                            Column(
-                                modifier = Modifier.width(84.dp).clip(RoundedCornerShape(10.dp))
-                                    .border(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else Color.White.copy(0.1f), RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) accentColor.copy(0.08f) else MaterialTheme.colorScheme.surface)
-                                    .clickable { viewModel.changeNavStyle(style) }
-                                    .padding(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (isSelected) {
-                                    Box(modifier = Modifier.size(16.dp).background(accentColor, CircleShape), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                                    }
-                                } else {
-                                    Box(modifier = Modifier.size(16.dp).background(Color.White.copy(0.08f), CircleShape))
-                                }
-                                Text(desc, fontSize = 9.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurface.copy(0.6f),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            }
-                        }
-                    }
-                }
-            }
+            // Dihapus per rombak total: bottom nav sekarang dikunci ke satu desain
+            // (persis Kuroflix, floating pill icon-only bubble putih). Opsi lama
+            // (IconLabel/IconOnly/PillLabel/PillIcon) sengaja dihilangkan dari UI
+            // karena salah satunya (IconLabel) dirender sebagai bar solid full-width
+            // lewat Scaffold.bottomBar -- itu penyebab "kotak hitam yang motong layar"
+            // yang dilaporkan. Daripada nambah kondisi lagi, semua jalur render nav
+            // sekarang cuma satu: lihat CurvedBottomNav.kt & MainActivity.kt.
 
             // ── Section: Theme Preset ──
             Card(
