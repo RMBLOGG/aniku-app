@@ -21,6 +21,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 
+// Blend warna menuju putih sebesar `amount` (0f..1f). Dipakai buat bikin
+// pill floating nav yang "sedikit lebih terang" dari background halaman,
+// alih-alih pakai surfaceColor tema yang bisa selisih jauh dan keliatan
+// seperti kotak solid terpisah.
+private fun Color.lightened(amount: Float): Color {
+    val a = amount.coerceIn(0f, 1f)
+    return Color(
+        red = red + (1f - red) * a,
+        green = green + (1f - green) * a,
+        blue = blue + (1f - blue) * a,
+        alpha = alpha
+    )
+}
+
 @Composable
 fun CurvedBottomNav(
     mainNavItems: List<Triple<String, String, ImageVector>>,
@@ -34,6 +48,18 @@ fun CurvedBottomNav(
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val backgroundColor = MaterialTheme.colorScheme.background
+
+    // Warna khusus buat pill "Floating" -- BUKAN surfaceColor tema biasa.
+    // surfaceColor tiap preset (Netflix, Midnight, dst) selisihnya jauh dari
+    // background halaman, jadi kalau dipakai apa adanya, pill nav keliatan
+    // sebagai "kotak" solid yang motong layar alih-alih ngambang nyatu kayak
+    // Kuroflix. Kuroflix sengaja bikin surface cuma sedikit lebih terang dari
+    // background (contoh: 0xFF0A0A0B -> 0xFF141416, selisih tipis). Di sini
+    // kita hitung ulang warna pill dari background halaman + lighten dikit
+    // (~7%), independen dari preset tema apa yang lagi aktif, supaya efek
+    // "floating & clean"-nya konsisten di semua tema.
+    val floatingNavBg = remember(backgroundColor) { backgroundColor.lightened(0.07f) }
 
     val allItems = listOf(Triple("home", "Home", Icons.Default.Home)) + mainNavItems
     val moreSelected = isSheetRouteActive
@@ -168,7 +194,7 @@ fun CurvedBottomNav(
                     .padding(bottom = 24.dp)
                     .height(64.dp)
                     .clip(RoundedCornerShape(32.dp))
-                    .background(surfaceColor) // solid, tanpa alpha -> gak ada bleed-through
+                    .background(floatingNavBg) // dekat ke background halaman -> ngambang, bukan "kotak"
                     .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(32.dp))
                     .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center
