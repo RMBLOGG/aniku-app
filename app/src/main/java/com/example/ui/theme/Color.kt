@@ -22,6 +22,16 @@ val MidnightSurface        = Color(0xFF13152B)
 val MidnightSurfaceVariant = Color(0xFF1C1F3A)
 val MidnightAccent         = Color(0xFF7C5AF6)
 
+// ── Sakura Noir (Premium) ──
+// Background gelap netral (bukan hitam pekat polos) supaya aksen pink-nya
+// tetap kerasa "soft" bukan norak, selisih background->surface dijaga tipis
+// (konsisten sama prinsip floating nav biar gak ada elemen yang keliatan
+// "kotak" solid terpisah pas nyatu sama komponen lain di app).
+val SakuraNoirBackground     = Color(0xFF16121A)
+val SakuraNoirSurface        = Color(0xFF201A26)
+val SakuraNoirSurfaceVariant = Color(0xFF2B2333)
+val SakuraNoirAccent         = Color(0xFFF2A6C4)
+
 // ── Accent palette ──
 val AccentRed    = Color(0xFFE53935)
 val AccentGreen  = Color(0xFF4CAF50)
@@ -59,6 +69,12 @@ fun getThemeColors(preset: String, accentName: String): ThemeColors = when (pres
         surface        = MidnightSurface,
         surfaceVariant = MidnightSurfaceVariant,
         accent         = MidnightAccent
+    )
+    "SakuraNoir" -> ThemeColors(
+        background     = SakuraNoirBackground,
+        surface        = SakuraNoirSurface,
+        surfaceVariant = SakuraNoirSurfaceVariant,
+        accent         = SakuraNoirAccent
     )
     else -> ThemeColors(  // Default
         background     = CinematicBackground,

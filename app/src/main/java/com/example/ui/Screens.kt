@@ -10362,6 +10362,7 @@ fun TampilanScreen(
     val activePreset by viewModel.themePreset.collectAsState()
     val activeCardStyle by viewModel.cardStyle.collectAsState()
     val activeNavStyle by viewModel.navStyle.collectAsState()
+    val sess by viewModel.session.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
 
     Column(
@@ -10459,21 +10460,26 @@ fun TampilanScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    val isPremiumUser = sess.isPremiumActive() || sess.isAdmin || sess.isModerator || sess.isBeta
                     val presets = listOf(
                         Triple("Default", Color(0xFF0A0A0A), Color(0xFFE53935)),
                         Triple("Netflix", Color(0xFF141414), Color(0xFFE50914)),
-                        Triple("Midnight", Color(0xFF0B0C1A), Color(0xFF7C5AF6))
+                        Triple("Midnight", Color(0xFF0B0C1A), Color(0xFF7C5AF6)),
+                        Triple("SakuraNoir", Color(0xFF16121A), Color(0xFFF2A6C4))
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         presets.forEach { (name, bgColor, acColor) ->
                             val isSelected = activePreset == name
+                            val isLocked = name == "SakuraNoir" && !isPremiumUser
                             Column(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .width(96.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
@@ -10481,7 +10487,13 @@ fun TampilanScreen(
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .background(bgColor)
-                                    .clickable { viewModel.changeThemePreset(name) }
+                                    .clickable {
+                                        if (isLocked) {
+                                            navController.navigate("premium_list")
+                                        } else {
+                                            viewModel.changeThemePreset(name)
+                                        }
+                                    }
                                     .padding(10.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -10518,6 +10530,21 @@ fun TampilanScreen(
                                             .size(6.dp)
                                             .background(acColor, CircleShape)
                                     )
+                                    if (isLocked) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Black.copy(alpha = 0.55f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Lock,
+                                                contentDescription = "Terkunci - fitur Premium",
+                                                tint = Color.White.copy(alpha = 0.9f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
                                 }
                                 // Checkmark or name
                                 if (isSelected) {
@@ -10531,11 +10558,19 @@ fun TampilanScreen(
                                     }
                                 }
                                 Text(
-                                    name,
+                                    if (name == "SakuraNoir") "Sakura Noir" else name,
                                     color = if (isSelected) acColor else Color.White.copy(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                 )
+                                if (isLocked) {
+                                    Text(
+                                        "Premium",
+                                        color = Color(0xFFF2A6C4).copy(alpha = 0.85f),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
                     }

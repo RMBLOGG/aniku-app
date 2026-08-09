@@ -207,13 +207,25 @@ class MainActivity : FragmentActivity() {
             val themePreset by viewModel.themePreset.collectAsState()
             val navStyle by viewModel.navStyle.collectAsState()
             val cardStyle by viewModel.cardStyle.collectAsState()
+            val session by viewModel.session.collectAsState()
+
+            // Sakura Noir itu tema Premium — kalau preset yang KESIMPEN di DataStore
+            // "SakuraNoir" tapi status premium user udah expired/gak aktif (misal buka
+            // app lagi pas masa premium abis), jangan biarin tema itu tetap kepake.
+            // Fallback otomatis ke "Default" di sini, di satu titik pusat, biar semua
+            // pemanggil MyApplicationTheme di bawah gak perlu masing-masing ngecek premium.
+            val effectiveThemePreset = if (themePreset == "SakuraNoir" && !session.isPremiumActive()) {
+                "Default"
+            } else {
+                themePreset
+            }
 
 
             MyApplicationTheme(
                 darkTheme = isDark,
                 accentName = accentColorName,
                 textScale = textSizeScale,
-                themePreset = themePreset
+                themePreset = effectiveThemePreset
             ) {
                 val shutdownEnabled by viewModel.remoteConfigManager.shutdownEnabled.collectAsState()
                 val shutdownMessage by viewModel.remoteConfigManager.shutdownMessage.collectAsState()
