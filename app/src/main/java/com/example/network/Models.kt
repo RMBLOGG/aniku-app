@@ -2147,7 +2147,8 @@ data class EquippedBadgePublicDto(
     val clan_id: String,
     val label: String,
     val background_color: String,
-    val text_color: String
+    val text_color: String,
+    val price_diamond: Int = 0
 )
 
 @JsonClass(generateAdapter = true)

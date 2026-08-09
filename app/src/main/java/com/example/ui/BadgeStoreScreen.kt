@@ -180,12 +180,15 @@ private fun BadgeStoreCard(
             .background(Color(0xFF1B1F2A))
             .padding(14.dp)
     ) {
-        // Preview badge - bentuk ribbon beneran, warna & teks sesuai tag clan asli
         Box(
             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            RibbonBadge(text = item.tag, backgroundColor = bg, textColor = Color.White)
+            FuturisticBadge(
+                text = item.tag,
+                baseColor = bg,
+                tier = badgeTierForPrice(item.badge_price_diamond)
+            )
         }
 
         Text(
@@ -195,8 +198,22 @@ private fun BadgeStoreCard(
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
         )
+
+        val tier = badgeTierForPrice(item.badge_price_diamond)
+        if (tier != BadgeTier.STANDARD) {
+            Text(
+                text = if (tier == BadgeTier.NEON) "✦ NEON TIER" else "✦ HOLO TIER",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = bg,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            )
+        } else {
+            Spacer(modifier = Modifier.height(6.dp))
+        }
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
