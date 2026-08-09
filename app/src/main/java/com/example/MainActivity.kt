@@ -786,7 +786,11 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
                     bottomBar = {
-                        if (showBottomBar) {
+                        // "Floating" dirender lewat overlay Box di bawah (sibling Scaffold),
+                        // BUKAN lewat slot bottomBar ini -- karena Scaffold.bottomBar selalu
+                        // mereservasi area solid di belakangnya, jadi nav-nya gak bisa beneran
+                        // "ngambang" di atas konten kayak punya Kuroflix.
+                        if (showBottomBar && navStyle != "Floating") {
                             CurvedBottomNav(
                                 mainNavItems = mainNavItems,
                                 currentRoute = currentRoute,
@@ -809,7 +813,9 @@ class MainActivity : FragmentActivity() {
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(
-                            bottom = if (showBottomBar) 76.dp else 0.dp
+                            // "Floating" gak butuh bottom padding -- konten sengaja scroll di
+                            // BELAKANG nav overlay-nya, persis kayak Kuroflix.
+                            bottom = if (showBottomBar && navStyle != "Floating") 76.dp else 0.dp
                         ),
                         enterTransition = {
                             val toTab = isTabRoute(targetState.destination.route)
@@ -1212,6 +1218,28 @@ class MainActivity : FragmentActivity() {
                             navController.navigate("watch/${data.episodeSlug}/$encodedTitle")
                         },
                         onClose = { viewModel.closeMiniPlayer() }
+                    )
+                }
+
+                // Bottom nav "Floating" — overlay beneran ngambang di atas konten,
+                // niru persis FloatingBottomNavigation-nya Kuroflix (bukan lewat
+                // Scaffold.bottomBar yang reserve area solid).
+                if (showBottomBar && navStyle == "Floating") {
+                    CurvedBottomNav(
+                        mainNavItems = mainNavItems,
+                        currentRoute = currentRoute,
+                        isSheetRouteActive = isSheetRouteActive,
+                        hasUnreadChat = hasUnreadChat,
+                        onNavigate = { route ->
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onMoreClick = { showMoreSheet = true },
+                        navStyle = navStyle,
+                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
                 }
                 } // end Box wrapper

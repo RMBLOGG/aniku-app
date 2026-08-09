@@ -10435,13 +10435,19 @@ fun TampilanScreen(
                         "IconLabel" to "Icon + Label",
                         "IconOnly"  to "Icon + titik aktif",
                         "PillLabel" to "Pill label aktif",
-                        "PillIcon"  to "Pill icon only"
+                        "PillIcon"  to "Pill icon only",
+                        "Floating"  to "Floating (ala Kuroflix)"
                     )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         navOptions.forEach { (style, desc) ->
                             val isSelected = activeNavStyle == style
                             Column(
-                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                                modifier = Modifier.width(84.dp).clip(RoundedCornerShape(10.dp))
                                     .border(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else Color.White.copy(0.1f), RoundedCornerShape(10.dp))
                                     .background(if (isSelected) accentColor.copy(0.08f) else MaterialTheme.colorScheme.surface)
                                     .clickable { viewModel.changeNavStyle(style) }

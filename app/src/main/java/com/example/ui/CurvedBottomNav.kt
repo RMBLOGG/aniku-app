@@ -28,7 +28,8 @@ fun CurvedBottomNav(
     hasUnreadChat: Boolean,
     onNavigate: (String) -> Unit,
     onMoreClick: () -> Unit,
-    navStyle: String = "IconLabel"
+    navStyle: String = "IconLabel",
+    modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -149,6 +150,37 @@ fun CurvedBottomNav(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // ── E: Floating (niru Kuroflix) — pill solid, icon-only, circle putih pas aktif ──
+        // Beda sama "PillIcon": ini dirender sebagai OVERLAY di atas konten (lihat MainActivity,
+        // bukan lewat Scaffold.bottomBar), jadi beneran ngambang & konten scroll di belakangnya
+        // tanpa ada area solid "nempel" yang direserve Scaffold.
+        "Floating" -> {
+            Box(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 24.dp)
+                    .height(64.dp)
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(surfaceColor) // solid, tanpa alpha -> gak ada bleed-through
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(32.dp))
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    allItems.forEach { (route, label, icon) ->
+                        FloatingCircleNavItem(icon, label, currentRoute == route, primaryColor, Modifier.weight(1f)) { onNavigate(route) }
+                    }
+                    FloatingCircleMoreItem(moreSelected, hasUnreadChat, primaryColor, Modifier.weight(1f)) { onMoreClick() }
                 }
             }
         }
@@ -307,6 +339,94 @@ private fun MoreNavItem(
                 }
                 if (showLabel) Text("Lainnya", fontSize = 10.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = iconTint)
+            }
+        }
+    }
+}
+
+// ── "Floating" style nav item (niru persis FloatingBottomNavigation Kuroflix) ──
+// Icon-only, scale animasi pas aktif, background jadi circle putih solid kalau aktif.
+
+@Composable
+private fun FloatingCircleNavItem(
+    icon: ImageVector, label: String, isSelected: Boolean,
+    primaryColor: Color, modifier: Modifier = Modifier, onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.7f),
+        label = "floating_icon_scale"
+    )
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .scale(scale)
+                .size(if (isSelected) 40.dp else 34.dp)
+                .clip(CircleShape)
+                .background(if (isSelected) Color.White else Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingCircleMoreItem(
+    isSelected: Boolean, hasUnreadChat: Boolean,
+    primaryColor: Color, modifier: Modifier = Modifier, onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.7f),
+        label = "floating_more_scale"
+    )
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .scale(scale)
+                .size(if (isSelected) 40.dp else 34.dp)
+                .clip(CircleShape)
+                .background(if (isSelected) Color.White else Color.Transparent),
+            contentAlignment = Alignment.Center
+        ) {
+            Box {
+                Icon(
+                    imageVector = Icons.Default.MoreHoriz,
+                    contentDescription = "Lainnya",
+                    tint = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+                if (hasUnreadChat) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.error)
+                            .align(Alignment.TopEnd)
+                    )
+                }
             }
         }
     }
