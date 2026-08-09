@@ -189,6 +189,7 @@ fun ClanScreen(
                                 onKick = { userId -> viewModel.kickMember(myClan!!.id, userId) },
                                 onPromote = { userId -> viewModel.promoteCoLeader(myClan!!.id, userId) },
                                 onDemote = { userId -> viewModel.demoteCoLeader(myClan!!.id, userId) },
+                                onTransferLeader = { userId -> viewModel.transferLeaderClan(myClan!!.id, userId) },
                                 onLeave = { viewModel.leaveClan() },
                                 onIconClick = {
                                     if (isLeader) iconPickerLauncher.launch("image/*")
@@ -837,11 +838,13 @@ private fun MyClanCard(
     onKick: (String) -> Unit,
     onPromote: (String) -> Unit,
     onDemote: (String) -> Unit,
+    onTransferLeader: (String) -> Unit,
     onLeave: () -> Unit,
     onIconClick: () -> Unit
 ) {
     val canManageMembers = isLeader || isCoLeader
     var showLeaveConfirm by remember { mutableStateOf(false) }
+    var transferTargetId by remember { mutableStateOf<String?>(null) }
     val xpIntoLevel = (clan.total_xp ?: 0) % 1000
     val progress = xpIntoLevel / 1000f
     val animatedProgress by animateFloatAsState(progress, tween(700, easing = FastOutSlowInEasing), label = "xp_progress")
@@ -1084,6 +1087,12 @@ private fun MyClanCard(
                                 Icon(Icons.Default.RemoveModerator, contentDescription = "Copot Co-Leader", tint = Color(0xFF64D9E5), modifier = Modifier.size(14.dp))
                             }
                         }
+                        if (isLeader && member.user_id != currentUserId && member.role != "leader") {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            IconButton(onClick = { transferTargetId = member.user_id }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.SwapHoriz, contentDescription = "Transfer Leader", tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                            }
+                        }
                         if (canManageMembers && member.user_id != currentUserId && member.role != "leader" &&
                             !(isCoLeader && member.role == "co_leader")
                         ) {
@@ -1092,6 +1101,31 @@ private fun MyClanCard(
                                 Icon(Icons.Default.PersonRemove, contentDescription = "Kick", tint = Color(0xFFE57373), modifier = Modifier.size(14.dp))
                             }
                         }
+                    }
+                }
+
+                if (transferTargetId != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "Yakin transfer leader ke member ini? Kamu bakal turun jadi Co-Leader.",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFFD700)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row {
+                        Button(
+                            onClick = {
+                                transferTargetId?.let { onTransferLeader(it) }
+                                transferTargetId = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA000))
+                        ) {
+                            Text("Ya, Transfer")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { transferTargetId = null }) { Text("Batal", color = Color.White.copy(alpha = 0.6f)) }
                     }
                 }
 

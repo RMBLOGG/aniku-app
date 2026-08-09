@@ -3450,6 +3450,19 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Leader transfer jabatan leader ke member/co-leader lain di clan-nya.
+    // Leader lama otomatis turun jadi co-leader (dihandle server-side).
+    fun transferLeaderClan(clanId: String, userId: String) {
+        viewModelScope.launch {
+            try {
+                val response = NetworkClient.supabaseDbApi.transferLeaderClan(mapOf("p_clan_id" to clanId, "p_target_user_id" to userId), getAuthHeader(), SUPABASE_ANON_KEY)
+                if (response.isSuccessful) loadMyClanMembers(clanId) else _clanActionError.value = response.errorBody()?.string() ?: "Gagal transfer leader"
+            } catch (e: Exception) {
+                _clanActionError.value = e.message ?: "Gagal transfer leader"
+            }
+        }
+    }
+
     fun deleteClan(clanId: String, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             try {

@@ -529,6 +529,15 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Leader transfer jabatan leader ke member/co-leader lain. Leader lama
+    // otomatis turun jadi co-leader (bukan dicopot ke member biasa).
+    @POST("rest/v1/rpc/transfer_leader_clan")
+    suspend fun transferLeaderClan(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<Unit>
+
     @POST("rest/v1/rpc/delete_clan")
     suspend fun deleteClan(
         @Body body: Map<String, @JvmSuppressWildcards Any?>,
