@@ -352,8 +352,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5")
 
     // Source yang cuma boleh dipakai member premium (atau beta/mod/admin).
-    // Dikosongin -> semua source (termasuk Dayynime-v5) bebas diakses semua user.
-    private val PREMIUM_ONLY_SOURCES = emptySet<String>()
+    private val PREMIUM_ONLY_SOURCES = setOf("Dayynime-v5")
 
     // Session flow
     val session = settingsStore.sessionFlow.stateIn(

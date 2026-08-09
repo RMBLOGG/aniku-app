@@ -1705,6 +1705,7 @@ private fun GiveawayBubble(
                 AsyncImage(
                     model = message.avatar_url,
                     contentDescription = message.username,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(CircleShape)
                 )
             } else {
