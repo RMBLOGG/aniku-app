@@ -1038,6 +1038,25 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
+    // Ambil reaction buat sekumpulan pesan sekaligus (batch, biar hemat request
+    // - dipanggil bareng tiap loadChatMessages, bukan per-pesan).
+    @GET("rest/v1/chat_reactions")
+    suspend fun getChatReactions(
+        @Query("message_id") messageIdQuery: String,
+        @Query("select") select: String = "message_id,user_id,emoji",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ChatReaction>
+
+    // Toggle reaction di 1 pesan Global Chat. Khusus Premium/Beta/Mod/Admin
+    // (dicek server-side di function-nya).
+    @POST("rest/v1/rpc/toggle_chat_reaction")
+    suspend fun toggleChatReaction(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<String>
+
     // ─── Chat khusus clan ───
     @GET("rest/v1/clan_chat_messages")
     suspend fun getClanChatMessages(
@@ -1062,6 +1081,22 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
+
+    // Reaction versi Clan Chat - pola sama kayak Global.
+    @GET("rest/v1/clan_chat_reactions")
+    suspend fun getClanChatReactions(
+        @Query("message_id") messageIdQuery: String,
+        @Query("select") select: String = "message_id,user_id,emoji",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<ChatReaction>
+
+    @POST("rest/v1/rpc/toggle_clan_chat_reaction")
+    suspend fun toggleClanChatReaction(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): retrofit2.Response<String>
 
     // ─── Presence: total user online di seluruh aplikasi ───
     @GET("rest/v1/user_presence")

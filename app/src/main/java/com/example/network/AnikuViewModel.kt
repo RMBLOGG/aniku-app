@@ -4935,6 +4935,10 @@ class AnikuViewModel(context: Context) : ViewModel() {
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
+    // Reaction Global Chat, di-index per message_id biar gampang dicariin di UI.
+    private val _chatReactions = MutableStateFlow<Map<String, List<ChatReaction>>>(emptyMap())
+    val chatReactions: StateFlow<Map<String, List<ChatReaction>>> = _chatReactions.asStateFlow()
+
     // Unread chat badge
     val hasUnreadChat: StateFlow<Boolean> = combine(
         _chatMessages,
@@ -5351,6 +5355,22 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // 100 pesan TERBARU, lalu di-reverse di sini jadi kronologis (lama -> baru)
                 // supaya tampilan chat tetap normal dari atas ke bawah.
                 _chatMessages.value = messages.reversed()
+
+                // Ambil reaction buat semua pesan yang lagi ditampilin, 1 request batch
+                // (bukan per-pesan) - sama semangatnya kayak batching profilesMap di atas.
+                try {
+                    val msgIds = messages.map { it.id }.distinct()
+                    if (msgIds.isNotEmpty()) {
+                        val reactions = NetworkClient.supabaseDbApi.getChatReactions(
+                            messageIdQuery = "in.(${msgIds.joinToString(",")})",
+                            authHeader = "Bearer $SUPABASE_ANON_KEY",
+                            apiKey = SUPABASE_ANON_KEY
+                        )
+                        _chatReactions.value = reactions.groupBy { it.message_id }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "Failed fetching chat reactions", e)
+                }
             } catch (e: retrofit2.HttpException) {
                 val errBody = e.response()?.errorBody()?.string() ?: "no body"
                 _chatError.value = "HTTP ${e.code()}: $errBody"
@@ -5478,9 +5498,54 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // Toggle reaction di pesan Global Chat. Optimistic update di local state
+    // biar responsif, langsung disinkronin ulang ke hasil beneran dari server.
+    // onError dipanggil kalau ditolak (misal bukan premium) biar UI bisa nampilin toast.
+    fun toggleChatReaction(messageId: String, emoji: String, onError: (String) -> Unit = {}) {
+        val currentSession = session.value
+        val userId = currentSession.userId
+        if (currentSession.token.isNullOrEmpty() || userId == null) {
+            onError("Harus login dulu")
+            return
+        }
+        viewModelScope.launch {
+            val before = _chatReactions.value
+            try {
+                val response = NetworkClient.supabaseDbApi.toggleChatReaction(
+                    mapOf("p_message_id" to messageId, "p_emoji" to emoji),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (!response.isSuccessful) {
+                    val err = response.errorBody()?.string() ?: ""
+                    onError(if (err.contains("Premium")) "Reaction chat cuma buat member Premium" else "Gagal kasih reaction")
+                    return@launch
+                }
+                // Refresh reaction cuma buat pesan ini (bukan reload semua pesan+profile).
+                val fresh = NetworkClient.supabaseDbApi.getChatReactions(
+                    messageIdQuery = "eq.$messageId",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val updated = before.toMutableMap()
+                updated[messageId] = fresh
+                _chatReactions.value = updated
+            } catch (e: retrofit2.HttpException) {
+                val errBody = e.response()?.errorBody()?.string() ?: ""
+                onError(if (errBody.contains("Premium")) "Reaction chat cuma buat member Premium" else "Gagal kasih reaction")
+            } catch (e: Exception) {
+                onError(e.message ?: "Gagal kasih reaction")
+            }
+        }
+    }
+
     // --- CLAN CHAT (chat khusus member clan, di-scope per clan_id) ---
     private val _clanChatMessages = MutableStateFlow<List<ClanChatMessage>>(emptyList())
     val clanChatMessages: StateFlow<List<ClanChatMessage>> = _clanChatMessages.asStateFlow()
+
+    // Reaction Clan Chat, sama pola kayak Global.
+    private val _clanChatReactions = MutableStateFlow<Map<String, List<ChatReaction>>>(emptyMap())
+    val clanChatReactions: StateFlow<Map<String, List<ChatReaction>>> = _clanChatReactions.asStateFlow()
 
     private val _isClanChatLoading = MutableStateFlow(false)
     val isClanChatLoading: StateFlow<Boolean> = _isClanChatLoading.asStateFlow()
@@ -5502,6 +5567,21 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 // Sama kayak chat global: API return terbaru dulu (desc), lalu di-reverse
                 // di sini jadi kronologis (lama -> baru) buat ditampilin.
                 _clanChatMessages.value = messagesDeferred.reversed()
+
+                // Batch fetch reaction buat pesan-pesan clan yang lagi ditampilin.
+                try {
+                    val msgIds = messagesDeferred.map { it.id }.distinct()
+                    if (msgIds.isNotEmpty()) {
+                        val reactions = NetworkClient.supabaseDbApi.getClanChatReactions(
+                            messageIdQuery = "in.(${msgIds.joinToString(",")})",
+                            authHeader = "Bearer $SUPABASE_ANON_KEY",
+                            apiKey = SUPABASE_ANON_KEY
+                        )
+                        _clanChatReactions.value = reactions.groupBy { it.message_id }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AnikuVM", "Failed fetching clan chat reactions", e)
+                }
             } catch (e: retrofit2.HttpException) {
                 val errBody = e.response()?.errorBody()?.string() ?: "no body"
                 _clanChatError.value = "HTTP ${e.code()}: $errBody"
@@ -5581,6 +5661,43 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _clanChatMessages.value = _clanChatMessages.value.filter { it.id != messageId }
             } catch (e: Exception) {
                 _clanChatError.value = "Gagal hapus pesan: ${e.message}"
+            }
+        }
+    }
+
+    // Toggle reaction di pesan Clan Chat - pola persis sama kayak toggleChatReaction.
+    fun toggleClanChatReaction(messageId: String, emoji: String, onError: (String) -> Unit = {}) {
+        val currentSession = session.value
+        if (currentSession.token.isNullOrEmpty()) {
+            onError("Harus login dulu")
+            return
+        }
+        viewModelScope.launch {
+            val before = _clanChatReactions.value
+            try {
+                val response = NetworkClient.supabaseDbApi.toggleClanChatReaction(
+                    mapOf("p_message_id" to messageId, "p_emoji" to emoji),
+                    authHeader = "Bearer ${currentSession.token}",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                if (!response.isSuccessful) {
+                    val err = response.errorBody()?.string() ?: ""
+                    onError(if (err.contains("Premium")) "Reaction chat cuma buat member Premium" else "Gagal kasih reaction")
+                    return@launch
+                }
+                val fresh = NetworkClient.supabaseDbApi.getClanChatReactions(
+                    messageIdQuery = "eq.$messageId",
+                    authHeader = "Bearer $SUPABASE_ANON_KEY",
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                val updated = before.toMutableMap()
+                updated[messageId] = fresh
+                _clanChatReactions.value = updated
+            } catch (e: retrofit2.HttpException) {
+                val errBody = e.response()?.errorBody()?.string() ?: ""
+                onError(if (errBody.contains("Premium")) "Reaction chat cuma buat member Premium" else "Gagal kasih reaction")
+            } catch (e: Exception) {
+                onError(e.message ?: "Gagal kasih reaction")
             }
         }
     }

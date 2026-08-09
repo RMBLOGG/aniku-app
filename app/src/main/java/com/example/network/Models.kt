@@ -451,6 +451,15 @@ data class ChatMessage(
     val giveaway_status: String? = null
 )
 
+// Satu baris reaction (emoji) dari 1 user ke 1 pesan chat/clan chat.
+// Dipake buat Global (chat_reactions) & Clan (clan_chat_reactions) - struktur sama.
+@JsonClass(generateAdapter = true)
+data class ChatReaction(
+    val message_id: String,
+    val user_id: String,
+    val emoji: String
+)
+
 // Chat khusus clan - struktur sama kayak ChatMessage tapi ada clan_id
 @JsonClass(generateAdapter = true)
 data class ClanChatMessage(

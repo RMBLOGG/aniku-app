@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.navigation.NavController
+import android.widget.Toast
 import coil.compose.AsyncImage
 import com.example.network.AnikuViewModel
 import com.example.network.ChatMessage
@@ -374,6 +375,7 @@ fun ChatScreen(
 ) {
     val session by viewModel.session.collectAsState()
     val messages by viewModel.chatMessages.collectAsState()
+    val chatReactionsMap by viewModel.chatReactions.collectAsState()
     val isChatLoading by viewModel.isChatLoading.collectAsState()
     val chatError by viewModel.chatError.collectAsState()
     val chatNotifEnabled by viewModel.chatNotifEnabled.collectAsState()
@@ -418,6 +420,7 @@ fun ChatScreen(
     val myClanMembership by viewModel.myClanMembership.collectAsState()
     val myClanDetail by viewModel.myClanDetail.collectAsState()
     val clanChatMessagesRaw by viewModel.clanChatMessages.collectAsState()
+    val clanChatReactionsMap by viewModel.clanChatReactions.collectAsState()
     val clanChatMessages = remember(clanChatMessagesRaw) { clanChatMessagesRaw.map { it.toChatMessage() } }
     val isClanChatLoading by viewModel.isClanChatLoading.collectAsState()
     val clanChatError by viewModel.clanChatError.collectAsState()
@@ -1078,7 +1081,14 @@ fun ChatScreen(
                                 onReply = if (isLoggedIn) { { replyTarget = message } } else null,
                                 onDelete = if (isOwn || session.canModerate()) {
                                     { viewModel.deleteChatMessage(message.id) }
-                                } else null
+                                } else null,
+                                reactions = chatReactionsMap[message.id] ?: emptyList(),
+                                currentUserId = currentUserId,
+                                onToggleReaction = if (isLoggedIn) { { emoji ->
+                                    viewModel.toggleChatReaction(message.id, emoji) { err ->
+                                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                    }
+                                } } else null
                             )
                             val readers = remember(chatReads, message.id, currentUserId) {
                                 chatReads.filter {
@@ -1150,7 +1160,14 @@ fun ChatScreen(
                                         onReply = if (isLoggedIn) { { clanReplyTarget = message } } else null,
                                         onDelete = if (isOwn || session.canModerate()) {
                                             { viewModel.deleteClanChatMessage(message.id) }
-                                        } else null
+                                        } else null,
+                                        reactions = clanChatReactionsMap[message.id] ?: emptyList(),
+                                        currentUserId = currentUserId,
+                                        onToggleReaction = if (isLoggedIn) { { emoji ->
+                                            viewModel.toggleClanChatReaction(message.id, emoji) { err ->
+                                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                            }
+                                        } } else null
                                     )
                                 }
                                 item { Spacer(modifier = Modifier.height(4.dp)) }
@@ -1263,7 +1280,10 @@ private fun ChatBubble(
     clanTagMap: Map<String, Pair<String, String?>>,
     viewModel: com.example.network.AnikuViewModel,
     onReply: (() -> Unit)?,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    reactions: List<com.example.network.ChatReaction> = emptyList(),
+    currentUserId: String? = null,
+    onToggleReaction: ((String) -> Unit)? = null
 ) {
     // Pesan giveaway "War Premium" dirender pakai bubble khusus (ada tombol
     // Klaim), bukan bubble teks biasa.
@@ -1286,6 +1306,8 @@ private fun ChatBubble(
     }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showReactionPicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     var swipeOffset by remember { mutableStateOf(0f) }
     val swipeThreshold = 80f
 
@@ -1368,7 +1390,10 @@ private fun ChatBubble(
         }
         .combinedClickable(
             onClick = {},
-            onLongClick = { if (onDelete != null) showDeleteDialog = true }
+            onLongClick = {
+                if (onToggleReaction != null) showReactionPicker = true
+                else if (onDelete != null) showDeleteDialog = true
+            }
         )
         .padding(horizontal = 12.dp, vertical = 2.dp)
 
@@ -1611,6 +1636,53 @@ private fun ChatBubble(
     }
     }
 
+    // Baris pill reaction (dikelompokin per emoji), muncul kalau ada yang react.
+    // Tap pill = toggle reaction kamu sendiri ke emoji itu (kalau kamu premium).
+    if (reactions.isNotEmpty()) {
+        val grouped = remember(reactions) { reactions.groupBy { it.emoji } }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp)
+                .padding(top = 2.dp, bottom = 4.dp),
+            horizontalArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                grouped.forEach { (emoji, list) ->
+                    val ownReacted = currentUserId != null && list.any { it.user_id == currentUserId }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (ownReacted) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            )
+                            .border(
+                                1.dp,
+                                if (ownReacted) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                RoundedCornerShape(50)
+                            )
+                            .clickable(enabled = onToggleReaction != null) {
+                                onToggleReaction?.invoke(emoji)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(emoji, fontSize = 12.sp)
+                        if (list.size > 1) {
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                "${list.size}",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Dialog konfirmasi hapus (long press)
     if (showDeleteDialog && onDelete != null) {
         AlertDialog(
@@ -1628,6 +1700,74 @@ private fun ChatBubble(
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Bottom sheet mini buat kasih reaction (muncul dari long press). Emoji
+    // bebas (bukan set tetap) - ada quick pick + kolom ketik/paste emoji lain.
+    if (showReactionPicker && onToggleReaction != null) {
+        var customEmoji by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showReactionPicker = false },
+            title = { Text("Kasih Reaction") },
+            text = {
+                Column {
+                    val quickEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "💯", "🗿")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        quickEmojis.forEach { e ->
+                            Text(
+                                e,
+                                fontSize = 22.sp,
+                                modifier = Modifier.clickable {
+                                    onToggleReaction(e)
+                                    showReactionPicker = false
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        "Atau ketik/paste emoji lain:",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = customEmoji,
+                        onValueChange = { if (it.length <= 8) customEmoji = it },
+                        placeholder = { Text("😊") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (customEmoji.isNotBlank()) onToggleReaction(customEmoji.trim())
+                        showReactionPicker = false
+                    },
+                    enabled = customEmoji.isNotBlank()
+                ) {
+                    Text("Kirim")
+                }
+            },
+            dismissButton = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (onDelete != null) {
+                        TextButton(onClick = {
+                            showReactionPicker = false
+                            showDeleteDialog = true
+                        }) {
+                            Text("Hapus Pesan", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    TextButton(onClick = { showReactionPicker = false }) { Text("Batal") }
                 }
             }
         )
