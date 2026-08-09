@@ -346,7 +346,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     val gridLayout = settingsStore.gridLayoutFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "2")
     val themePreset = settingsStore.themePresetFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Default")
     val cardStyle = settingsStore.cardStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Rounded")
-    val navStyle = settingsStore.navStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "IconLabel")
+    val navStyle = settingsStore.navStyleFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "Floating")
     // Semua source yang ada di app, dipake sebagai fallback terakhir kalau
     // default_data_source dari remote config kebetulan juga lagi disable.
     private val ALL_DATA_SOURCES = listOf("Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5")

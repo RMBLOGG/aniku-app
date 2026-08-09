@@ -18,7 +18,7 @@ class SettingsStore(private val context: Context) {
         val DATA_SOURCE = stringPreferencesKey("data_source") // "Dayynime-v1", "Dayynime-v2", "Dayynime-v3", "Dayynime-v4", "Dayynime-v5"
         val THEME_PRESET = stringPreferencesKey("theme_preset") // "Default", "Netflix", "Midnight"
         val CARD_STYLE = stringPreferencesKey("card_style") // "Rounded", "Sharp", "Poster", "Wide"
-        val NAV_STYLE = stringPreferencesKey("nav_style") // "IconLabel", "IconOnly", "PillLabel", "PillIcon"
+        val NAV_STYLE = stringPreferencesKey("nav_style") // "IconLabel", "IconOnly", "PillLabel", "PillIcon", "Floating"
 
         // Auth/User details
         val AUTH_TOKEN = stringPreferencesKey("auth_token")
@@ -81,7 +81,7 @@ class SettingsStore(private val context: Context) {
     }
 
     val navStyleFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[NAV_STYLE] ?: "IconLabel"
+        preferences[NAV_STYLE] ?: "Floating"
     }
 
     val sessionFlow: Flow<UserSession> = context.dataStore.data.map { preferences ->

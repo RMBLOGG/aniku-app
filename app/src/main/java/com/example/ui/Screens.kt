@@ -1426,6 +1426,11 @@ fun HomeScreen(
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
     var showLoginDialog by remember { mutableStateOf(false) }
+    // Style "Floating" render nav sebagai overlay ngambang (bukan Scaffold.bottomBar),
+    // jadi konten di sini butuh ekstra bottom padding sendiri biar item terakhir gak
+    // ketutup nav -- persis pattern "space for bottom floating navigation bar" di Kuroflix.
+    val navStyle by viewModel.navStyle.collectAsState()
+    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
     // Lambda stabil dishare ke semua card di screen ini, jadi gak bikin instance baru tiap card/tiap recomposition
     val onShowLoginDialog = remember { { showLoginDialog = true } }
     val viewerCounts by viewModel.viewerCounts.collectAsState()
@@ -1754,7 +1759,8 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            contentPadding = PaddingValues(bottom = floatingNavClearance)
         ) {
             // ── Hero: Profile card + EXP + Premium + Carousel + Search + Global Chat ──
             item {
@@ -3337,6 +3343,8 @@ fun SearchScreen(
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
+    val navStyle by viewModel.navStyle.collectAsState()
+    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
     val accentColor = MaterialTheme.colorScheme.primary
     val cardStyle by viewModel.cardStyle.collectAsState()
     val gridLayout by viewModel.gridLayout.collectAsState()
@@ -3392,7 +3400,7 @@ fun SearchScreen(
             )
             if (gridLayout == "List") {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -3412,7 +3420,7 @@ fun SearchScreen(
                 val columns = if (gridLayout == "3") 3 else 2
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
@@ -3466,7 +3474,7 @@ fun SearchScreen(
             if (gridLayout == "List") {
                 LazyColumn(
                     state = searchListState,
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -3494,7 +3502,7 @@ fun SearchScreen(
                 LazyVerticalGrid(
                     state = searchGridState,
                     columns = GridCells.Fixed(columns),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
@@ -3547,6 +3555,8 @@ fun ExploreScreen(
     val hasNext by viewModel.exploreHasNext.collectAsState()
     val bookmarkedAnimes by viewModel.bookmarks.collectAsState()
     // Set slug utk lookup O(1), dihitung ulang cuma saat list bookmark berubah (bukan tiap item/tiap scroll)
+    val navStyle by viewModel.navStyle.collectAsState()
+    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
     val bookmarkedSlugs = remember(bookmarkedAnimes) { bookmarkedAnimes.mapTo(HashSet(bookmarkedAnimes.size)) { it.slug } }
     val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
@@ -3702,7 +3712,7 @@ fun ExploreScreen(
                 } else if (gridLayout == "List") {
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
@@ -3730,7 +3740,7 @@ fun ExploreScreen(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(columns),
                         state = gridState,
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize()
@@ -3946,7 +3956,7 @@ fun ScheduleScreen(
                     }
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
@@ -4026,6 +4036,8 @@ fun BookmarkScreen(
     val cardStyle by viewModel.cardStyle.collectAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val gridLayout by viewModel.gridLayout.collectAsState()
+    val navStyle by viewModel.navStyle.collectAsState()
+    val floatingNavClearance = if (navStyle == "Floating") 100.dp else 0.dp
 
     LaunchedEffect(Unit) {
         viewModel.refreshBookmarks()
@@ -4079,7 +4091,7 @@ fun BookmarkScreen(
             }
         } else if (gridLayout == "List") {
             LazyColumn(
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -4106,7 +4118,7 @@ fun BookmarkScreen(
             val columns = if (gridLayout == "3") 3 else 2
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + floatingNavClearance),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.fillMaxSize()
