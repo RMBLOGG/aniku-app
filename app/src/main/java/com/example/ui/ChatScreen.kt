@@ -1271,7 +1271,7 @@ private fun ReadReceiptRow(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
@@ -1706,71 +1706,142 @@ private fun ChatBubble(
     }
 
     // Bottom sheet mini buat kasih reaction (muncul dari long press). Emoji
-    // bebas (bukan set tetap) - ada quick pick + kolom ketik/paste emoji lain.
+    // bebas (bukan set tetap) - ada quick pick (chip bulat) + kolom ketik/paste
+    // emoji lain. Custom Dialog (bukan AlertDialog bawaan) biar gayanya nyambung
+    // sama tema gold/dark yang dipake di GiveawayBubble & fitur premium lain.
     if (showReactionPicker && onToggleReaction != null) {
         var customEmoji by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showReactionPicker = false },
-            title = { Text("Kasih Reaction") },
-            text = {
-                Column {
-                    val quickEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "💯", "🗿")
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.horizontalScroll(rememberScrollState())
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showReactionPicker = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, Color(0xFFFFC94A).copy(alpha = 0.25f), RoundedCornerShape(24.dp))
+                    .padding(20.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFC94A).copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        quickEmojis.forEach { e ->
-                            Text(
-                                e,
-                                fontSize = 22.sp,
-                                modifier = Modifier.clickable {
+                        Text("✨", fontSize = 16.sp)
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        "Kasih Reaction",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                val quickEmojis = listOf("👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "💯", "🗿")
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    quickEmojis.forEach { e ->
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                                .clickable {
                                     onToggleReaction(e)
                                     showReactionPicker = false
-                                }
-                            )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(e, fontSize = 22.sp)
                         }
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    "ATAU KETIK/PASTE EMOJI LAIN",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = customEmoji,
+                    onValueChange = { if (it.length <= 8) customEmoji = it },
+                    placeholder = { Text("😊") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFFFFC94A),
+                        cursorColor = Color(0xFFFFC94A)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                if (onDelete != null) {
                     Text(
-                        "Atau ketik/paste emoji lain:",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        "🗑  Hapus Pesan Ini",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .clickable {
+                                showReactionPicker = false
+                                showDeleteDialog = true
+                            }
+                            .padding(vertical = 4.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = customEmoji,
-                        onValueChange = { if (it.length <= 8) customEmoji = it },
-                        placeholder = { Text("😊") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    Spacer(modifier = Modifier.height(14.dp))
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (customEmoji.isNotBlank()) onToggleReaction(customEmoji.trim())
-                        showReactionPicker = false
-                    },
-                    enabled = customEmoji.isNotBlank()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Kirim")
-                }
-            },
-            dismissButton = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (onDelete != null) {
-                        TextButton(onClick = {
-                            showReactionPicker = false
-                            showDeleteDialog = true
-                        }) {
-                            Text("Hapus Pesan", color = MaterialTheme.colorScheme.error)
-                        }
+                    Text(
+                        "Batal",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier
+                            .clickable { showReactionPicker = false }
+                            .padding(horizontal = 10.dp, vertical = 10.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (customEmoji.isNotBlank()) Color(0xFFFFC94A)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            )
+                            .clickable(enabled = customEmoji.isNotBlank()) {
+                                if (customEmoji.isNotBlank()) onToggleReaction(customEmoji.trim())
+                                showReactionPicker = false
+                            }
+                            .padding(horizontal = 22.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            "Kirim",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (customEmoji.isNotBlank()) Color.Black else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        )
                     }
-                    TextButton(onClick = { showReactionPicker = false }) { Text("Batal") }
                 }
             }
-        )
+        }
     }
 }
 
