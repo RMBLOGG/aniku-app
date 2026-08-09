@@ -1845,7 +1845,6 @@ private fun GiveawayBubble(
         }
     }
 }
-}
 
 @Composable
 private fun OwnChatBubble(
