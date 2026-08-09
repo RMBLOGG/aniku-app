@@ -1432,23 +1432,22 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
 
-    // ─── Badge Store ───────────────────────────────────────────────
-    // Katalog badge yg lagi dijual, urut sort_order
-    @GET("rest/v1/badge_store_items")
-    suspend fun getBadgeStoreItems(
-        @Query("order") order: String = "sort_order.asc",
+    // ─── Badge Store (tag clan asli, auto-sync dari tabel clans) ─────
+    // Katalog badge = daftar clan publik yg tag-nya bisa dibeli
+    @GET("rest/v1/clan_badge_catalog")
+    suspend fun getClanBadgeCatalog(
+        @Query("order") order: String = "tag.asc",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): List<BadgeStoreItemDto>
+    ): List<ClanBadgeCatalogDto>
 
-    // Badge yg udah dimiliki user ini (RLS otomatis batasin ke user login),
-    // sekalian join detail badge-nya biar gak perlu fetch 2x.
-    @GET("rest/v1/user_owned_badges")
-    suspend fun getMyOwnedBadges(
-        @Query("select") select: String = "badge_id,purchased_at,badge_store_items(*)",
+    // Badge tag-clan yg udah dimiliki user ini (RLS otomatis batasin ke user login)
+    @GET("rest/v1/user_owned_clan_badges")
+    suspend fun getMyOwnedClanBadges(
+        @Query("select") select: String = "clan_id,purchased_at",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
-    ): List<OwnedBadgeDto>
+    ): List<OwnedClanBadgeDto>
 
     // Badge yg lagi dipakai tiap user, publik (buat ditampilin di chat/profil orang lain)
     @GET("rest/v1/equipped_badges_public")
@@ -1457,23 +1456,23 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<EquippedBadgePublicDto>
 
-    // Beli badge - potong Diamond, validasi semua di server (function buy_badge)
-    @POST("rest/v1/rpc/buy_badge")
-    suspend fun buyBadge(
-        @Body body: BuyBadgeRequest,
+    // Beli badge tag-clan - potong Diamond, validasi semua di server (function buy_clan_badge)
+    @POST("rest/v1/rpc/buy_clan_badge")
+    suspend fun buyClanBadge(
+        @Body body: BuyClanBadgeRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
-    ): BuyBadgeResult
+    ): BuyClanBadgeResult
 
-    // Pakai/lepas badge yg udah dimiliki (p_badge_id null = lepas)
-    @POST("rest/v1/rpc/equip_badge")
-    suspend fun equipBadge(
-        @Body body: EquipBadgeRequest,
+    // Pakai/lepas badge tag-clan yg udah dimiliki (p_clan_id null = lepas)
+    @POST("rest/v1/rpc/equip_clan_badge")
+    suspend fun equipClanBadge(
+        @Body body: EquipClanBadgeRequest,
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String,
         @Header("Prefer") prefer: String = "return=representation"
-    ): EquipBadgeResult
+    ): EquipClanBadgeResult
 }
 
 // Aniku Store (aniku-store.my.id) -- Next.js, host TERPISAH dari Supabase.

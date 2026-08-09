@@ -16,12 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import com.example.network.AnikuViewModel
-import com.example.network.BadgeStoreItemDto
+import com.example.network.ClanBadgeCatalogDto
 
 private fun parseHex(hex: String, fallback: Color): Color = try {
     Color(android.graphics.Color.parseColor(hex))
@@ -38,10 +40,10 @@ fun BadgeStoreScreen(
     val context = LocalContext.current
     val catalog by viewModel.badgeCatalog.collectAsState()
     val owned by viewModel.myOwnedBadges.collectAsState()
-    val equippedId by viewModel.equippedBadgeId.collectAsState()
+    val equippedClanId by viewModel.equippedBadgeClanId.collectAsState()
     val diamondBalance by viewModel.diamondBalance.collectAsState()
 
-    var busyBadgeId by remember { mutableStateOf<Long?>(null) }
+    var busyClanId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadBadgeCatalog()
@@ -49,7 +51,7 @@ fun BadgeStoreScreen(
         viewModel.loadEquippedBadgesPublic()
     }
 
-    val ownedIds = remember(owned) { owned.map { it.badge_id }.toSet() }
+    val ownedIds = remember(owned) { owned.map { it.clan_id }.toSet() }
 
     Scaffold(
         topBar = {
@@ -92,42 +94,50 @@ fun BadgeStoreScreen(
             return@Scaffold
         }
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize().padding(padding)
-        ) {
-            items(catalog) { item ->
-                BadgeStoreCard(
-                    item = item,
-                    isOwned = ownedIds.contains(item.id),
-                    isEquipped = equippedId == item.id,
-                    isBusy = busyBadgeId == item.id,
-                    diamondBalance = diamondBalance,
-                    onBuy = {
-                        busyBadgeId = item.id
-                        viewModel.buyBadge(item.id) { result, error ->
-                            busyBadgeId = null
-                            if (result != null) {
-                                Toast.makeText(context, "Badge \"${result.label}\" berhasil dibeli!", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, error ?: "Gagal beli badge", Toast.LENGTH_SHORT).show()
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Text(
+                "Tag badge kosmetik dari clan publik - bisa dipajang di chat walau kamu bukan anggotanya",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(catalog) { item ->
+                    BadgeStoreCard(
+                        item = item,
+                        isOwned = ownedIds.contains(item.clan_id),
+                        isEquipped = equippedClanId == item.clan_id,
+                        isBusy = busyClanId == item.clan_id,
+                        diamondBalance = diamondBalance,
+                        onBuy = {
+                            busyClanId = item.clan_id
+                            viewModel.buyBadge(item.clan_id) { result, error ->
+                                busyClanId = null
+                                if (result != null) {
+                                    Toast.makeText(context, "Badge tag \"${result.tag}\" berhasil dibeli!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, error ?: "Gagal beli badge", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        onEquip = {
+                            busyClanId = item.clan_id
+                            val target = if (equippedClanId == item.clan_id) null else item.clan_id
+                            viewModel.equipBadge(target) { success, error ->
+                                busyClanId = null
+                                if (!success) {
+                                    Toast.makeText(context, error ?: "Gagal pakai badge", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
-                    },
-                    onEquip = {
-                        busyBadgeId = item.id
-                        val target = if (equippedId == item.id) null else item.id
-                        viewModel.equipBadge(target) { success, error ->
-                            busyBadgeId = null
-                            if (!success) {
-                                Toast.makeText(context, error ?: "Gagal pakai badge", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -135,7 +145,7 @@ fun BadgeStoreScreen(
 
 @Composable
 private fun BadgeStoreCard(
-    item: BadgeStoreItemDto,
+    item: ClanBadgeCatalogDto,
     isOwned: Boolean,
     isEquipped: Boolean,
     isBusy: Boolean,
@@ -143,9 +153,8 @@ private fun BadgeStoreCard(
     onBuy: () -> Unit,
     onEquip: () -> Unit
 ) {
-    val bg = parseHex(item.background_color, Color(0xFF8A4FD6))
-    val textColor = parseHex(item.text_color, Color.White)
-    val canAfford = diamondBalance >= item.price_diamond
+    val bg = parseHex(item.badge_color, Color(0xFF8A4FD6))
+    val canAfford = diamondBalance >= item.badge_price_diamond
 
     Column(
         modifier = Modifier
@@ -154,16 +163,23 @@ private fun BadgeStoreCard(
             .background(Color(0xFF1B1F2A))
             .padding(14.dp)
     ) {
-        // Preview badge - bentuk beneran sesuai shape-nya, bukan cuma warna
+        // Preview badge - bentuk ribbon beneran, warna & teks sesuai tag clan asli
         Box(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            when (item.shape) {
-                "pennant" -> PennantBadge(text = item.label, backgroundColor = bg, textColor = textColor)
-                else -> RibbonBadge(text = item.label, backgroundColor = bg, textColor = textColor)
-            }
+            RibbonBadge(text = item.tag, backgroundColor = bg, textColor = Color.White)
         }
+
+        Text(
+            text = item.name,
+            fontSize = 11.sp,
+            color = Color(0xFF9AA3AF),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        )
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -178,7 +194,7 @@ private fun BadgeStoreCard(
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "${item.price_diamond}",
+                text = "${item.badge_price_diamond}",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFFCFD8DC)
@@ -219,7 +235,7 @@ private fun BadgeStoreCard(
                             !canAfford -> "DM kurang"
                             else -> "Beli"
                         },
-                        color = textColor
+                        color = Color.White
                     )
                 }
             }

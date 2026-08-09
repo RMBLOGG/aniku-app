@@ -2119,58 +2119,56 @@ data class AnimeinwebStreamResponse(
 )
 
 
-// ─────────────── Badge Store (badge tag ribbon/pennant yg bisa dibeli) ───────────────
+// ─────────────── Badge Store (badge tag clan asli yg bisa dibeli, auto-sync dari clans) ───────────────
 
+// 1 baris = 1 clan publik yg tag-nya bisa dibeli sbg badge kosmetik.
+// clan_id dipakai sebagai id badge (bukan id numerik terpisah).
 @JsonClass(generateAdapter = true)
-data class BadgeStoreItemDto(
-    val id: Long,
-    val code: String,
-    val label: String,
-    val shape: String, // "ribbon" atau "pennant"
-    val background_color: String,
-    val text_color: String,
-    val price_diamond: Int,
-    val sort_order: Int? = 0
+data class ClanBadgeCatalogDto(
+    val clan_id: String,
+    val tag: String,
+    val name: String,
+    val icon_url: String? = null,
+    val badge_color: String,
+    val badge_price_diamond: Int
 )
 
-// Baris kepemilikan badge user, join langsung ke badge_store_items biar sekali fetch
+// Baris kepemilikan badge tag-clan user - cukup clan_id, detail tampilan
+// (warna/harga) diambil dari badgeCatalog yg udah kebaca di layar store.
 @JsonClass(generateAdapter = true)
-data class OwnedBadgeDto(
-    val badge_id: Long,
-    val purchased_at: String? = null,
-    val badge_store_items: BadgeStoreItemDto? = null
+data class OwnedClanBadgeDto(
+    val clan_id: String,
+    val purchased_at: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class EquippedBadgePublicDto(
     val user_id: String,
-    val badge_id: Long,
+    val clan_id: String,
     val label: String,
-    val shape: String,
     val background_color: String,
     val text_color: String
 )
 
 @JsonClass(generateAdapter = true)
-data class BuyBadgeRequest(
-    val p_badge_id: Long
+data class BuyClanBadgeRequest(
+    val p_clan_id: String
 )
 
 @JsonClass(generateAdapter = true)
-data class BuyBadgeResult(
-    val badge_id: Long,
-    val code: String,
-    val label: String,
+data class BuyClanBadgeResult(
+    val clan_id: String,
+    val tag: String,
     val price_diamond: Int,
     val remaining_balance: Int
 )
 
 @JsonClass(generateAdapter = true)
-data class EquipBadgeRequest(
-    val p_badge_id: Long?
+data class EquipClanBadgeRequest(
+    val p_clan_id: String?
 )
 
 @JsonClass(generateAdapter = true)
-data class EquipBadgeResult(
-    val equipped_badge_id: Long?
+data class EquipClanBadgeResult(
+    val equipped_clan_badge_id: String?
 )

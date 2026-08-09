@@ -6688,26 +6688,27 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // ─── Badge Store ───────────────────────────────────────────────
+    // ─── Badge Store (tag clan asli, auto-sync dari tabel clans) ─────
 
-    private val _badgeCatalog = MutableStateFlow<List<BadgeStoreItemDto>>(emptyList())
-    val badgeCatalog: StateFlow<List<BadgeStoreItemDto>> = _badgeCatalog.asStateFlow()
+    private val _badgeCatalog = MutableStateFlow<List<ClanBadgeCatalogDto>>(emptyList())
+    val badgeCatalog: StateFlow<List<ClanBadgeCatalogDto>> = _badgeCatalog.asStateFlow()
 
-    private val _myOwnedBadges = MutableStateFlow<List<OwnedBadgeDto>>(emptyList())
-    val myOwnedBadges: StateFlow<List<OwnedBadgeDto>> = _myOwnedBadges.asStateFlow()
+    private val _myOwnedBadges = MutableStateFlow<List<OwnedClanBadgeDto>>(emptyList())
+    val myOwnedBadges: StateFlow<List<OwnedClanBadgeDto>> = _myOwnedBadges.asStateFlow()
 
-    private val _equippedBadgeId = MutableStateFlow<Long?>(null)
-    val equippedBadgeId: StateFlow<Long?> = _equippedBadgeId.asStateFlow()
+    private val _equippedBadgeClanId = MutableStateFlow<String?>(null)
+    val equippedBadgeClanId: StateFlow<String?> = _equippedBadgeClanId.asStateFlow()
 
-    // user_id -> badge yg lagi dipakai orang itu, dipakai buat render di chat
-    // (mirip clanTagMap di atas, cuma sumbernya beda tabel).
+    // user_id -> badge tag-clan yg lagi dipakai orang itu, dipakai buat render di chat
+    // (mirip clanTagMap di atas, cuma sumbernya beda tabel & ini badge kosmetik,
+    // bisa beda dari clan asli tempat dia jadi anggota).
     private val _equippedBadgesMap = MutableStateFlow<Map<String, EquippedBadgePublicDto>>(emptyMap())
     val equippedBadgesMap: StateFlow<Map<String, EquippedBadgePublicDto>> = _equippedBadgesMap.asStateFlow()
 
     fun loadBadgeCatalog() {
         viewModelScope.launch {
             try {
-                _badgeCatalog.value = NetworkClient.supabaseDbApi.getBadgeStoreItems(
+                _badgeCatalog.value = NetworkClient.supabaseDbApi.getClanBadgeCatalog(
                     authHeader = getAuthHeader(),
                     apiKey = SUPABASE_ANON_KEY
                 )
@@ -6720,7 +6721,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
     fun loadMyOwnedBadges() {
         viewModelScope.launch {
             try {
-                _myOwnedBadges.value = NetworkClient.supabaseDbApi.getMyOwnedBadges(
+                _myOwnedBadges.value = NetworkClient.supabaseDbApi.getMyOwnedClanBadges(
                     authHeader = getAuthHeader(),
                     apiKey = SUPABASE_ANON_KEY
                 )
@@ -6741,7 +6742,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
                 _equippedBadgesMap.value = raw.associateBy { it.user_id }
                 val myId = session.value.userId
                 raw.firstOrNull { it.user_id == myId }?.let {
-                    _equippedBadgeId.value = it.badge_id
+                    _equippedBadgeClanId.value = it.clan_id
                 }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal load equipped badges public", e)
@@ -6749,13 +6750,13 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Beli badge - potong Diamond di server, refresh koleksi + saldo kalau sukses.
-    fun buyBadge(badgeId: Long, onResult: (BuyBadgeResult?, String?) -> Unit) {
+    // Beli badge tag-clan - potong Diamond di server, refresh koleksi + saldo kalau sukses.
+    fun buyBadge(clanId: String, onResult: (BuyClanBadgeResult?, String?) -> Unit) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
-                val result = NetworkClient.supabaseDbApi.buyBadge(
-                    body = BuyBadgeRequest(p_badge_id = badgeId),
+                val result = NetworkClient.supabaseDbApi.buyClanBadge(
+                    body = BuyClanBadgeRequest(p_clan_id = clanId),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
@@ -6776,17 +6777,17 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
-    // Pakai badge yg udah dibeli. badgeId = null buat lepas badge (gak pakai apapun).
-    fun equipBadge(badgeId: Long?, onResult: (Boolean, String?) -> Unit) {
+    // Pakai badge tag-clan yg udah dibeli. clanId = null buat lepas badge (gak pakai apapun).
+    fun equipBadge(clanId: String?, onResult: (Boolean, String?) -> Unit) {
         val authHeader = getAuthHeader()
         viewModelScope.launch {
             try {
-                val result = NetworkClient.supabaseDbApi.equipBadge(
-                    body = EquipBadgeRequest(p_badge_id = badgeId),
+                val result = NetworkClient.supabaseDbApi.equipClanBadge(
+                    body = EquipClanBadgeRequest(p_clan_id = clanId),
                     authHeader = authHeader,
                     apiKey = SUPABASE_ANON_KEY
                 )
-                _equippedBadgeId.value = result.equipped_badge_id
+                _equippedBadgeClanId.value = result.equipped_clan_badge_id
                 loadEquippedBadgesPublic()
                 onResult(true, null)
             } catch (e: retrofit2.HttpException) {
