@@ -6688,4 +6688,119 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ─── Badge Store ───────────────────────────────────────────────
+
+    private val _badgeCatalog = MutableStateFlow<List<BadgeStoreItemDto>>(emptyList())
+    val badgeCatalog: StateFlow<List<BadgeStoreItemDto>> = _badgeCatalog.asStateFlow()
+
+    private val _myOwnedBadges = MutableStateFlow<List<OwnedBadgeDto>>(emptyList())
+    val myOwnedBadges: StateFlow<List<OwnedBadgeDto>> = _myOwnedBadges.asStateFlow()
+
+    private val _equippedBadgeId = MutableStateFlow<Long?>(null)
+    val equippedBadgeId: StateFlow<Long?> = _equippedBadgeId.asStateFlow()
+
+    // user_id -> badge yg lagi dipakai orang itu, dipakai buat render di chat
+    // (mirip clanTagMap di atas, cuma sumbernya beda tabel).
+    private val _equippedBadgesMap = MutableStateFlow<Map<String, EquippedBadgePublicDto>>(emptyMap())
+    val equippedBadgesMap: StateFlow<Map<String, EquippedBadgePublicDto>> = _equippedBadgesMap.asStateFlow()
+
+    fun loadBadgeCatalog() {
+        viewModelScope.launch {
+            try {
+                _badgeCatalog.value = NetworkClient.supabaseDbApi.getBadgeStoreItems(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load badge catalog", e)
+            }
+        }
+    }
+
+    fun loadMyOwnedBadges() {
+        viewModelScope.launch {
+            try {
+                _myOwnedBadges.value = NetworkClient.supabaseDbApi.getMyOwnedBadges(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load badge milik sendiri", e)
+            }
+        }
+    }
+
+    // Dipanggil bareng loadClanTagMap() pas buka chat, biar badge orang lain kebaca juga.
+    fun loadEquippedBadgesPublic() {
+        viewModelScope.launch {
+            try {
+                val raw = NetworkClient.supabaseDbApi.getEquippedBadgesPublic(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _equippedBadgesMap.value = raw.associateBy { it.user_id }
+                val myId = session.value.userId
+                raw.firstOrNull { it.user_id == myId }?.let {
+                    _equippedBadgeId.value = it.badge_id
+                }
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load equipped badges public", e)
+            }
+        }
+    }
+
+    // Beli badge - potong Diamond di server, refresh koleksi + saldo kalau sukses.
+    fun buyBadge(badgeId: Long, onResult: (BuyBadgeResult?, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.buyBadge(
+                    body = BuyBadgeRequest(p_badge_id = badgeId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _diamondBalance.value = result.remaining_balance
+                loadMyOwnedBadges()
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal beli badge (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "buyBadge error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    // Pakai badge yg udah dibeli. badgeId = null buat lepas badge (gak pakai apapun).
+    fun equipBadge(badgeId: Long?, onResult: (Boolean, String?) -> Unit) {
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.equipBadge(
+                    body = EquipBadgeRequest(p_badge_id = badgeId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _equippedBadgeId.value = result.equipped_badge_id
+                loadEquippedBadgesPublic()
+                onResult(true, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(false, errorMsg ?: "Gagal pakai badge (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "equipBadge error", e)
+                onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
 }

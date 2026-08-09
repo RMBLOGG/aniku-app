@@ -2119,3 +2119,58 @@ data class AnimeinwebStreamResponse(
 )
 
 
+// ─────────────── Badge Store (badge tag ribbon/pennant yg bisa dibeli) ───────────────
+
+@JsonClass(generateAdapter = true)
+data class BadgeStoreItemDto(
+    val id: Long,
+    val code: String,
+    val label: String,
+    val shape: String, // "ribbon" atau "pennant"
+    val background_color: String,
+    val text_color: String,
+    val price_diamond: Int,
+    val sort_order: Int? = 0
+)
+
+// Baris kepemilikan badge user, join langsung ke badge_store_items biar sekali fetch
+@JsonClass(generateAdapter = true)
+data class OwnedBadgeDto(
+    val badge_id: Long,
+    val purchased_at: String? = null,
+    val badge_store_items: BadgeStoreItemDto? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class EquippedBadgePublicDto(
+    val user_id: String,
+    val badge_id: Long,
+    val label: String,
+    val shape: String,
+    val background_color: String,
+    val text_color: String
+)
+
+@JsonClass(generateAdapter = true)
+data class BuyBadgeRequest(
+    val p_badge_id: Long
+)
+
+@JsonClass(generateAdapter = true)
+data class BuyBadgeResult(
+    val badge_id: Long,
+    val code: String,
+    val label: String,
+    val price_diamond: Int,
+    val remaining_balance: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class EquipBadgeRequest(
+    val p_badge_id: Long?
+)
+
+@JsonClass(generateAdapter = true)
+data class EquipBadgeResult(
+    val equipped_badge_id: Long?
+)

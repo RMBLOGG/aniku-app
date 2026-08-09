@@ -454,6 +454,7 @@ fun ChatScreen(
     // bukan bagian dari polling chat.
     LaunchedEffect(Unit) {
         viewModel.loadClanTagMap()
+        viewModel.loadEquippedBadgesPublic()
     }
     LaunchedEffect(chatRoomEnabled) {
         if (!chatRoomEnabled) return@LaunchedEffect
@@ -581,6 +582,9 @@ fun ChatScreen(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { navController.navigate("badge_store") }) {
+                            Icon(Icons.Default.Sell, contentDescription = "Badge Store")
+                        }
                         IconButton(onClick = { viewModel.toggleChatNotif() }) {
                             Icon(
                                 if (chatNotifEnabled) Icons.Default.Notifications else Icons.Default.NotificationsOff,
@@ -1285,6 +1289,8 @@ private fun ChatBubble(
     currentUserId: String? = null,
     onToggleReaction: ((String) -> Unit)? = null
 ) {
+    val equippedBadgesMap by viewModel.equippedBadgesMap.collectAsState()
+
     // Pesan giveaway "War Premium" dirender pakai bubble khusus (ada tombol
     // Klaim), bukan bubble teks biasa.
     if (message.message_type == "giveaway") {
@@ -1403,6 +1409,7 @@ private fun ChatBubble(
             timeStr = timeStr,
             navController = navController,
             clanTagMap = clanTagMap,
+            viewModel = viewModel,
             modifier = dragModifier
         )
     } else {
@@ -1483,6 +1490,19 @@ private fun ChatBubble(
                     )
                 }
                 clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                equippedBadgesMap[message.user_id]?.let { badge ->
+                    val bg = remember(badge.background_color) {
+                        try { Color(android.graphics.Color.parseColor(badge.background_color)) } catch (e: Exception) { Color(0xFF8A4FD6) }
+                    }
+                    val txt = remember(badge.text_color) {
+                        try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
+                    }
+                    if (badge.shape == "pennant") {
+                        PennantBadge(text = badge.label, backgroundColor = bg, textColor = txt)
+                    } else {
+                        RibbonBadge(text = badge.label, backgroundColor = bg, textColor = txt)
+                    }
+                }
                 if (message.role == "admin" || message.is_admin == true) {
                     GlossyGradientText(
                         text = "ADMIN",
@@ -2064,9 +2084,12 @@ private fun OwnChatBubble(
     timeStr: String,
     navController: NavController,
     clanTagMap: Map<String, Pair<String, String?>>,
+    viewModel: com.example.network.AnikuViewModel,
     modifier: Modifier = Modifier
 ) {
     var showFullImage by remember { mutableStateOf(false) }
+    val equippedBadgesMap by viewModel.equippedBadgesMap.collectAsState()
+    val myEquippedBadge = equippedBadgesMap[message.user_id]
 
     val customColorParsed = remember(message.custom_name_color) {
         message.custom_name_color?.let {
@@ -2170,6 +2193,19 @@ private fun OwnChatBubble(
                     )
                 }
                 clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                myEquippedBadge?.let { badge ->
+                    val bg = remember(badge.background_color) {
+                        try { Color(android.graphics.Color.parseColor(badge.background_color)) } catch (e: Exception) { Color(0xFF8A4FD6) }
+                    }
+                    val txt = remember(badge.text_color) {
+                        try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
+                    }
+                    if (badge.shape == "pennant") {
+                        PennantBadge(text = badge.label, backgroundColor = bg, textColor = txt)
+                    } else {
+                        RibbonBadge(text = badge.label, backgroundColor = bg, textColor = txt)
+                    }
+                }
                 GlossyGradientText(
                     text = message.username,
                     colors = when {

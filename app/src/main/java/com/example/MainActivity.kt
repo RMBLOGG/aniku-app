@@ -1109,6 +1109,12 @@ class MainActivity : FragmentActivity() {
                                 onTradeClick = { navController.navigate("trade") }
                             )
                         }
+                        composable("badge_store") {
+                            com.example.ui.BadgeStoreScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         composable("trade") {
                             TradeScreen(
                                 viewModel = viewModel,

@@ -1431,6 +1431,49 @@ interface SupabaseDbApi {
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): retrofit2.Response<Unit>
+
+    // ─── Badge Store ───────────────────────────────────────────────
+    // Katalog badge yg lagi dijual, urut sort_order
+    @GET("rest/v1/badge_store_items")
+    suspend fun getBadgeStoreItems(
+        @Query("order") order: String = "sort_order.asc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<BadgeStoreItemDto>
+
+    // Badge yg udah dimiliki user ini (RLS otomatis batasin ke user login),
+    // sekalian join detail badge-nya biar gak perlu fetch 2x.
+    @GET("rest/v1/user_owned_badges")
+    suspend fun getMyOwnedBadges(
+        @Query("select") select: String = "badge_id,purchased_at,badge_store_items(*)",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<OwnedBadgeDto>
+
+    // Badge yg lagi dipakai tiap user, publik (buat ditampilin di chat/profil orang lain)
+    @GET("rest/v1/equipped_badges_public")
+    suspend fun getEquippedBadgesPublic(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<EquippedBadgePublicDto>
+
+    // Beli badge - potong Diamond, validasi semua di server (function buy_badge)
+    @POST("rest/v1/rpc/buy_badge")
+    suspend fun buyBadge(
+        @Body body: BuyBadgeRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): BuyBadgeResult
+
+    // Pakai/lepas badge yg udah dimiliki (p_badge_id null = lepas)
+    @POST("rest/v1/rpc/equip_badge")
+    suspend fun equipBadge(
+        @Body body: EquipBadgeRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): EquipBadgeResult
 }
 
 // Aniku Store (aniku-store.my.id) -- Next.js, host TERPISAH dari Supabase.
