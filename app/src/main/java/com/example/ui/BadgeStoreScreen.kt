@@ -29,6 +29,7 @@ private fun parseHex(hex: String, fallback: Color): Color = try {
     fallback
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BadgeStoreScreen(
     viewModel: AnikuViewModel,
