@@ -1497,7 +1497,12 @@ private fun ChatBubble(
                     val txt = remember(badge.text_color) {
                         try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
                     }
-                    FuturisticBadge(text = badge.label, baseColor = bg, tier = badgeTierForPrice(badge.price_diamond))
+                    FuturisticBadge(
+                        text = badge.label,
+                        baseColor = bg,
+                        tier = badgeTierForPrice(badge.price_diamond),
+                        shape = if (badge.badge_shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+                    )
                 }
                 if (message.role == "admin" || message.is_admin == true) {
                     GlossyGradientText(
@@ -2196,7 +2201,12 @@ private fun OwnChatBubble(
                     val txt = remember(badge.text_color) {
                         try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
                     }
-                    FuturisticBadge(text = badge.label, baseColor = bg, tier = badgeTierForPrice(badge.price_diamond))
+                    FuturisticBadge(
+                        text = badge.label,
+                        baseColor = bg,
+                        tier = badgeTierForPrice(badge.price_diamond),
+                        shape = if (badge.badge_shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+                    )
                 }
                 GlossyGradientText(
                     text = message.username,

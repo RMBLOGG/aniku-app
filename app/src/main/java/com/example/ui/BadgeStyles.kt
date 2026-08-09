@@ -156,7 +156,12 @@ fun FuturisticBadge(
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(start = 10.dp, end = 12.dp, top = 3.dp, bottom = 3.dp)
+                .padding(
+                    start = if (shape is PennantBadgeShape) 12.dp else 10.dp,
+                    end = if (shape is PennantBadgeShape) 16.dp else 12.dp,
+                    top = 3.dp,
+                    bottom = 3.dp
+                )
         )
     }
 }
