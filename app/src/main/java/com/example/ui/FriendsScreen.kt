@@ -15,12 +15,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +36,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -71,6 +75,18 @@ fun FriendsScreen(
 
     var selectedTab by remember { mutableStateOf(0) }
     val seenFriendIds = remember { mutableSetOf<String>() }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Hasil pencarian user (by username atau nomor user #1234), exclude diri sendiri.
+    val searchResults = remember(searchQuery, userDirectory, myId) {
+        val q = searchQuery.trim()
+        if (q.isEmpty()) emptyList()
+        else userDirectory.filter { p ->
+            p.id != myId &&
+                (p.username?.contains(q, ignoreCase = true) == true ||
+                    p.user_number?.toString()?.contains(q) == true)
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -116,6 +132,66 @@ fun FriendsScreen(
 
             when (selectedTab) {
                 0 -> {
+                    FriendSearchBar(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it }
+                    )
+
+                    if (searchQuery.isNotBlank()) {
+                        // Mode pencarian: tampilkan hasil user + tombol Add.
+                        if (searchResults.isEmpty()) {
+                            EmptyState(Icons.Default.Search, "Gak ketemu user dengan kata kunci itu.")
+                        } else {
+                            LazyColumn(
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(searchResults, key = { it.id }) { profile ->
+                                    val status = viewModel.friendshipStatusWith(profile.id)
+                                    FriendRow(
+                                        profile = profile,
+                                        fallbackId = profile.id,
+                                        chat = null,
+                                        myId = myId,
+                                        isUnread = false,
+                                        onClick = {},
+                                        trailing = {
+                                            when (status) {
+                                                "accepted" -> PillActionButton(
+                                                    label = "Teman",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    onClick = {}
+                                                )
+                                                "pending_sent" -> PillActionButton(
+                                                    label = "Terkirim",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    onClick = {}
+                                                )
+                                                "pending_received" -> AnimatedIconButton(
+                                                    icon = Icons.Filled.Check,
+                                                    background = Color(0xFF1B7A3D).copy(alpha = 0.18f),
+                                                    tint = Color(0xFF4CAF50),
+                                                    contentDescription = "Terima",
+                                                    onClick = {
+                                                        viewModel.friendshipWith(profile.id)?.id?.let {
+                                                            viewModel.respondToFriendRequest(it, accept = true)
+                                                        }
+                                                    }
+                                                )
+                                                else -> PillActionButton(
+                                                    label = "Add",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    onClick = { viewModel.sendFriendRequest(profile.id) }
+                                                )
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        return@Column
+                    }
+
                     if (friendsList.isEmpty()) {
                         EmptyState(Icons.Default.People, "Belum ada teman.\nCari user lain terus kirim permintaan pertemanan!")
                     } else {
@@ -294,6 +370,38 @@ private fun FriendTabSwitcher(
             }
         }
     }
+}
+
+@Composable
+private fun FriendSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text("Cari username atau nomor user...", fontSize = 13.5.sp) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Filled.Close, contentDescription = "Hapus")
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            unfocusedBorderColor = Color.Transparent,
+            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+        )
+    )
 }
 
 @Composable
