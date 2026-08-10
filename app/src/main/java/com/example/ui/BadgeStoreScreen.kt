@@ -3,6 +3,7 @@ package com.example.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +32,15 @@ private fun parseHex(hex: String, fallback: Color): Color = try {
     fallback
 }
 
+private fun tierFromString(tier: String): BadgeTier = when (tier) {
+    "holo" -> BadgeTier.HOLO
+    "neon" -> BadgeTier.NEON
+    else -> BadgeTier.STANDARD
+}
+
+private fun shapeFromString(shape: String) =
+    if (shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BadgeStoreScreen(
@@ -41,9 +51,11 @@ fun BadgeStoreScreen(
     val catalog by viewModel.badgeCatalog.collectAsState()
     val owned by viewModel.myOwnedBadges.collectAsState()
     val equippedClanId by viewModel.equippedBadgeClanId.collectAsState()
+    val equippedSkinId by viewModel.equippedBadgeSkinId.collectAsState()
     val diamondBalance by viewModel.diamondBalance.collectAsState()
 
-    var busyClanId by remember { mutableStateOf<String?>(null) }
+    // busy key = "clanId:skinId" biar loading indicator-nya spesifik per kartu
+    var busyKey by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -53,7 +65,7 @@ fun BadgeStoreScreen(
         isLoading = false
     }
 
-    val ownedIds = remember(owned) { owned.map { it.clan_id }.toSet() }
+    val ownedKeys = remember(owned) { owned.map { "${it.clan_id}:${it.skin_id}" }.toSet() }
 
     Scaffold(
         topBar = {
@@ -111,43 +123,58 @@ fun BadgeStoreScreen(
             return@Scaffold
         }
 
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Text(
-                "Tag badge clan kamu sendiri - beli buat dipajang di chat",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-            )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(catalog) { item ->
+        // Kelompokin per clan biar ada judul "AniKu Family" dsb di atas 6 varian desainnya
+        val grouped = remember(catalog) { catalog.groupBy { Triple(it.clan_id, it.name, it.tag) } }
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            grouped.forEach { (clanInfo, skins) ->
+                val (_, clanName, clanTag) = clanInfo
+                item(span = { GridItemSpan(2) }) {
+                    Column(modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)) {
+                        Text(
+                            text = "$clanName ($clanTag)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Pilih salah satu desain buat tag clan kamu",
+                            fontSize = 11.sp,
+                            color = Color(0xFF9AA3AF)
+                        )
+                    }
+                }
+                items(skins) { item ->
+                    val key = "${item.clan_id}:${item.skin_id}"
                     BadgeStoreCard(
                         item = item,
-                        isOwned = ownedIds.contains(item.clan_id),
-                        isEquipped = equippedClanId == item.clan_id,
-                        isBusy = busyClanId == item.clan_id,
+                        isOwned = ownedKeys.contains(key),
+                        isEquipped = equippedClanId == item.clan_id && equippedSkinId == item.skin_id,
+                        isBusy = busyKey == key,
                         diamondBalance = diamondBalance,
                         onBuy = {
-                            busyClanId = item.clan_id
-                            viewModel.buyBadge(item.clan_id) { result, error ->
-                                busyClanId = null
+                            busyKey = key
+                            viewModel.buyBadge(item.clan_id, item.skin_id) { result, error ->
+                                busyKey = null
                                 if (result != null) {
-                                    Toast.makeText(context, "Badge tag \"${result.tag}\" berhasil dibeli!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Desain \"${item.skin_name}\" berhasil dibeli!", Toast.LENGTH_SHORT).show()
                                 } else {
                                     Toast.makeText(context, error ?: "Gagal beli badge", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
                         onEquip = {
-                            busyClanId = item.clan_id
-                            val target = if (equippedClanId == item.clan_id) null else item.clan_id
-                            viewModel.equipBadge(target) { success, error ->
-                                busyClanId = null
+                            busyKey = key
+                            val alreadyEquipped = equippedClanId == item.clan_id && equippedSkinId == item.skin_id
+                            val targetClan = if (alreadyEquipped) null else item.clan_id
+                            val targetSkin = if (alreadyEquipped) null else item.skin_id
+                            viewModel.equipBadge(targetClan, targetSkin) { success, error ->
+                                busyKey = null
                                 if (!success) {
                                     Toast.makeText(context, error ?: "Gagal pakai badge", Toast.LENGTH_SHORT).show()
                                 }
@@ -172,6 +199,7 @@ private fun BadgeStoreCard(
 ) {
     val bg = parseHex(item.badge_color, Color(0xFF8A4FD6))
     val canAfford = diamondBalance >= item.badge_price_diamond
+    val tier = tierFromString(item.badge_tier)
 
     Column(
         modifier = Modifier
@@ -187,12 +215,13 @@ private fun BadgeStoreCard(
             FuturisticBadge(
                 text = item.tag,
                 baseColor = bg,
-                tier = badgeTierForPrice(item.badge_price_diamond)
+                tier = tier,
+                shape = shapeFromString(item.badge_shape)
             )
         }
 
         Text(
-            text = item.name,
+            text = item.skin_name,
             fontSize = 11.sp,
             color = Color(0xFF9AA3AF),
             textAlign = TextAlign.Center,
@@ -201,7 +230,6 @@ private fun BadgeStoreCard(
             modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
         )
 
-        val tier = badgeTierForPrice(item.badge_price_diamond)
         if (tier != BadgeTier.STANDARD) {
             Text(
                 text = if (tier == BadgeTier.NEON) "✦ NEON TIER" else "✦ HOLO TIER",

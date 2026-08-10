@@ -2119,10 +2119,11 @@ data class AnimeinwebStreamResponse(
 )
 
 
-// ─────────────── Badge Store (badge tag clan asli yg bisa dibeli, auto-sync dari clans) ───────────────
+// ─────────────── Badge Store (tag clan asli, BEBERAPA PILIHAN SKIN per clan) ───────────────
 
-// 1 baris = 1 clan publik yg tag-nya bisa dibeli sbg badge kosmetik.
-// clan_id dipakai sebagai id badge (bukan id numerik terpisah).
+// 1 baris = 1 varian skin (bentuk+tier) buat 1 clan yg user-nya jadi anggota.
+// 1 clan bisa muncul beberapa kali di list ini (beda skin_id), makanya
+// key unik gabungan clan_id + skin_id, bukan clan_id doang.
 @JsonClass(generateAdapter = true)
 data class ClanBadgeCatalogDto(
     val clan_id: String,
@@ -2130,14 +2131,18 @@ data class ClanBadgeCatalogDto(
     val name: String,
     val icon_url: String? = null,
     val badge_color: String,
+    val skin_id: String,
+    val badge_shape: String,
+    val badge_tier: String,
+    val skin_name: String,
     val badge_price_diamond: Int
 )
 
-// Baris kepemilikan badge tag-clan user - cukup clan_id, detail tampilan
-// (warna/harga) diambil dari badgeCatalog yg udah kebaca di layar store.
+// Baris kepemilikan 1 varian skin badge (clan_id + skin_id).
 @JsonClass(generateAdapter = true)
 data class OwnedClanBadgeDto(
     val clan_id: String,
+    val skin_id: String,
     val purchased_at: String? = null
 )
 
@@ -2148,28 +2153,34 @@ data class EquippedBadgePublicDto(
     val label: String,
     val background_color: String,
     val text_color: String,
-    val price_diamond: Int = 0
+    val skin_id: String = "ribbon_standard",
+    val badge_shape: String = "ribbon",
+    val badge_tier: String = "standard"
 )
 
 @JsonClass(generateAdapter = true)
 data class BuyClanBadgeRequest(
-    val p_clan_id: String
+    val p_clan_id: String,
+    val p_skin_id: String
 )
 
 @JsonClass(generateAdapter = true)
 data class BuyClanBadgeResult(
     val clan_id: String,
     val tag: String,
+    val skin_id: String,
     val price_diamond: Int,
     val remaining_balance: Int
 )
 
 @JsonClass(generateAdapter = true)
 data class EquipClanBadgeRequest(
-    val p_clan_id: String?
+    val p_clan_id: String?,
+    val p_skin_id: String?
 )
 
 @JsonClass(generateAdapter = true)
 data class EquipClanBadgeResult(
-    val equipped_clan_badge_id: String?
+    val equipped_clan_badge_id: String?,
+    val equipped_badge_skin_id: String?
 )

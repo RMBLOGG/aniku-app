@@ -1433,18 +1433,17 @@ interface SupabaseDbApi {
     ): retrofit2.Response<Unit>
 
     // ─── Badge Store (tag clan asli, auto-sync dari tabel clans) ─────
-    // Katalog badge = daftar clan publik yg tag-nya bisa dibeli
+    // Katalog badge = daftar clan yg diikutin user, dikali beberapa varian skin
     @GET("rest/v1/clan_badge_catalog")
     suspend fun getClanBadgeCatalog(
-        @Query("order") order: String = "tag.asc",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<ClanBadgeCatalogDto>
 
-    // Badge tag-clan yg udah dimiliki user ini (RLS otomatis batasin ke user login)
+    // Skin badge yg udah dimiliki user ini (RLS otomatis batasin ke user login)
     @GET("rest/v1/user_owned_clan_badges")
     suspend fun getMyOwnedClanBadges(
-        @Query("select") select: String = "clan_id,purchased_at",
+        @Query("select") select: String = "clan_id,skin_id,purchased_at",
         @Header("Authorization") authHeader: String,
         @Header("apikey") apiKey: String
     ): List<OwnedClanBadgeDto>

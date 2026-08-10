@@ -3,6 +3,7 @@ package com.example.ui
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -76,20 +77,32 @@ fun FuturisticBadge(
 ) {
     val infinite = rememberInfiniteTransition(label = "badge_fx")
 
-    val shimmer by infinite.animateFloatSafe(
-        initial = -0.4f,
-        target = 1.4f,
-        durationMillis = 1700
+    val shimmer by infinite.animateFloat(
+        initialValue = -0.4f,
+        targetValue = 1.4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1700, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
     )
-    val hueAnim by infinite.animateFloatSafe(
-        initial = 0f,
-        target = 360f,
-        durationMillis = 4500
+    val hueAnim by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "hue"
     )
-    val glowPulse by infinite.animateFloatPingPong(
-        initial = 0.45f,
-        target = 1f,
-        durationMillis = 900
+    val glowPulse by infinite.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
     )
 
     val gradientColors = when (tier) {
@@ -156,38 +169,12 @@ fun FuturisticBadge(
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.Center)
-                .padding(start = 10.dp, end = 12.dp, top = 3.dp, bottom = 3.dp)
+                .padding(
+                    start = if (shape is PennantBadgeShape) 12.dp else 10.dp,
+                    end = if (shape is PennantBadgeShape) 16.dp else 12.dp,
+                    top = 3.dp,
+                    bottom = 3.dp
+                )
         )
     }
 }
-
-// ── helper animasi kecil biar pemanggilan di atas ringkas ──────────────────
-@Composable
-private fun androidx.compose.animation.core.InfiniteTransition.animateFloatSafe(
-    initial: Float,
-    target: Float,
-    durationMillis: Int
-) = this.animateFloat(
-    initialValue = initial,
-    targetValue = target,
-    animationSpec = infiniteRepeatable(
-        animation = tween(durationMillis, easing = LinearEasing),
-        repeatMode = RepeatMode.Restart
-    ),
-    label = "anim"
-)
-
-@Composable
-private fun androidx.compose.animation.core.InfiniteTransition.animateFloatPingPong(
-    initial: Float,
-    target: Float,
-    durationMillis: Int
-) = this.animateFloat(
-    initialValue = initial,
-    targetValue = target,
-    animationSpec = infiniteRepeatable(
-        animation = tween(durationMillis, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Reverse
-    ),
-    label = "anim_pingpong"
-)
