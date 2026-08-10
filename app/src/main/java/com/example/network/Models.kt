@@ -2130,7 +2130,6 @@ data class ClanBadgeCatalogDto(
     val name: String,
     val icon_url: String? = null,
     val badge_color: String,
-    val badge_shape: String = "ribbon",
     val badge_price_diamond: Int
 )
 
@@ -2149,7 +2148,6 @@ data class EquippedBadgePublicDto(
     val label: String,
     val background_color: String,
     val text_color: String,
-    val badge_shape: String = "ribbon",
     val price_diamond: Int = 0
 )
 

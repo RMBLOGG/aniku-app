@@ -187,8 +187,7 @@ private fun BadgeStoreCard(
             FuturisticBadge(
                 text = item.tag,
                 baseColor = bg,
-                tier = badgeTierForPrice(item.badge_price_diamond),
-                shape = if (item.badge_shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+                tier = badgeTierForPrice(item.badge_price_diamond)
             )
         }
 
