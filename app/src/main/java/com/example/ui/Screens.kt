@@ -11948,6 +11948,7 @@ private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
 // ADMIN - EVENT GACHA (banner khusus 1 anime di rentang tanggal)
 // ================================================================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AdminGachaEventFormSection(viewModel: AnikuViewModel) {
     val context = LocalContext.current
