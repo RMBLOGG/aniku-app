@@ -8467,7 +8467,8 @@ fun ProfileScreen(
 @Composable
 fun AdminPanelScreen(
     viewModel: AnikuViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onViewEventCharacters: (com.example.network.GachaEventDto) -> Unit = {}
 ) {
     val users by viewModel.adminUsers.collectAsState()
     val announcements by viewModel.adminAnnouncements.collectAsState()
@@ -9437,7 +9438,8 @@ fun AdminPanelScreen(
                                         onDelete = {
                                             deletingGachaEventId = event.id
                                             viewModel.deleteGachaEvent(event.id) { _, _ -> deletingGachaEventId = null }
-                                        }
+                                        },
+                                        onViewCharacters = { onViewEventCharacters(event) }
                                     )
                                 }
                             }
@@ -12244,7 +12246,8 @@ private fun AdminGachaEventFormSection(viewModel: AnikuViewModel) {
 private fun AdminGachaEventRow(
     event: com.example.network.GachaEventDto,
     onDelete: () -> Unit,
-    isDeleting: Boolean
+    isDeleting: Boolean,
+    onViewCharacters: () -> Unit = {}
 ) {
     // Nilai starts_at/ends_at dari server itu UTC - wajib di-parse sebagai
     // UTC juga, baru dibandingin ke waktu sekarang. displayFormat di bawah
@@ -12308,6 +12311,9 @@ private fun AdminGachaEventRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     fontSize = 11.sp
                 )
+            }
+            IconButton(onClick = onViewCharacters) {
+                Icon(Icons.Default.Groups, contentDescription = "Lihat Karakter", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = onDelete, enabled = !isDeleting) {
                 if (isDeleting) {

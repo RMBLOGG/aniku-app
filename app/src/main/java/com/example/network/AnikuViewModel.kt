@@ -4294,6 +4294,39 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ── Liat roster karakter dari 1 anime (dipakai EventCharactersScreen buat
+    // cek isi 1 event gacha, baik yang lagi aktif maupun event lain di riwayat
+    // admin). Judul anime disimpen di state juga -- bukan lewat nav argument --
+    // biar konsisten sama pola screen lain di app ini yang gak pakai args route. ──
+
+    private val _eventCharacters = MutableStateFlow<List<CharacterInfoDto>>(emptyList())
+    val eventCharacters: StateFlow<List<CharacterInfoDto>> = _eventCharacters.asStateFlow()
+
+    private val _isLoadingEventCharacters = MutableStateFlow(false)
+    val isLoadingEventCharacters: StateFlow<Boolean> = _isLoadingEventCharacters.asStateFlow()
+
+    private val _eventCharactersAnimeTitle = MutableStateFlow("")
+    val eventCharactersAnimeTitle: StateFlow<String> = _eventCharactersAnimeTitle.asStateFlow()
+
+    fun loadEventCharacters(animeMalId: Int, animeTitle: String) {
+        _eventCharactersAnimeTitle.value = animeTitle
+        viewModelScope.launch {
+            _isLoadingEventCharacters.value = true
+            try {
+                _eventCharacters.value = NetworkClient.supabaseDbApi.getCharactersByAnime(
+                    animeMalIdFilter = "eq.$animeMalId",
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load event characters", e)
+                _eventCharacters.value = emptyList()
+            } finally {
+                _isLoadingEventCharacters.value = false
+            }
+        }
+    }
+
     // ── Panel admin - kelola event gacha ──────────────────────────────
 
     private val _allGachaEvents = MutableStateFlow<List<GachaEventDto>>(emptyList())

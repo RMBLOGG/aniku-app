@@ -1106,7 +1106,14 @@ class MainActivity : FragmentActivity() {
                                 viewModel = viewModel,
                                 onBack = { navController.popBackStack() },
                                 onTopUpClick = { navController.navigate("diamond_topup") },
-                                onTradeClick = { navController.navigate("trade") }
+                                onTradeClick = { navController.navigate("trade") },
+                                onViewEventCharacters = { navController.navigate("event_characters") }
+                            )
+                        }
+                        composable("event_characters") {
+                            com.example.ui.EventCharactersScreen(
+                                viewModel = viewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("badge_store") {
@@ -1144,7 +1151,11 @@ class MainActivity : FragmentActivity() {
                         composable("admin") {
                             AdminPanelScreen(
                                 viewModel = viewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onViewEventCharacters = { event ->
+                                    viewModel.loadEventCharacters(event.anime_mal_id, event.anime_title)
+                                    navController.navigate("event_characters")
+                                }
                             )
                         }
                         composable("settings") {

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Star
@@ -318,7 +319,8 @@ fun GachaScreen(
     viewModel: AnikuViewModel,
     onBack: () -> Unit,
     onTopUpClick: () -> Unit,
-    onTradeClick: () -> Unit = {}
+    onTradeClick: () -> Unit = {},
+    onViewEventCharacters: () -> Unit = {}
 ) {
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val collection by viewModel.gachaCollection.collectAsState()
@@ -443,7 +445,13 @@ fun GachaScreen(
                         verticalArrangement = Arrangement.Center
                     ) {
                         activeEvent?.let { event ->
-                            EventBannerCard(event = event)
+                            EventBannerCard(
+                                event = event,
+                                onViewCharacters = {
+                                    viewModel.loadEventCharacters(event.anime_mal_id, event.anime_title)
+                                    onViewEventCharacters()
+                                }
+                            )
                             Spacer(modifier = Modifier.height(16.dp))
                         }
 
@@ -615,7 +623,10 @@ fun GachaScreen(
 //  SALDO DM — kartu kaca dengan border sapuan neon
 // ============================================================================
 @Composable
-private fun EventBannerCard(event: com.example.network.GachaEventDto) {
+private fun EventBannerCard(
+    event: com.example.network.GachaEventDto,
+    onViewCharacters: () -> Unit = {}
+) {
     val shine = rememberGlossyShine(2600)
     val remainingText = remember(event.ends_at) {
         try {
@@ -676,6 +687,21 @@ private fun EventBannerCard(event: com.example.network.GachaEventDto) {
         if (remainingText != null) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(remainingText, color = Neon.Cyan, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .align(Alignment.End)
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(0.6.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
+                .clickable(onClick = onViewCharacters)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+            Spacer(modifier = Modifier.width(5.dp))
+            Text("Lihat Karakter", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

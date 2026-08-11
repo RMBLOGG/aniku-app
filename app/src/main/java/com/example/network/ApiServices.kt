@@ -419,6 +419,19 @@ interface SupabaseDbApi {
         @Query("select") select: String = "mal_id,name,image_url,anime_title,rarity"
     ): List<CharacterInfoDto>
 
+    // Semua karakter dari 1 anime tertentu (filter by anime_mal_id, BUKAN mal_id
+    // karakter kayak getCharactersByIds di atas) -- dipakai buat nampilin isi
+    // roster 1 event gacha (EventCharactersScreen), biar admin/user bisa cek
+    // karakter apa aja + rarity-nya sebelum/selama event jalan.
+    @GET("rest/v1/characters")
+    suspend fun getCharactersByAnime(
+        @Query("anime_mal_id") animeMalIdFilter: String,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "mal_id,name,image_url,anime_title,rarity",
+        @Query("order") order: String = "name.asc"
+    ): List<CharacterInfoDto>
+
     // --- Clan & Diamond ---
     @GET("rest/v1/clan_members")
     suspend fun getUserClanMembership(
