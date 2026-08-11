@@ -8476,6 +8476,8 @@ fun AdminPanelScreen(
     val isLoading by viewModel.isAdminLoading.collectAsState()
     val banStatusMessage by viewModel.banStatusMessage.collectAsState()
     val sess by viewModel.session.collectAsState()
+    val gachaEvents by viewModel.allGachaEvents.collectAsState()
+    var deletingGachaEventId by remember { mutableStateOf<Long?>(null) }
     val accentColor = MaterialTheme.colorScheme.primary
     val context = LocalContext.current
 
@@ -8492,6 +8494,7 @@ fun AdminPanelScreen(
     // (scope Composable utama) biar bisa diakses dari Row tab DAN dari when(selectedTab)
     // di LazyColumn bawah, yang sebelumnya beda scope sama val lokal di dalam Row.
     val giftPremiumTabIndex = if (sess.isAdmin) 7 else -1
+    val gachaEventTabIndex = if (sess.isAdmin) 8 else -1
 
     // Announcements adding inputs state
     var annTitle by remember { mutableStateOf("") }
@@ -8587,6 +8590,8 @@ fun AdminPanelScreen(
                 // Tab ini SENGAJA cuma admin (bukan canModerate()) -- moderator
                 // ga boleh grant premium manual tanpa approval admin.
                 if (sess.isAdmin) add("Gift Premium" to Icons.Default.WorkspacePremium)
+                // Sama kayak Gift Premium, sengaja admin-only.
+                if (sess.isAdmin) add("Event Gacha" to Icons.Default.Whatshot)
             }
             sections.forEachIndexed { index, (label, icon) ->
                 val isSelected = selectedTab == index
@@ -9419,6 +9424,23 @@ fun AdminPanelScreen(
                     giftPremiumTabIndex -> {
                         if (sess.isAdmin) {
                             item { AdminGiftPremiumSection(viewModel = viewModel) }
+                        }
+                    }
+                    gachaEventTabIndex -> {
+                        if (sess.isAdmin) {
+                            item { AdminGachaEventFormSection(viewModel = viewModel) }
+                            items(gachaEvents, key = { it.id }) { event ->
+                                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                    AdminGachaEventRow(
+                                        event = event,
+                                        isDeleting = deletingGachaEventId == event.id,
+                                        onDelete = {
+                                            deletingGachaEventId = event.id
+                                            viewModel.deleteGachaEvent(event.id) { _, _ -> deletingGachaEventId = null }
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -11917,6 +11939,222 @@ private fun AdminGiftPremiumSection(viewModel: AnikuViewModel) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
                 Text("Berikan Premium")
+            }
+        }
+    }
+}
+
+// ================================================================
+// ADMIN - EVENT GACHA (banner khusus 1 anime di rentang tanggal)
+// ================================================================
+
+@Composable
+private fun AdminGachaEventFormSection(viewModel: AnikuViewModel) {
+    val context = LocalContext.current
+    val animeOptions by viewModel.gachaAnimeOptions.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadGachaAnimeOptions()
+        viewModel.loadAllGachaEvents()
+    }
+
+    var title by remember { mutableStateOf("") }
+    var selectedAnime by remember { mutableStateOf<com.example.network.GachaAnimeOptionDto?>(null) }
+    var animeMenuExpanded by remember { mutableStateOf(false) }
+    var startsAtMillis by remember { mutableStateOf<Long?>(null) }
+    var endsAtMillis by remember { mutableStateOf<Long?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+
+    val displayFormat = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale("id", "ID")) }
+    val apiFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()) }
+
+    fun pickDateTime(onPicked: (Long) -> Unit) {
+        val cal = java.util.Calendar.getInstance()
+        android.app.DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                android.app.TimePickerDialog(
+                    context,
+                    { _, hour, minute ->
+                        cal.set(year, month, day, hour, minute, 0)
+                        onPicked(cal.timeInMillis)
+                    },
+                    cal.get(java.util.Calendar.HOUR_OF_DAY),
+                    cal.get(java.util.Calendar.MINUTE),
+                    true
+                ).show()
+            },
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH),
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text("Event Gacha", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "Bikin periode gacha spesial 1 anime doang (misal \"One Piece Only Week\"). Selama event aktif, pool karakter gacha otomatis dibatesin ke anime yang dipilih.",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = { Text("Judul event (mis. \"One Piece Only Week\")") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = animeMenuExpanded,
+            onExpandedChange = { animeMenuExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = selectedAnime?.let { "${it.anime_title} (${it.character_count} karakter)" } ?: "",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Pilih anime") },
+                placeholder = { Text("Ketuk buat pilih dari daftar") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = animeMenuExpanded) },
+                modifier = Modifier.fillMaxWidth().menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = animeMenuExpanded,
+                onDismissRequest = { animeMenuExpanded = false }
+            ) {
+                if (animeOptions.isEmpty()) {
+                    DropdownMenuItem(text = { Text("Belum ada anime di database") }, onClick = {})
+                }
+                animeOptions.forEach { anime ->
+                    DropdownMenuItem(
+                        text = { Text("${anime.anime_title} (${anime.character_count} karakter)") },
+                        onClick = {
+                            selectedAnime = anime
+                            animeMenuExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedButton(
+            onClick = { pickDateTime { startsAtMillis = it } },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(startsAtMillis?.let { "Mulai: ${displayFormat.format(it)}" } ?: "Pilih tanggal & jam mulai")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = { pickDateTime { endsAtMillis = it } },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(endsAtMillis?.let { "Selesai: ${displayFormat.format(it)}" } ?: "Pilih tanggal & jam selesai")
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Button(
+            onClick = {
+                val anime = selectedAnime
+                val start = startsAtMillis
+                val end = endsAtMillis
+                when {
+                    title.isBlank() -> Toast.makeText(context, "Judul event belum diisi", Toast.LENGTH_SHORT).show()
+                    anime == null -> Toast.makeText(context, "Pilih anime dulu", Toast.LENGTH_SHORT).show()
+                    start == null || end == null -> Toast.makeText(context, "Pilih tanggal mulai & selesai", Toast.LENGTH_SHORT).show()
+                    end <= start -> Toast.makeText(context, "Tanggal selesai harus setelah mulai", Toast.LENGTH_SHORT).show()
+                    else -> {
+                        isSubmitting = true
+                        viewModel.createGachaEvent(
+                            title = title.trim(),
+                            animeMalId = anime.anime_mal_id,
+                            animeTitle = anime.anime_title,
+                            startsAtIso = apiFormat.format(start),
+                            endsAtIso = apiFormat.format(end)
+                        ) { result, error ->
+                            isSubmitting = false
+                            if (result != null) {
+                                Toast.makeText(context, "Event \"${result.title}\" berhasil dibuat", Toast.LENGTH_SHORT).show()
+                                title = ""
+                                selectedAnime = null
+                                startsAtMillis = null
+                                endsAtMillis = null
+                            } else {
+                                Toast.makeText(context, error ?: "Gagal bikin event", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+            },
+            enabled = !isSubmitting,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (isSubmitting) "Membuat..." else "Buat Event")
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Semua Event", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AdminGachaEventRow(
+    event: com.example.network.GachaEventDto,
+    onDelete: () -> Unit,
+    isDeleting: Boolean
+) {
+    val apiFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()) }
+    val displayFormat = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale("id", "ID")) }
+    val status = remember(event) {
+        try {
+            val start = apiFormat.parse(event.starts_at.substringBefore("+").take(19))?.time ?: 0L
+            val end = apiFormat.parse(event.ends_at.substringBefore("+").take(19))?.time ?: 0L
+            val now = System.currentTimeMillis()
+            when {
+                now < start -> "Akan Datang" to Color(0xFF3B82F6)
+                now in start..end -> "Aktif" to Color(0xFF39FF6A)
+                else -> "Berakhir" to Color(0xFF9AA3AF)
+            }
+        } catch (e: Exception) {
+            "?" to Color(0xFF9AA3AF)
+        }
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(status.second.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(status.first, color = status.second, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(event.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(event.anime_title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text(
+                    "${displayFormat.format(apiFormat.parse(event.starts_at.substringBefore("+").take(19)) ?: java.util.Date())} - ${displayFormat.format(apiFormat.parse(event.ends_at.substringBefore("+").take(19)) ?: java.util.Date())}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontSize = 11.sp
+                )
+            }
+            IconButton(onClick = onDelete, enabled = !isDeleting) {
+                Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE0473F))
             }
         }
     }

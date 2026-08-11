@@ -924,6 +924,49 @@ interface SupabaseDbApi {
         @Header("Prefer") prefer: String = "return=representation"
     ): GachaRollResult
 
+    // Event gacha yg lagi aktif sekarang (kalau ada) - buat nampilin banner
+    // "khusus anime X" di GachaScreen. List kosong = gak ada event.
+    @GET("rest/v1/gacha_active_event")
+    suspend fun getActiveGachaEvent(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<GachaEventDto>
+
+    // Semua event (aktif/lewat/akan datang) - buat panel admin liat riwayat & jadwal
+    @GET("rest/v1/gacha_events")
+    suspend fun getAllGachaEvents(
+        @Query("select") select: String = "id,title,anime_mal_id,anime_title,banner_image_url,starts_at,ends_at",
+        @Query("order") order: String = "starts_at.desc",
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<GachaEventDto>
+
+    // Daftar anime (distinct dari tabel characters) buat dropdown pilihan
+    // admin pas bikin event - jadi admin milih dari list, bukan ngetik id manual.
+    @GET("rest/v1/gacha_anime_list")
+    suspend fun getGachaAnimeList(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String
+    ): List<GachaAnimeOptionDto>
+
+    // Bikin event gacha baru - CUMA admin, validasi di server (function create_gacha_event)
+    @POST("rest/v1/rpc/create_gacha_event")
+    suspend fun createGachaEvent(
+        @Body body: CreateGachaEventRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): CreateGachaEventResult
+
+    // Hapus event gacha - CUMA admin
+    @POST("rest/v1/rpc/delete_gacha_event")
+    suspend fun deleteGachaEvent(
+        @Body body: DeleteGachaEventRequest,
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Header("Prefer") prefer: String = "return=representation"
+    ): DeleteGachaEventResult
+
     // Quiz "Tebak Anime dari Poster" - dipanggil SEBELUM soal ditampilkan.
     // Ngecek wajib punya clan + motong jatah harian/Diamond di server lewat
     // function play_quiz_round (SECURITY DEFINER), lihat supabase/quiz_system.sql.

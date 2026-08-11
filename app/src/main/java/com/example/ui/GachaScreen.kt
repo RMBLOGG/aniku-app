@@ -323,6 +323,11 @@ fun GachaScreen(
     val diamondBalance by viewModel.diamondBalance.collectAsState()
     val collection by viewModel.gachaCollection.collectAsState()
     val savedShowcaseIds by viewModel.myShowcaseIds.collectAsState()
+    val activeEvent by viewModel.activeGachaEvent.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadActiveGachaEvent()
+    }
 
     var selectedTab by remember { mutableStateOf(0) } // 0 = Gacha, 1 = Koleksi
     var isRolling by remember { mutableStateOf(false) }
@@ -437,6 +442,11 @@ fun GachaScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
+                        activeEvent?.let { event ->
+                            EventBannerCard(event = event)
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+
                         HexPortal(isRolling = isRolling)
 
                         Spacer(modifier = Modifier.height(28.dp))
@@ -604,6 +614,72 @@ fun GachaScreen(
 // ============================================================================
 //  SALDO DM — kartu kaca dengan border sapuan neon
 // ============================================================================
+@Composable
+private fun EventBannerCard(event: com.example.network.GachaEventDto) {
+    val shine = rememberGlossyShine(2600)
+    val remainingText = remember(event.ends_at) {
+        try {
+            val parser = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+            parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            val cleaned = event.ends_at.substringBefore("+").substringBefore("Z").take(19)
+            val endMillis = parser.parse(cleaned)?.time ?: return@remember null
+            val diffMs = endMillis - System.currentTimeMillis()
+            when {
+                diffMs <= 0 -> "Event udah berakhir"
+                diffMs >= 86_400_000L -> {
+                    val days = diffMs / 86_400_000L
+                    val hours = (diffMs % 86_400_000L) / 3_600_000L
+                    "Berakhir dalam $days hari $hours jam"
+                }
+                diffMs >= 3_600_000L -> {
+                    val hours = diffMs / 3_600_000L
+                    val minutes = (diffMs % 3_600_000L) / 60_000L
+                    "Berakhir dalam $hours jam $minutes menit"
+                }
+                else -> "Berakhir dalam ${diffMs / 60_000L} menit"
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Brush.linearGradient(listOf(Neon.Magenta.copy(alpha = 0.22f), Neon.Purple.copy(alpha = 0.18f))))
+            .glossyBorder(
+                colors = listOf(Neon.Magenta.copy(alpha = 0.8f), Neon.Cyan.copy(alpha = 0.6f)),
+                shine = shine,
+                cornerRadius = 16.dp,
+                strokeWidth = 1.2.dp
+            )
+            .padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Whatshot, contentDescription = null, tint = Neon.Magenta, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                "EVENT SPESIAL",
+                color = Neon.Magenta,
+                fontWeight = FontWeight.Black,
+                fontSize = 11.sp
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(event.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text(
+            "Selama event, gacha cuma keluar karakter ${event.anime_title}!",
+            color = Color.White.copy(alpha = 0.75f),
+            fontSize = 12.sp
+        )
+        if (remainingText != null) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(remainingText, color = Neon.Cyan, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
 @Composable
 private fun NeonBalanceCard(diamondBalance: Int, onTopUp: () -> Unit) {
     val shine = rememberGlossyShine(3200)

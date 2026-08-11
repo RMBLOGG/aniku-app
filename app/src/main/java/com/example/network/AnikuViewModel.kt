@@ -4275,6 +4275,133 @@ class AnikuViewModel(context: Context) : ViewModel() {
         }
     }
 
+    // ─── Gacha Event (banner khusus 1 anime di rentang tanggal) ─────
+
+    private val _activeGachaEvent = MutableStateFlow<GachaEventDto?>(null)
+    val activeGachaEvent: StateFlow<GachaEventDto?> = _activeGachaEvent.asStateFlow()
+
+    fun loadActiveGachaEvent() {
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.getActiveGachaEvent(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                _activeGachaEvent.value = result.firstOrNull()
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load active gacha event", e)
+            }
+        }
+    }
+
+    // ── Panel admin - kelola event gacha ──────────────────────────────
+
+    private val _allGachaEvents = MutableStateFlow<List<GachaEventDto>>(emptyList())
+    val allGachaEvents: StateFlow<List<GachaEventDto>> = _allGachaEvents.asStateFlow()
+
+    private val _gachaAnimeOptions = MutableStateFlow<List<GachaAnimeOptionDto>>(emptyList())
+    val gachaAnimeOptions: StateFlow<List<GachaAnimeOptionDto>> = _gachaAnimeOptions.asStateFlow()
+
+    fun loadAllGachaEvents() {
+        viewModelScope.launch {
+            try {
+                _allGachaEvents.value = NetworkClient.supabaseDbApi.getAllGachaEvents(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load semua gacha event", e)
+            }
+        }
+    }
+
+    fun loadGachaAnimeOptions() {
+        viewModelScope.launch {
+            try {
+                _gachaAnimeOptions.value = NetworkClient.supabaseDbApi.getGachaAnimeList(
+                    authHeader = getAuthHeader(),
+                    apiKey = SUPABASE_ANON_KEY
+                )
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "Gagal load daftar anime gacha", e)
+            }
+        }
+    }
+
+    // startsAtIso/endsAtIso format "yyyy-MM-dd'T'HH:mm:ss" (tanpa zona, dianggap UTC oleh server)
+    fun createGachaEvent(
+        title: String,
+        animeMalId: Int,
+        animeTitle: String,
+        startsAtIso: String,
+        endsAtIso: String,
+        onResult: (CreateGachaEventResult?, String?) -> Unit
+    ) {
+        if (!session.value.isAdmin) {
+            onResult(null, "Cuma admin yang boleh bikin event gacha")
+            return
+        }
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                val result = NetworkClient.supabaseDbApi.createGachaEvent(
+                    body = CreateGachaEventRequest(
+                        p_title = title,
+                        p_anime_mal_id = animeMalId,
+                        p_anime_title = animeTitle,
+                        p_starts_at = startsAtIso,
+                        p_ends_at = endsAtIso
+                    ),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadAllGachaEvents()
+                loadActiveGachaEvent()
+                onResult(result, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(null, errorMsg ?: "Gagal bikin event (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "createGachaEvent error", e)
+                onResult(null, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
+    fun deleteGachaEvent(eventId: Long, onResult: (Boolean, String?) -> Unit) {
+        if (!session.value.isAdmin) {
+            onResult(false, "Cuma admin yang boleh hapus event gacha")
+            return
+        }
+        val authHeader = getAuthHeader()
+        viewModelScope.launch {
+            try {
+                NetworkClient.supabaseDbApi.deleteGachaEvent(
+                    body = DeleteGachaEventRequest(p_event_id = eventId),
+                    authHeader = authHeader,
+                    apiKey = SUPABASE_ANON_KEY
+                )
+                loadAllGachaEvents()
+                loadActiveGachaEvent()
+                onResult(true, null)
+            } catch (e: retrofit2.HttpException) {
+                val errorMsg = try {
+                    val errorBody = e.response()?.errorBody()?.string()
+                    val json = errorBody?.let { org.json.JSONObject(it) }
+                    json?.optString("message")?.takeIf { it.isNotBlank() }
+                } catch (parseErr: Exception) { null }
+                onResult(false, errorMsg ?: "Gagal hapus event (HTTP ${e.code()})")
+            } catch (e: Exception) {
+                Log.e("AnikuVM", "deleteGachaEvent error", e)
+                onResult(false, e.message ?: "Terjadi kesalahan")
+            }
+        }
+    }
+
     // Roll gacha karakter - potong DM sesuai cost, dapet 1 karakter random (rarity
     // ditentuin server). Semua validasi (saldo cukup, dll) ada di function gacha_roll,
     // jadi response error di sini ngambil pesan yang sama kayak giveDiamond di atas.

@@ -590,7 +590,55 @@ data class GachaRollResult(
     val rarity: String,
     val is_new: Boolean,
     val total_owned: Int,
-    val remaining_balance: Int
+    val remaining_balance: Int,
+    val event_title: String? = null
+)
+
+// ─────────────── Gacha Event (banner khusus 1 anime di rentang tanggal) ───────────────
+
+@JsonClass(generateAdapter = true)
+data class GachaEventDto(
+    val id: Long,
+    val title: String,
+    val anime_mal_id: Int,
+    val anime_title: String,
+    val banner_image_url: String? = null,
+    val starts_at: String,
+    val ends_at: String
+)
+
+// Buat dropdown pilihan anime di panel admin - distinct dari tabel characters
+@JsonClass(generateAdapter = true)
+data class GachaAnimeOptionDto(
+    val anime_mal_id: Int,
+    val anime_title: String,
+    val character_count: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class CreateGachaEventRequest(
+    val p_title: String,
+    val p_anime_mal_id: Int,
+    val p_anime_title: String,
+    val p_starts_at: String,
+    val p_ends_at: String
+)
+
+@JsonClass(generateAdapter = true)
+data class CreateGachaEventResult(
+    val id: Long,
+    val title: String,
+    val anime_title: String
+)
+
+@JsonClass(generateAdapter = true)
+data class DeleteGachaEventRequest(
+    val p_event_id: Long
+)
+
+@JsonClass(generateAdapter = true)
+data class DeleteGachaEventResult(
+    val deleted_id: Long
 )
 
 // ─────────────── Trade kartu gacha antar user ───────────────
