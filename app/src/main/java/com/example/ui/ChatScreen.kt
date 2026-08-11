@@ -1489,23 +1489,18 @@ private fun ChatBubble(
                         fontWeight = FontWeight.Medium
                     )
                 }
-                clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                // Kalau user udah equip badge custom, tag clan polos yg lama gak usah
+                // dobel ditampilin - cukup badge custom-nya aja.
+                if (equippedBadgesMap[message.user_id] == null) {
+                    clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                }
                 equippedBadgesMap[message.user_id]?.let { badge ->
-                    val bg = remember(badge.background_color) {
-                        try { Color(android.graphics.Color.parseColor(badge.background_color)) } catch (e: Exception) { Color(0xFF8A4FD6) }
-                    }
-                    val txt = remember(badge.text_color) {
-                        try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
-                    }
+                    val skinStyle = remember(badge.skin_id) { badgeSkinStyle(badge.skin_id) }
                     FuturisticBadge(
                         text = badge.label,
-                        baseColor = bg,
-                        tier = when (badge.badge_tier) {
-                            "holo" -> BadgeTier.HOLO
-                            "neon" -> BadgeTier.NEON
-                            else -> BadgeTier.STANDARD
-                        },
-                        shape = if (badge.badge_shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+                        baseColor = skinStyle.baseColor,
+                        tier = skinStyle.tier,
+                        shape = if (skinStyle.shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
                     )
                 }
                 if (message.role == "admin" || message.is_admin == true) {
@@ -2197,23 +2192,16 @@ private fun OwnChatBubble(
                         fontWeight = FontWeight.Medium
                     )
                 }
-                clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                if (myEquippedBadge == null) {
+                    clanTagMap[message.user_id]?.let { (tag, _) -> ClanTagBadge(tag) }
+                }
                 myEquippedBadge?.let { badge ->
-                    val bg = remember(badge.background_color) {
-                        try { Color(android.graphics.Color.parseColor(badge.background_color)) } catch (e: Exception) { Color(0xFF8A4FD6) }
-                    }
-                    val txt = remember(badge.text_color) {
-                        try { Color(android.graphics.Color.parseColor(badge.text_color)) } catch (e: Exception) { Color.White }
-                    }
+                    val skinStyle = remember(badge.skin_id) { badgeSkinStyle(badge.skin_id) }
                     FuturisticBadge(
                         text = badge.label,
-                        baseColor = bg,
-                        tier = when (badge.badge_tier) {
-                            "holo" -> BadgeTier.HOLO
-                            "neon" -> BadgeTier.NEON
-                            else -> BadgeTier.STANDARD
-                        },
-                        shape = if (badge.badge_shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
+                        baseColor = skinStyle.baseColor,
+                        tier = skinStyle.tier,
+                        shape = if (skinStyle.shape == "pennant") PennantBadgeShape() else RibbonBadgeShape()
                     )
                 }
                 GlossyGradientText(

@@ -26,12 +26,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.network.AnikuViewModel
 import com.example.network.ClanBadgeCatalogDto
 
-private fun parseHex(hex: String, fallback: Color): Color = try {
-    Color(android.graphics.Color.parseColor(hex))
-} catch (e: Exception) {
-    fallback
-}
-
 private fun tierFromString(tier: String): BadgeTier = when (tier) {
     "holo" -> BadgeTier.HOLO
     "neon" -> BadgeTier.NEON
@@ -197,7 +191,8 @@ private fun BadgeStoreCard(
     onBuy: () -> Unit,
     onEquip: () -> Unit
 ) {
-    val bg = parseHex(item.badge_color, Color(0xFF8A4FD6))
+    val skinStyle = badgeSkinStyle(item.skin_id)
+    val bg = skinStyle.baseColor
     val canAfford = diamondBalance >= item.badge_price_diamond
     val tier = tierFromString(item.badge_tier)
 
