@@ -11960,14 +11960,28 @@ private fun AdminGachaEventFormSection(viewModel: AnikuViewModel) {
     }
 
     var title by remember { mutableStateOf("") }
+    var animeQuery by remember { mutableStateOf("") }
     var selectedAnime by remember { mutableStateOf<com.example.network.GachaAnimeOptionDto?>(null) }
     var animeMenuExpanded by remember { mutableStateOf(false) }
     var startsAtMillis by remember { mutableStateOf<Long?>(null) }
     var endsAtMillis by remember { mutableStateOf<Long?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
 
+    val filteredAnime = remember(animeQuery, animeOptions) {
+        if (animeQuery.isBlank()) animeOptions
+        else animeOptions.filter { it.anime_title.contains(animeQuery, ignoreCase = true) }
+    }
+
     val displayFormat = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale("id", "ID")) }
-    val apiFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()) }
+    // Wajib format ke UTC eksplisit (+ akhiran 'Z') pas ngirim ke server -
+    // kolom timestamptz di Postgres nganggep string tanpa offset itu UTC,
+    // jadi kalau kita kirim jam lokal mentah-mentah, waktunya geser sejauh
+    // selisih zona waktu device (mis. WIB = UTC+7 -> geser 7 jam).
+    val apiFormat = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.getDefault()).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
 
     fun pickDateTime(onPicked: (Long) -> Unit) {
         val cal = java.util.Calendar.getInstance()
@@ -11991,120 +12005,238 @@ private fun AdminGachaEventFormSection(viewModel: AnikuViewModel) {
         ).show()
     }
 
+    val accentStart = Color(0xFFFF5FA2)
+    val accentEnd = Color(0xFF8A4FD6)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text("Event Gacha", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            "Bikin periode gacha spesial 1 anime doang (misal \"One Piece Only Week\"). Selama event aktif, pool karakter gacha otomatis dibatesin ke anime yang dipilih.",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = title,
-            onValueChange = { title = it },
-            label = { Text("Judul event (mis. \"One Piece Only Week\")") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-
-        ExposedDropdownMenuBox(
-            expanded = animeMenuExpanded,
-            onExpandedChange = { animeMenuExpanded = it }
+        // ── Header gradient card ──────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(listOf(accentStart.copy(alpha = 0.22f), accentEnd.copy(alpha = 0.22f))))
+                .padding(16.dp)
         ) {
-            OutlinedTextField(
-                value = selectedAnime?.let { "${it.anime_title} (${it.character_count} karakter)" } ?: "",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Pilih anime") },
-                placeholder = { Text("Ketuk buat pilih dari daftar") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = animeMenuExpanded) },
-                modifier = Modifier.fillMaxWidth().menuAnchor()
-            )
-            ExposedDropdownMenu(
-                expanded = animeMenuExpanded,
-                onDismissRequest = { animeMenuExpanded = false }
-            ) {
-                if (animeOptions.isEmpty()) {
-                    DropdownMenuItem(text = { Text("Belum ada anime di database") }, onClick = {})
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Brush.linearGradient(listOf(accentStart, accentEnd))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Whatshot, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
-                animeOptions.forEach { anime ->
-                    DropdownMenuItem(
-                        text = { Text("${anime.anime_title} (${anime.character_count} karakter)") },
-                        onClick = {
-                            selectedAnime = anime
-                            animeMenuExpanded = false
-                        }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("Event Gacha", fontSize = 17.sp, fontWeight = FontWeight.Black)
+                    Text(
+                        "Gacha spesial 1 anime doang di rentang tanggal tertentu",
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(10.dp))
 
-        OutlinedButton(
-            onClick = { pickDateTime { startsAtMillis = it } },
-            modifier = Modifier.fillMaxWidth()
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Card form bikin event ─────────────────────────────────
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(16.dp)
         ) {
-            Text(startsAtMillis?.let { "Mulai: ${displayFormat.format(it)}" } ?: "Pilih tanggal & jam mulai")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
+            Text("Buat Event Baru", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
 
-        OutlinedButton(
-            onClick = { pickDateTime { endsAtMillis = it } },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(endsAtMillis?.let { "Selesai: ${displayFormat.format(it)}" } ?: "Pilih tanggal & jam selesai")
-        }
-        Spacer(modifier = Modifier.height(14.dp))
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Judul event") },
+                placeholder = { Text("mis. \"One Piece Only Week\"") },
+                leadingIcon = { Icon(Icons.Default.Campaign, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(10.dp))
 
-        Button(
-            onClick = {
-                val anime = selectedAnime
-                val start = startsAtMillis
-                val end = endsAtMillis
-                when {
-                    title.isBlank() -> Toast.makeText(context, "Judul event belum diisi", Toast.LENGTH_SHORT).show()
-                    anime == null -> Toast.makeText(context, "Pilih anime dulu", Toast.LENGTH_SHORT).show()
-                    start == null || end == null -> Toast.makeText(context, "Pilih tanggal mulai & selesai", Toast.LENGTH_SHORT).show()
-                    end <= start -> Toast.makeText(context, "Tanggal selesai harus setelah mulai", Toast.LENGTH_SHORT).show()
-                    else -> {
-                        isSubmitting = true
-                        viewModel.createGachaEvent(
-                            title = title.trim(),
-                            animeMalId = anime.anime_mal_id,
-                            animeTitle = anime.anime_title,
-                            startsAtIso = apiFormat.format(start),
-                            endsAtIso = apiFormat.format(end)
-                        ) { result, error ->
-                            isSubmitting = false
-                            if (result != null) {
-                                Toast.makeText(context, "Event \"${result.title}\" berhasil dibuat", Toast.LENGTH_SHORT).show()
-                                title = ""
-                                selectedAnime = null
-                                startsAtMillis = null
-                                endsAtMillis = null
-                            } else {
-                                Toast.makeText(context, error ?: "Gagal bikin event", Toast.LENGTH_SHORT).show()
-                            }
+            // ── Dropdown anime DENGAN search - ketik langsung buat nyaring ──
+            ExposedDropdownMenuBox(
+                expanded = animeMenuExpanded,
+                onExpandedChange = { animeMenuExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = animeQuery,
+                    onValueChange = {
+                        animeQuery = it
+                        selectedAnime = null
+                        animeMenuExpanded = true
+                    },
+                    label = { Text("Cari anime") },
+                    placeholder = { Text("Ketik nama anime...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (selectedAnime != null) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF39FF6A))
+                        } else {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = animeMenuExpanded)
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                )
+                ExposedDropdownMenu(
+                    expanded = animeMenuExpanded,
+                    onDismissRequest = { animeMenuExpanded = false }
+                ) {
+                    if (animeOptions.isEmpty()) {
+                        DropdownMenuItem(text = { Text("Belum ada anime di database") }, onClick = {})
+                    } else if (filteredAnime.isEmpty()) {
+                        DropdownMenuItem(text = { Text("Gak ketemu anime \"$animeQuery\"") }, onClick = {})
+                    } else {
+                        filteredAnime.take(40).forEach { anime ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(anime.anime_title, modifier = Modifier.weight(1f))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(accentEnd.copy(alpha = 0.18f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("${anime.character_count}", fontSize = 11.sp, color = accentEnd, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    selectedAnime = anime
+                                    animeQuery = anime.anime_title
+                                    animeMenuExpanded = false
+                                }
+                            )
+                        }
+                        if (filteredAnime.size > 40) {
+                            DropdownMenuItem(
+                                text = { Text("+${filteredAnime.size - 40} anime lagi, persempit pencarian...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {}
+                            )
                         }
                     }
                 }
-            },
-            enabled = !isSubmitting,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (isSubmitting) "Membuat..." else "Buat Event")
+            }
+            selectedAnime?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "${it.character_count} karakter tersedia buat anime ini",
+                    fontSize = 11.sp,
+                    color = Color(0xFF39FF6A)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = { pickDateTime { startsAtMillis = it } },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column {
+                        Text("Mulai", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            startsAtMillis?.let { displayFormat.format(it) } ?: "Pilih",
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+                OutlinedButton(
+                    onClick = { pickDateTime { endsAtMillis = it } },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column {
+                        Text("Selesai", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            endsAtMillis?.let { displayFormat.format(it) } ?: "Pilih",
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    val anime = selectedAnime
+                    val start = startsAtMillis
+                    val end = endsAtMillis
+                    when {
+                        title.isBlank() -> Toast.makeText(context, "Judul event belum diisi", Toast.LENGTH_SHORT).show()
+                        anime == null -> Toast.makeText(context, "Pilih anime dulu dari daftar pencarian", Toast.LENGTH_SHORT).show()
+                        start == null || end == null -> Toast.makeText(context, "Pilih tanggal mulai & selesai", Toast.LENGTH_SHORT).show()
+                        end <= start -> Toast.makeText(context, "Tanggal selesai harus setelah mulai", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            isSubmitting = true
+                            viewModel.createGachaEvent(
+                                title = title.trim(),
+                                animeMalId = anime.anime_mal_id,
+                                animeTitle = anime.anime_title,
+                                startsAtIso = apiFormat.format(start),
+                                endsAtIso = apiFormat.format(end)
+                            ) { result, error ->
+                                isSubmitting = false
+                                if (result != null) {
+                                    Toast.makeText(context, "Event \"${result.title}\" berhasil dibuat", Toast.LENGTH_SHORT).show()
+                                    title = ""
+                                    animeQuery = ""
+                                    selectedAnime = null
+                                    startsAtMillis = null
+                                    endsAtMillis = null
+                                } else {
+                                    Toast.makeText(context, error ?: "Gagal bikin event", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accentEnd),
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                } else {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Buat Event", fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider()
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("Semua Event", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.EventNote, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Semua Event", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 
@@ -12114,49 +12246,77 @@ private fun AdminGachaEventRow(
     onDelete: () -> Unit,
     isDeleting: Boolean
 ) {
-    val apiFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()) }
-    val displayFormat = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale("id", "ID")) }
+    // Nilai starts_at/ends_at dari server itu UTC - wajib di-parse sebagai
+    // UTC juga, baru dibandingin ke waktu sekarang. displayFormat di bawah
+    // sengaja TETEP pake zona waktu device (buat ditampilin ke admin).
+    val apiFormat = remember {
+        java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault()).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+    }
+    val displayFormat = remember { java.text.SimpleDateFormat("dd MMM, HH:mm", java.util.Locale("id", "ID")) }
     val status = remember(event) {
         try {
             val start = apiFormat.parse(event.starts_at.substringBefore("+").take(19))?.time ?: 0L
             val end = apiFormat.parse(event.ends_at.substringBefore("+").take(19))?.time ?: 0L
             val now = System.currentTimeMillis()
             when {
-                now < start -> "Akan Datang" to Color(0xFF3B82F6)
-                now in start..end -> "Aktif" to Color(0xFF39FF6A)
-                else -> "Berakhir" to Color(0xFF9AA3AF)
+                now < start -> Triple("Akan Datang", Color(0xFF3B82F6), Icons.Default.Schedule)
+                now in start..end -> Triple("Aktif", Color(0xFF39FF6A), Icons.Default.Bolt)
+                else -> Triple("Berakhir", Color(0xFF6B7280), Icons.Default.History)
             }
         } catch (e: Exception) {
-            "?" to Color(0xFF9AA3AF)
+            Triple("?", Color(0xFF6B7280), Icons.Default.Schedule)
         }
     }
+    val (statusLabel, statusColor, statusIcon) = status
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier.padding(vertical = 6.dp).fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Aksen warna tipis di kiri sesuai status, biar keliatan sekilas tanpa baca teks
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .fillMaxHeight()
+                .background(statusColor)
+        )
+        Row(
+            modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(modifier = Modifier.weight(1f)) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(status.second.copy(alpha = 0.2f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(status.first, color = status.second, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(statusIcon, contentDescription = null, tint = statusColor, modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(statusLabel, color = statusColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(event.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(event.anime_title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text(event.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Movie, contentDescription = null, modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(event.anime_title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                }
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    "${displayFormat.format(apiFormat.parse(event.starts_at.substringBefore("+").take(19)) ?: java.util.Date())} - ${displayFormat.format(apiFormat.parse(event.ends_at.substringBefore("+").take(19)) ?: java.util.Date())}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    "${displayFormat.format(apiFormat.parse(event.starts_at.substringBefore("+").take(19)) ?: java.util.Date())}  →  ${displayFormat.format(apiFormat.parse(event.ends_at.substringBefore("+").take(19)) ?: java.util.Date())}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                     fontSize = 11.sp
                 )
             }
             IconButton(onClick = onDelete, enabled = !isDeleting) {
-                Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = Color(0xFFE0473F))
+                if (isDeleting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFE0473F))
+                } else {
+                    Icon(Icons.Default.DeleteOutline, contentDescription = "Hapus", tint = Color(0xFFE0473F))
+                }
             }
         }
     }
 }
+
