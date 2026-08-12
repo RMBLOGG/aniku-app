@@ -37,6 +37,7 @@ private val RARITY_RANK = listOf("Mythic", "Legendary", "Epic", "Rare", "Common"
 //  event aktif). Data animeMalId/animeTitle di-load ke ViewModel SEBELUM
 //  navigasi ke sini -- lihat AnikuViewModel.loadEventCharacters().
 // ================================================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventCharactersScreen(
     viewModel: AnikuViewModel,
