@@ -376,6 +376,19 @@ interface SupabaseDbApi {
         @Header("apikey") apiKey: String
     ): List<ProfileDto>
 
+    // Khusus buat layar "Daftar Pengguna" (publik) -- cuma ambil kolom yang
+    // dipakai di UI + dibatasi limit, biar response gak makin membengkak
+    // seiring user bertambah (ini penyebab OOM crash di HttpLoggingInterceptor
+    // waktu response /profiles tanpa select/limit makin gede).
+    @GET("rest/v1/profiles")
+    suspend fun getUserDirectory(
+        @Header("Authorization") authHeader: String,
+        @Header("apikey") apiKey: String,
+        @Query("select") select: String = "id,username,avatar_url,user_number,season_xp,season_level,is_banned,custom_name_color,premium_until",
+        @Query("order") order: String = "season_xp.desc.nullslast",
+        @Query("limit") limit: Int = 500
+    ): List<ProfileDto>
+
     @GET("rest/v1/profiles")
     suspend fun getProfileByUserId(
         @Query("id") idQuery: String,
@@ -1642,7 +1655,10 @@ object NetworkClient {
         .build()
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        // BODY logging buffer seluruh response ke memori jadi String -> OOM kalau response gede
+        // (misal /profiles tanpa limit). Pakai BASIC di release, BODY cuma kalau debug build.
+        level = if (com.example.BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                else HttpLoggingInterceptor.Level.BASIC
     }
 
     // OkHttpClient khusus Anime API — dengan cache 50MB

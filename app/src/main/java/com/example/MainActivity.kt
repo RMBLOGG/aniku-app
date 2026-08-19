@@ -13,6 +13,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.fragment.app.FragmentActivity
+import androidx.activity.viewModels
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
@@ -71,6 +74,25 @@ private fun isTabRoute(route: String?): Boolean {
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : FragmentActivity() {
 
+    // Factory manual karena AnikuViewModel butuh Context di constructor.
+    // Pakai `by viewModels()` (bukan `AnikuViewModel(this)` langsung) supaya
+    // instance-nya di-retain oleh framework selama Activity ini hidup --
+    // termasuk pas Activity di-recreate akibat config change / low-memory
+    // recreation setelah app ditinggal ke app lain sebentar. Sebelumnya tiap
+    // onCreate() bikin ViewModel baru dari nol, semua StateFlow (session cache,
+    // leaderboard, feed, dll) balik ke kondisi kosong dan seluruh init() (fetch
+    // remote config, cek device-ban, dst) jalan ulang -- makanya kelihatan kayak
+    // "relog"/lemot tiap balik dari app lain, padahal sesi login-nya sendiri
+    // sebenarnya masih valid di DataStore.
+    private val viewModel: AnikuViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return AnikuViewModel(applicationContext) as T
+            }
+        }
+    }
+
     companion object {
         var isWatchingDirectStream = false
         var pipExoPlayer: androidx.media3.exoplayer.ExoPlayer? = null
@@ -124,7 +146,8 @@ class MainActivity : FragmentActivity() {
 
         // Immersive sticky — juga diperkuat di onResume & onWindowFocusChanged
         hideSystemBars()
-        val viewModel = AnikuViewModel(this)
+        // viewModel udah di-init lewat delegate `by viewModels()` di atas --
+        // di-retain otomatis selama Activity hidup, gak dibuat ulang tiap onCreate.
 
         // Minta izin notifikasi (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

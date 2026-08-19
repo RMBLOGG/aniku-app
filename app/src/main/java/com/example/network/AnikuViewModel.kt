@@ -3084,7 +3084,7 @@ class AnikuViewModel(context: Context) : ViewModel() {
         _isUserDirectoryLoading.value = true
         viewModelScope.launch {
             try {
-                _userDirectory.value = NetworkClient.supabaseDbApi.getProfiles(authHeader, SUPABASE_ANON_KEY)
+                _userDirectory.value = NetworkClient.supabaseDbApi.getUserDirectory(authHeader, SUPABASE_ANON_KEY)
                     .sortedBy { it.user_number ?: Int.MAX_VALUE }
             } catch (e: Exception) {
                 Log.e("AnikuVM", "Gagal load user directory", e)
