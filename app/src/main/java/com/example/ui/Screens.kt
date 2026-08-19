@@ -2212,21 +2212,87 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(18.dp))
                         }
 
-                        // ── Search bar (decorative, buka halaman pencarian) ──
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 20.dp)
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(50))
-                                .background(Color.White.copy(alpha = 0.07f))
-                                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
-                                .clickable { navController.navigate("search") }
-                                .padding(horizontal = 16.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Cari Anime Di Sini", color = Color.White.copy(alpha = 0.4f), fontSize = 13.5.sp)
+                        // ── Search bar (decorative, buka halaman pencarian) — otomatis
+                        // digantiin banner promo app baru kalau admin nyalain dari
+                        // Firebase Remote Config (lihat RemoteConfigManager.PromoAppConfig).
+                        // Search tetap bisa diakses lewat tab search di bottom nav.
+                        val promoAppConfig by viewModel.remoteConfigManager.promoAppConfig.collectAsState()
+                        val promoCtx = LocalContext.current
+
+                        if (promoAppConfig.isUsable()) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 20.dp)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(accentColor.copy(alpha = 0.22f), accentColor.copy(alpha = 0.08f))
+                                        )
+                                    )
+                                    .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(50))
+                                    .clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(promoAppConfig.link))
+                                        promoCtx.startActivity(intent)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(promoCtx)
+                                        .data(promoAppConfig.iconUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = promoAppConfig.appName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(9.dp))
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        promoAppConfig.appName,
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        promoAppConfig.description,
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(50))
+                                        .background(accentColor)
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Coba", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 20.dp)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.07f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(50))
+                                    .clickable { navController.navigate("search") }
+                                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text("Cari Anime Di Sini", color = Color.White.copy(alpha = 0.4f), fontSize = 13.5.sp)
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(18.dp))

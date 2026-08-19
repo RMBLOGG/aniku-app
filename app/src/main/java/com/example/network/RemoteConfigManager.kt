@@ -33,6 +33,13 @@ import kotlinx.coroutines.flow.asStateFlow
  *   (contoh: "Dayynime-v1")
  * - disabled_sources: daftar source yang dimatiin, dipisah koma
  *   (contoh: "Dayynime-v1,Dayynime-v2")
+ * - promo_app_enabled: nyala/matiin banner promo app baru di Home (ganti posisi search bar).
+ *   Default FALSE, admin nyalain manual pas emang lagi mau promosiin app baru.
+ * - promo_app_icon_url: URL icon app yang dipromosiin (link gambar langsung, misal dari GitHub/Imgur)
+ * - promo_app_name: nama app yang dipromosiin (contoh: "Zenime")
+ * - promo_app_description: deskripsi singkat, 1 baris (contoh: "Streaming makin ringan & cepat!")
+ * - promo_app_link: link tujuan pas banner di-tap, biasanya link GitHub Release
+ *   (contoh: "https://github.com/user/zenime/releases/latest")
  */
 class RemoteConfigManager {
 
@@ -59,7 +66,12 @@ class RemoteConfigManager {
                     KEY_SHUTDOWN_MESSAGE to "Aniku terpaksa tutup karena biaya server & database bulanan udah gak bisa ditanggung lagi oleh admin.",
                     KEY_SHUTDOWN_SUPPORT_INFO to "",
                     KEY_DEFAULT_SOURCE to "Dayynime-v1",
-                    KEY_DISABLED_SOURCES to ""
+                    KEY_DISABLED_SOURCES to "",
+                    KEY_PROMO_APP_ENABLED to false,
+                    KEY_PROMO_APP_ICON_URL to "",
+                    KEY_PROMO_APP_NAME to "",
+                    KEY_PROMO_APP_DESCRIPTION to "",
+                    KEY_PROMO_APP_LINK to ""
                 )
             )
         }
@@ -106,6 +118,23 @@ class RemoteConfigManager {
 
     private val _disabledSources = MutableStateFlow<Set<String>>(emptySet())
     val disabledSources: StateFlow<Set<String>> = _disabledSources.asStateFlow()
+
+    // Promo app baru: banner di Home yang ngegantiin search bar. Admin isi lewat
+    // Firebase Console, gak butuh update APK. Kalau promoAppEnabled false atau
+    // salah satu field kosong, UI di Home fallback balik nampilin search bar biasa.
+    data class PromoAppConfig(
+        val enabled: Boolean = false,
+        val iconUrl: String = "",
+        val appName: String = "",
+        val description: String = "",
+        val link: String = ""
+    ) {
+        // Valid kalau nyala DAN semua field yang dibutuhin buat nampilin banner-nya keisi
+        fun isUsable(): Boolean = enabled && iconUrl.isNotBlank() && appName.isNotBlank() && link.isNotBlank()
+    }
+
+    private val _promoAppConfig = MutableStateFlow(PromoAppConfig())
+    val promoAppConfig: StateFlow<PromoAppConfig> = _promoAppConfig.asStateFlow()
 
     /** Fetch nilai terbaru dari server lalu update semua flag. Panggil pas app start. */
     fun fetchAndApply() {
@@ -154,6 +183,13 @@ class RemoteConfigManager {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
+        _promoAppConfig.value = PromoAppConfig(
+            enabled = remoteConfig.getBoolean(KEY_PROMO_APP_ENABLED),
+            iconUrl = remoteConfig.getString(KEY_PROMO_APP_ICON_URL),
+            appName = remoteConfig.getString(KEY_PROMO_APP_NAME),
+            description = remoteConfig.getString(KEY_PROMO_APP_DESCRIPTION),
+            link = remoteConfig.getString(KEY_PROMO_APP_LINK)
+        )
     }
 
     companion object {
@@ -170,5 +206,10 @@ class RemoteConfigManager {
         private const val KEY_SHUTDOWN_SUPPORT_INFO = "app_shutdown_support_info"
         private const val KEY_DEFAULT_SOURCE = "default_data_source"
         private const val KEY_DISABLED_SOURCES = "disabled_sources"
+        private const val KEY_PROMO_APP_ENABLED = "promo_app_enabled"
+        private const val KEY_PROMO_APP_ICON_URL = "promo_app_icon_url"
+        private const val KEY_PROMO_APP_NAME = "promo_app_name"
+        private const val KEY_PROMO_APP_DESCRIPTION = "promo_app_description"
+        private const val KEY_PROMO_APP_LINK = "promo_app_link"
     }
 }
